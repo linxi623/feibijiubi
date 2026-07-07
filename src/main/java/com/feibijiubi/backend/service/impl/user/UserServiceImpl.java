@@ -73,10 +73,10 @@ public class UserServiceImpl implements UserService {
         if(!Objects.equals(request.getOldPassword(), user.getPasswordHash())) {
             throw new BusinessException(400, "旧密码错误");
         }
-        if(Objects.equals(request.getNewPasswoed(), user.getPasswordHash())) {
+        if(Objects.equals(request.getNewPassword(), user.getPasswordHash())) {
             throw new BusinessException(400, "新密码不能与旧密码一致");
         }
-        user.setPasswordHash(request.getNewPasswoed());
+        user.setPasswordHash(request.getNewPassword());
         userMapper.updatePassword(user);
     }
 
@@ -98,13 +98,13 @@ public class UserServiceImpl implements UserService {
         if(request.getOldPassword() == null) {
             throw new BusinessException(400, "旧密码不能为空");
         }
-        if(request.getNewPasswoed() == null) {
+        if(request.getNewPassword() == null) {
             throw new BusinessException(400, "新密码不能为空");
         }
-        if(request.getConfirmedpassword() == null) {
+        if(request.getConfirmedPassword() == null) {
             throw new BusinessException(400, "确认密码不能为空");
         }
-        if(!Objects.equals(request.getNewPasswoed(), request.getConfirmedpassword())) {
+        if(!Objects.equals(request.getNewPassword(), request.getConfirmedPassword())) {
             throw new BusinessException(400, "两次密码不一致");
         }
     }

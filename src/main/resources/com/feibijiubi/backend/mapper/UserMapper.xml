@@ -57,6 +57,7 @@
             id,
             username,
             nickname,
+            password_hash,
             avatar_url,
             background_url,
             gender,
@@ -91,7 +92,7 @@
     <update id="updatePassword">
         UPDATE users
         <set>
-            <if test="passwordHash != null and passwordHash != ''">passwordhash = #{passwordHash},</if>
+            <if test="passwordHash != null and passwordHash != ''">password_hash = #{passwordHash},</if>
         </set>
         WHERE id = #{id}
             AND deleted_at IS NULL
