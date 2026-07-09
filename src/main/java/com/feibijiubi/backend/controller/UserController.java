@@ -20,7 +20,7 @@ public class UserController {
 
     @GetMapping("/me")
     public ApiResponse<UserVO> getCurrentUser(HttpServletRequest request) {
-        Long currentUserId = (Long) request.getAttribute("currentUserId");
+        Integer currentUserId = (Integer) request.getAttribute("currentUserId");
         UserVO user = userService.getCurrentUser(currentUserId);
         return ApiResponse.success("查询成功", user);
     }
@@ -28,7 +28,7 @@ public class UserController {
     @PutMapping("/me")
     public ApiResponse<Void> updateProfile(HttpServletRequest httprequest,
                                              @RequestBody UserProfileDTO request) {
-        Long currentUserId = (Long) httprequest.getAttribute("currentUserId");
+        Integer currentUserId = (Integer) httprequest.getAttribute("currentUserId");
         userService.updateProfile(currentUserId, request);
         return ApiResponse.successMessage("修改成功");
     }
@@ -36,7 +36,7 @@ public class UserController {
     @PutMapping("/me/password")
     public ApiResponse<Void> updatePassword(HttpServletRequest httprequest,
                                             @RequestBody UserChangePasswordDTO request) {
-        Long currentUserId = (Long) httprequest.getAttribute("currentUserId");
+        Integer currentUserId = (Integer) httprequest.getAttribute("currentUserId");
         userService.updatePassword(currentUserId, request);
         return ApiResponse.successMessage("修改成功");
     }
@@ -44,7 +44,7 @@ public class UserController {
     @PutMapping("/me/avatar")
     public ApiResponse<UserVO> updateAvatar(HttpServletRequest httprequest,
                                           @RequestParam("file") MultipartFile file) {
-        Long currentUserId = (Long) httprequest.getAttribute("currentUserId");
+        Integer currentUserId = (Integer) httprequest.getAttribute("currentUserId");
         String avatarUrl = userService.updateAvatar(currentUserId, file);
         UserVO user = userService.getCurrentUser(currentUserId);
         return ApiResponse.success("修改成功", user);

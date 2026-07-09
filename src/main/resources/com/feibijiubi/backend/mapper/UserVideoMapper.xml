@@ -1,0 +1,86 @@
+<!--定义Mapper映射文件的约束和基本结构-->
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.feibijiubi.backend.mapper.UserVideoMapper">
+    <insert id="insert"
+            useGeneratedKeys="true"
+            keyProperty="id">
+        INSERT INTO user_video(
+            vid,
+            uid,
+            play_time,
+            liked,
+            unliked,
+            coin,
+            collect,
+            played_at,
+            liked_at,
+            coined_at
+        ) VALUES (
+            #{vid},
+            #{uid},
+            #{playTime},
+            #{liked},
+            #{unliked},
+            #{coin},
+            #{collect},
+            #{playedAt},
+            #{likedAt},
+            #{coinedAt}
+        )
+    </insert>
+
+    <update id="updatePlay">
+        UPDATE user_video
+        <set>
+            <if test="playTime != null">play_time = #{playTime},</if>
+            <if test="playedAt != null"> played_at = #{playedAt},</if>
+        </set>
+        WHERE vid = #{vid} AND uid = #{uid}
+    </update>
+
+    <update id="updateLike">
+        UPDATE user_video
+        <set>
+            <if test="liked != null">liked = #{liked},</if>
+            <if test="likedAt != null"> liked_at = #{likedAt},</if>
+        </set>
+        WHERE vid = #{vid} AND uid = #{uid}
+    </update>
+
+    <update id="updateCoin">
+        UPDATE user_video
+        <set>
+            <if test="coin != null">coin = #{coin},</if>
+            <if test="coinedAt != null"> coined_at = #{coinedAt},</if>
+        </set>
+        WHERE vid = #{vid} AND uid = #{uid}
+    </update>
+
+    <update id="updateCollect">
+        UPDATE user_video
+        <set>
+            <if test="collect != null">collect = #{collect}</if>
+        </set>
+        WHERE vid = #{vid} AND uid = #{uid}
+    </update>
+
+    <select id="selectByUidAndVid" resultType="com.feibijiubi.backend.entity.UserVideo">
+        SELECT
+            id,
+            vid,
+            uid,
+            play_time,
+            liked,
+            unliked,
+            coin,
+            collect,
+            played_at,
+            liked_at,
+            coined_at
+        FROM user_video
+        WHERE vid = #{vid} AND uid = #{uid}
+    </select>
+</mapper>

@@ -1,6 +1,7 @@
 package com.feibijiubi.backend.service.impl.user;
 
 import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.config.TencentCosProperties;
 import com.feibijiubi.backend.converter.UserConverter;
 import com.feibijiubi.backend.dto.UserChangePasswordDTO;
 import com.feibijiubi.backend.dto.UserProfileDTO;
@@ -26,7 +27,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserVO getCurrentUser(Long currentUserId) {
+    public UserVO getCurrentUser(Integer currentUserId) {
         User user = userMapper.selectById(currentUserId);
         if (user == null) {
             throw new BusinessException(401, "登录状态异常，请重新登录");
@@ -40,7 +41,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void updateProfile(Long currentUserId, UserProfileDTO request) {
+    public void updateProfile(Integer currentUserId, UserProfileDTO request) {
         loginValidation(currentUserId);
 
         if(request == null) {
@@ -61,7 +62,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void updatePassword(Long currentUserId, UserChangePasswordDTO request) {
+    public void updatePassword(Integer currentUserId, UserChangePasswordDTO request) {
         validateChangePasswordRequest(request);
         User user = userMapper.selectById(currentUserId);
         if(user == null) {
@@ -81,10 +82,10 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public String updateAvatar(Long currentUserId, MultipartFile file) {
+    public String updateAvatar(Integer currentUserId, MultipartFile file) {
         loginValidation(currentUserId);
 
-        String avatarUrl = fileStorageService.uploadImage(file, "avatar/" + currentUserId);
+        String avatarUrl = fileStorageService.uploadImage(currentUserId, file, "avatar/" + currentUserId);
 
         userMapper.updateAvatar(currentUserId, avatarUrl);
 
@@ -109,7 +110,7 @@ public class UserServiceImpl implements UserService {
         }
     }
 
-    private void loginValidation(Long currentUserId) {
+    private void loginValidation(Integer currentUserId) {
         User user = userMapper.selectById(currentUserId);
         if (user == null) {
             throw new BusinessException(401, "登录状态异常，请重新登录");

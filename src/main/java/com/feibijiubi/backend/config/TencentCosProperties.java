@@ -10,6 +10,7 @@ public class TencentCosProperties {
     private String secretId;
     private String secretKey;
     private String region;
+    private String appId;
     private String bucket;
     private String baseUrl;
 }

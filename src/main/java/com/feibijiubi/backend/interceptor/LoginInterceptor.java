@@ -30,10 +30,9 @@ public class LoginInterceptor implements HandlerInterceptor {
             throw new BusinessException(401, "请先登录");
         }
 
-        Long userId = tokenService.getUserId(token);
+        Integer userId = tokenService.getUserId(token);
         request.setAttribute("currentUserId", userId);
 
         return true;
-
     }
 }

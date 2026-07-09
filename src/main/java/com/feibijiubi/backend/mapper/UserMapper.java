@@ -24,7 +24,7 @@ public interface UserMapper {
     /**
      * 根据用户 id 查询用户信息。
      */
-    User selectById(Long id);
+    User selectById(Integer id);
 
     /**
      * 根据用户 id 修改用户信息
@@ -42,5 +42,5 @@ public interface UserMapper {
      * @param currentUserId
      * @param avatarUrl
      */
-    void updateAvatar(@Param("currentUserId")Long currentUserId,@Param("avatarUrl")String avatarUrl);
+    void updateAvatar(@Param("currentUserId")Integer currentUserId,@Param("avatarUrl")String avatarUrl);
 }

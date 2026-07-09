@@ -1,0 +1,63 @@
+<!--定义Mapper映射文件的约束和基本结构-->
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.feibijiubi.backend.mapper.VideoStatusMapper">
+    <insert id="insertDefault">
+        INSERT INTO video_status(vid)
+        VALUES (#{vid})
+    </insert>
+
+    <select id="selectByVid"
+            resultType="com.feibijiubi.backend.entity.VideoStatus">
+        SELECT
+            vid,
+            play_times,
+            like_times,
+            unlike_times,
+            comment_times,
+            coin_times,
+            share_times,
+            collect_times,
+            danmu_times
+        FROM video_status
+        WHERE vid = #{vid}
+    </select>
+
+    <update id="increasePlayTimes">
+        UPDATE video_status
+        SET   play_times = play_times + 1
+        WHERE vid = #{vid}
+    </update>
+
+    <update id="increaseLikeTimes">
+        UPDATE video_status
+        SET   like_times = like_times + 1
+        WHERE vid = #{vid}
+    </update>
+
+    <update id="decreaseLikeTimes">
+        UPDATE video_status
+        SET   like_times = GREATEST(like_times - 1, 0)
+        WHERE vid = #{vid}
+    </update>
+
+    <update id="increaseCoinTimes">
+        UPDATE video_status
+        SET   coin_times = coin_times + #{coin}
+        WHERE vid = #{vid}
+    </update>
+
+    <update id="increaseCollectTimes">
+        UPDATE video_status
+        SET   collect_times = collect_times + 1
+        WHERE vid = #{vid}
+    </update>
+
+    <update id="decreaseCollectTimes">
+        UPDATE video_status
+        SET   collect_times = GREATEST(collect_times - 1, 0)
+        WHERE vid = #{vid}
+    </update>
+</mapper>

@@ -27,9 +27,9 @@ public class JwtTokenServiceImpl implements TokenService {
     }
 
     @Override
-    public Long getUserId(String token) {
+    public Integer getUserId(String token) {
         try {
-            Long userId = JwtUtils.getUserId(token, jwtProperties.getSecret());
+            Integer userId = JwtUtils.getUserId(token, jwtProperties.getSecret());
             if (userId == null) {
                 throw new BusinessException(401, "请先登录");
             }

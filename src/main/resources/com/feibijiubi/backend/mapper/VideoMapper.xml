@@ -1,0 +1,89 @@
+<!--定义Mapper映射文件的约束和基本结构-->
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.feibijiubi.backend.mapper.VideoMapper">
+    <insert id="insert"
+            parameterType="com.feibijiubi.backend.entity.Video"
+            useGeneratedKeys="true"
+            keyProperty="vid">
+        INSERT INTO video (
+            uid,
+            title,
+            source_type,
+            visibility,
+            duration,
+            mc_id,
+            sc_id,
+            tags,
+            description,
+            cover_url,
+            cover_key,
+            video_url,
+            video_key,
+            status,
+            created_at
+        ) VALUES (
+            #{uid},
+            #{title},
+            #{sourceType},
+            #{visibility},
+            #{duration},
+            #{mcId},
+            #{scId},
+            #{tags},
+            #{description},
+            #{coverUrl},
+            #{coverKey},
+            #{videoUrl},
+            #{videoKey},
+            #{status},
+            #{createdAt}
+        )
+    </insert>
+    <select id="selectByVid"
+            resultType="com.feibijiubi.backend.entity.Video">
+        SELECT
+            vid,
+            uid,
+            title,
+            source_type,
+            visibility,
+            duration,
+            mc_id,
+            sc_id,
+            tags,
+            description,
+            cover_url,
+            video_url,
+            status,
+            created_at,
+            deleted_at
+        FROM video
+        WHERE vid = #{vid}
+    </select>
+
+    <select id="selectPublishedList"
+            resultType="com.feibijiubi.backend.entity.Video">
+        SELECT
+            vid,
+            uid,
+            title,
+            source_type,
+            visibility,
+            duration,
+            mc_id,
+            sc_id,
+            tags,
+            description,
+            cover_url,
+            video_url,
+            status,
+            created_at,
+            deleted_at
+        FROM video
+        WHERE status = 1
+        ORDER BY created_at DESC
+    </select>
+</mapper>

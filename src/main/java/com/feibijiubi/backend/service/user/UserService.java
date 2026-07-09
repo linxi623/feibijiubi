@@ -6,11 +6,11 @@ import com.feibijiubi.backend.vo.UserVO;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface UserService {
-    UserVO getCurrentUser(Long currentUserId);
+    UserVO getCurrentUser(Integer currentUserId);
 
-    void updateProfile(Long currentUserId, UserProfileDTO request);
+    void updateProfile(Integer currentUserId, UserProfileDTO request);
 
-    void updatePassword(Long currentUserId, UserChangePasswordDTO request);
+    void updatePassword(Integer currentUserId, UserChangePasswordDTO request);
 
-    String updateAvatar(Long currentUserId, MultipartFile file);
+    String updateAvatar(Integer currentUserId, MultipartFile file);
 }

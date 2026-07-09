@@ -12,7 +12,7 @@ public class JwtUtils {
     private JwtUtils() {}
 
     public static String createToken(
-            Long userId,
+            Integer userId,
             String username,
             Byte role,
             String secret,
@@ -41,7 +41,7 @@ public class JwtUtils {
                 .getBody();
     }
 
-    public static Long getUserId(String token, String secret) {
+    public static Integer getUserId(String token, String secret) {
         Claims claims = parseToken(token, secret);
         Object userId = claims.get("userId");
 
@@ -49,7 +49,7 @@ public class JwtUtils {
             return null;
         }
 
-        return Long.valueOf(userId.toString());
+        return Integer.valueOf(userId.toString());
     }
 
     private static SecretKey createSecretKey(String secret) {
