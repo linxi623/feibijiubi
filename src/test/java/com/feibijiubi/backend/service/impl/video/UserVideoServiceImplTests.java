@@ -77,6 +77,7 @@ class UserVideoServiceImplTests {
     @Test
     void savePlayProgressUpdatesRecordWithoutIncreasingCount() {
         when(videoMapper.selectByVid(1)).thenReturn(videoWithDuration(120D));
+        when(userVideoMapper.selectByUidAndVid(2, 1)).thenReturn(userVideo(2, 1));
         when(userVideoMapper.updatePlay(any(UserVideo.class))).thenReturn(1);
 
         userVideoService.savePlayProgress(1, 2, 35.5D);
@@ -126,6 +127,7 @@ class UserVideoServiceImplTests {
     @Test
     void savePlayProgressStopsWhenRecordUpdateFails() {
         when(videoMapper.selectByVid(1)).thenReturn(videoWithDuration(120D));
+        when(userVideoMapper.selectByUidAndVid(2, 1)).thenReturn(userVideo(2, 1));
         when(userVideoMapper.updatePlay(any(UserVideo.class))).thenReturn(0);
 
         BusinessException exception = assertThrows(BusinessException.class,
@@ -133,6 +135,13 @@ class UserVideoServiceImplTests {
 
         assertEquals(500, exception.getCode());
         verify(videoStatusMapper, never()).increasePlayTimes(any());
+    }
+
+    private UserVideo userVideo(Integer uid, Integer vid) {
+        UserVideo userVideo = new UserVideo();
+        userVideo.setUid(uid);
+        userVideo.setVid(vid);
+        return userVideo;
     }
 
     private Video videoWithDuration(Double duration) {

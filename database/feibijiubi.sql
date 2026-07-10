@@ -4,11 +4,12 @@ CREATE DATABASE IF NOT EXISTS `feibijiubi`
 
 USE `feibijiubi`;
 
+DROP TABLE IF EXISTS `upload_temp_file`;
 DROP TABLE IF EXISTS `user_video`;
 DROP TABLE IF EXISTS `video_status`;
 DROP TABLE IF EXISTS `video`;
 DROP TABLE IF EXISTS `users`;
-DROP TABLE IF EXISTS `upload_temp_file`;
+
 
 CREATE TABLE `users` (
     `id` INT NOT NULL AUTO_INCREMENT COMMENT '用户ID',
@@ -89,8 +90,7 @@ CREATE TABLE `user_video` (
     KEY `idx_user_video_vid` (`vid`),
     CONSTRAINT `fk_user_video_uid` FOREIGN KEY (`uid`) REFERENCES `users` (`id`),
     CONSTRAINT `fk_user_video_vid` FOREIGN KEY (`vid`) REFERENCES `video` (`vid`),
-    CONSTRAINT `ck_user_video_coin` CHECK (`coin` >= 0 AND `coin` <= 2),
-    CONSTRAINT `ck_user_video_like_unlike` CHECK (NOT (`liked` = 1 AND `unliked` = 1))
+    CONSTRAINT `ck_user_video_coin` CHECK (`coin` >= 0 AND `coin` <= 2)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户视频关系表';
 
 CREATE TABLE `upload_temp_file` (

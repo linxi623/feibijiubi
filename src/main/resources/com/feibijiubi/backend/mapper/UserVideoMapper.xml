@@ -23,7 +23,7 @@
         UPDATE user_video
         <set>
             <if test="liked != null">liked = #{liked},</if>
-            <if test="unliked != null">unliked = #{unliked}</if>
+            <if test="unliked != null">unliked = #{unliked},</if>
             <if test="likedAt != null"> liked_at = #{likedAt},</if>
         </set>
         WHERE vid = #{vid} AND uid = #{uid}

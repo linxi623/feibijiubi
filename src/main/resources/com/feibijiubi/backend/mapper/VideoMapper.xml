@@ -115,7 +115,7 @@
         </if>
 
         ORDER BY v.created_at DESC, v.vid DESC
-        LIMIT #{limit}
+        LIMIT #{size}
     </select>
 
 </mapper>

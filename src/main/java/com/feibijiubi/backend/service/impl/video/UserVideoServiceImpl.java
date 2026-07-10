@@ -55,9 +55,7 @@ public class UserVideoServiceImpl implements UserVideoService {
             throw new BusinessException(400, "播放进度不能超过视频时长");
         }
 
-        userVideoMapper.ensureExists(currentUserId, vid);
-
-        UserVideo userVideo = userVideoMapper.selectByUidAndVid(currentUserId, vid);
+        UserVideo userVideo = getOrCreateUserVideo(currentUserId, vid);
         userVideo.setPlayTime(playTime);
         userVideo.setPlayedAt(LocalDateTime.now());
 
@@ -73,26 +71,45 @@ public class UserVideoServiceImpl implements UserVideoService {
         if (currentUserId == null) {
             throw new BusinessException(401, "请先登录");
         }
+        if (isLike == null || isSet == null) {
+            throw new BusinessException(400, "点赞参数不合法");
+        }
         validateVideo(vid);
 
-        userVideoMapper.ensureExists(currentUserId, vid);
+        UserVideo userVideo = getOrCreateUserVideo(currentUserId, vid);
 
-        UserVideo userVideo = userVideoMapper.selectByUidAndVid(currentUserId, vid);
-        if(isLike) {
+        boolean stateChanged;
+        if (isLike) {
+            stateChanged = !isSet.equals(userVideo.getLiked());
+            if (!stateChanged) {
+                return;
+            }
             userVideo.setLiked(isSet);
-            userVideo.setLikedAt(LocalDateTime.now());
+            if (isSet) {
+                userVideo.setLikedAt(LocalDateTime.now());
+            }
         } else {
+            stateChanged = !isSet.equals(userVideo.getUnliked());
+            if (!stateChanged) {
+                return;
+            }
             userVideo.setUnliked(isSet);
         }
-        int statusRow = isSet ? videoStatusMapper.increaseLikeTimes(vid, isLike) :
-                videoStatusMapper.decreaseLikeTimes(vid, isLike);
-        if (statusRow != 1) {
-            throw new BusinessException(500, "视频点赞失败");
-        }
+
         int userVideoRows = userVideoMapper.updateLike(userVideo);
         if (userVideoRows != 1) {
-            throw new BusinessException(500, "点赞失败");
+            throw new BusinessException(500, "点赞状态更新失败");
         }
+
+        int statusRows = isSet
+                ? videoStatusMapper.increaseLikeTimes(vid, isLike)
+                : videoStatusMapper.decreaseLikeTimes(vid, isLike);
+
+        if (statusRows != 1) {
+            throw new BusinessException(500, "视频点赞统计更新失败");
+        }
+
+
     }
 
     @Override
@@ -102,20 +119,26 @@ public class UserVideoServiceImpl implements UserVideoService {
             throw new BusinessException(401, "请先登录");
         }
 
-        User user = userMapper.selectById(currentUserId);
-        Integer coinValue = user.getCoin();
-        if(coin > 2) {
-            throw new BusinessException(400, "最多只能投两个硬币");
+        if (coin == null || coin < 1 || coin > 2) {
+            throw new BusinessException(400, "单次只能投一个或两个硬币");
         }
-        if(coin > coinValue) {
+
+        User user = userMapper.selectById(currentUserId);
+        if (user == null) {
+            throw new BusinessException(404, "用户不存在");
+        }
+        Integer coinValue = user.getCoin();
+        if (coinValue == null) {
+            throw new BusinessException(500, "用户硬币数据异常");
+        }
+        if (coin > coinValue) {
             throw new BusinessException(400, "硬币数量不够");
         }
 
         validateVideo(vid);
-        userVideoMapper.ensureExists(currentUserId, vid);
-        UserVideo userVideo =  userVideoMapper.selectByUidAndVid(vid, currentUserId);
+        UserVideo userVideo = getOrCreateUserVideo(currentUserId, vid);
 
-        if(userVideo.getCoin() != 0) {
+        if (userVideo.getCoin() != null && userVideo.getCoin() != 0) {
             throw new BusinessException(400, "用户无法对同一个视频多次投币");
         }
         int statusRows = videoStatusMapper.increaseCoinTimes(vid, coin);
@@ -143,27 +166,47 @@ public class UserVideoServiceImpl implements UserVideoService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void Collect(Integer currentUserId, Integer vid, Boolean isCollect) {
         if(currentUserId == null) {
             throw new BusinessException(401, "请先登录");
         }
+        if (isCollect == null) {
+            throw new BusinessException(400, "收藏参数不合法");
+        }
         validateVideo(vid);
 
-        int statusRows = isCollect ? videoStatusMapper.increaseCollectTimes(vid) :
-                videoStatusMapper.decreaseCollectTimes(vid);
-        if (statusRows != 1) {
-            throw new BusinessException(500, "收藏失败");
+        UserVideo userVideo = getOrCreateUserVideo(currentUserId, vid);
+
+        if (isCollect.equals(userVideo.getCollect())) {
+            return;
         }
 
+        userVideo.setCollect(isCollect);
+
+        int userVideoRows = userVideoMapper.updateCollect(userVideo);
+        if (userVideoRows != 1) {
+            throw new BusinessException(500, "收藏状态更新失败");
+        }
+
+        int statusRows = isCollect
+                ? videoStatusMapper.increaseCollectTimes(vid)
+                : videoStatusMapper.decreaseCollectTimes(vid);
+
+        if (statusRows != 1) {
+            throw new BusinessException(500, "收藏统计更新失败");
+        }
+
+    }
+
+    private UserVideo getOrCreateUserVideo(Integer currentUserId, Integer vid) {
         userVideoMapper.ensureExists(currentUserId, vid);
 
-        UserVideo userVideo = userVideoMapper.selectByUidAndVid(vid, currentUserId);
-        userVideo.setCollect(isCollect);
-        userVideo.setCoinedAt(LocalDateTime.now());
-        int userVideoRows =  userVideoMapper.updateCollect(userVideo);
-        if (userVideoRows != 1) {
-            throw new BusinessException(500, "收藏失败");
+        UserVideo userVideo = userVideoMapper.selectByUidAndVid(currentUserId, vid);
+        if (userVideo == null) {
+            throw new BusinessException(500, "用户视频关系创建失败");
         }
+        return userVideo;
     }
 
     private Video validateVideo(Integer vid) {
