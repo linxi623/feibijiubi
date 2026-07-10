@@ -33,13 +33,19 @@
 
     <update id="increaseLikeTimes">
         UPDATE video_status
-        SET   like_times = like_times + 1
+        <set>
+            <if test="isLike and isLike != null">like_times = like_times + 1</if>
+            <if test="isLike and isLike != null">unlike_times = unlike_times + 1</if>
+        </set>
         WHERE vid = #{vid}
     </update>
 
     <update id="decreaseLikeTimes">
         UPDATE video_status
-        SET   like_times = GREATEST(like_times - 1, 0)
+        <set>
+            <if test="isLike and isLike != null">like_times = GREATEST(like_times - 1, 0)</if>
+            <if test="isLike and isLike != null">unlike_times = GREATEST(unlike_times - 1, 0)</if>
+        </set>
         WHERE vid = #{vid}
     </update>
 
@@ -58,6 +64,12 @@
     <update id="decreaseCollectTimes">
         UPDATE video_status
         SET   collect_times = GREATEST(collect_times - 1, 0)
+        WHERE vid = #{vid}
+    </update>
+
+    <update id="increaseShareTimes">
+        UPDATE video_status
+        SET   share_times = share_times + 1
         WHERE vid = #{vid}
     </update>
 </mapper>

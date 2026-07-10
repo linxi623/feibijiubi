@@ -6,9 +6,9 @@ import org.apache.ibatis.annotations.Param;
 
 @Mapper
 public interface UserVideoMapper {
-    UserVideo selectByUidAndVid(@Param("uid")Integer uid,@Param("vid") Integer vid);
+    UserVideo selectByUidAndVid(@Param("uid") Integer uid, @Param("vid") Integer vid);
 
-    int insert(UserVideo userVideo);
+    int ensureExists(@Param("uid") Integer uid, @Param("vid") Integer vid);
 
     int updatePlay(UserVideo userVideo);
 

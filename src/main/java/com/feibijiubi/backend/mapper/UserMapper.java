@@ -42,5 +42,12 @@ public interface UserMapper {
      * @param currentUserId
      * @param avatarUrl
      */
-    void updateAvatar(@Param("currentUserId")Integer currentUserId,@Param("avatarUrl")String avatarUrl);
+    void updateAvatar(@Param("currentUserId")Integer currentUserId,
+                      @Param("avatarUrl")String avatarUrl);
+
+    int decreaseCoin(@Param("currentUserId")Integer currentUserId,
+                     @Param("coin")Byte coin);
+
+    int increaseCoin(@Param("currentUserId")Integer currentUserId,
+                    @Param("coin")Byte coin);
 }

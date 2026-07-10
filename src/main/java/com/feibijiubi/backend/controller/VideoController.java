@@ -1,13 +1,13 @@
 package com.feibijiubi.backend.controller;
 
 
+import com.feibijiubi.backend.annotation.OptionalLogin;
 import com.feibijiubi.backend.common.ApiResponse;
 import com.feibijiubi.backend.dto.VideoSubmitDTO;
 import com.feibijiubi.backend.dto.VideoUploadPrepareDTO;
 import com.feibijiubi.backend.service.storage.FileStorageService;
 import com.feibijiubi.backend.service.video.VideoService;
-import com.feibijiubi.backend.vo.VideoSubmitVO;
-import com.feibijiubi.backend.vo.VideoUploadPrepareVO;
+import com.feibijiubi.backend.vo.*;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -40,11 +40,27 @@ public class VideoController {
         return ApiResponse.success(url);
     }
 
-    @PostMapping
+    @PostMapping()
     public ApiResponse<VideoSubmitVO> submitVideo(HttpServletRequest httprequest,
                                                   @RequestBody VideoSubmitDTO request) {
         Integer currentUserId = (Integer) httprequest.getAttribute("currentUserId");
         VideoSubmitVO vo = videoService.submitVideo(currentUserId, request);
         return ApiResponse.success("投稿成功", vo);
+    }
+
+    @OptionalLogin
+    @GetMapping("/{vid}")
+    public ApiResponse<VideoDetailVO> getVideoDetail(HttpServletRequest httprequest,
+                                                     @PathVariable Integer vid) {
+        Integer currentUserId = (Integer) httprequest.getAttribute("currentUserId");
+        VideoDetailVO vo = videoService.getVideoDetail(currentUserId, vid);
+        return ApiResponse.success(vo);
+    }
+
+    @GetMapping("/feed")
+    public ApiResponse<CursorPageVO<VideoListItemVO>> getVideoFeed(@RequestParam(required = false) String cursor,
+                                                  @RequestParam(defaultValue = "15") Integer size) {
+        CursorPageVO<VideoListItemVO> vo = videoService.getVideoFeed(cursor, size);
+        return ApiResponse.success(vo);
     }
 }

@@ -3,12 +3,18 @@ package com.feibijiubi.backend.service.impl.video;
 import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.dto.VideoSubmitDTO;
 import com.feibijiubi.backend.entity.UploadTempFile;
+import com.feibijiubi.backend.entity.UserVideo;
 import com.feibijiubi.backend.entity.Video;
+import com.feibijiubi.backend.entity.VideoStatus;
 import com.feibijiubi.backend.mapper.UploadTempFileMapper;
+import com.feibijiubi.backend.mapper.UserVideoMapper;
 import com.feibijiubi.backend.mapper.VideoMapper;
 import com.feibijiubi.backend.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.service.storage.FileStorageService;
 import com.feibijiubi.backend.service.video.VideoService;
+import com.feibijiubi.backend.vo.CursorPageVO;
+import com.feibijiubi.backend.vo.VideoDetailVO;
+import com.feibijiubi.backend.vo.VideoListItemVO;
 import com.feibijiubi.backend.vo.VideoSubmitVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,6 +23,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 
 @Slf4j
@@ -31,15 +38,17 @@ public class VideoServiceImpl implements VideoService {
     private final VideoMapper videoMapper;
     private final VideoStatusMapper videoStatusMapper;
     private final FileStorageService fileStorageService;
+    private final UserVideoMapper userVideoMapper;
 
     public VideoServiceImpl(UploadTempFileMapper uploadTempFileMapper,
                             VideoMapper videoMapper,
                             VideoStatusMapper videoStatusMapper,
-                            FileStorageService fileStorageService) {
+                            FileStorageService fileStorageService, UserVideoMapper userVideoMapper) {
         this.uploadTempFileMapper = uploadTempFileMapper;
         this.videoMapper = videoMapper;
         this.videoStatusMapper = videoStatusMapper;
         this.fileStorageService = fileStorageService;
+        this.userVideoMapper = userVideoMapper;
     }
 
     @Override
@@ -121,6 +130,84 @@ public class VideoServiceImpl implements VideoService {
         } catch (RuntimeException e) {
             deleteFormalObjectQuietly(copiedVideoKey);
             deleteFormalObjectQuietly(copiedCoverKey);
+            throw new BusinessException(500, e.getMessage());
+        }
+    }
+
+    @Override
+    public VideoDetailVO getVideoDetail(Integer currentUserId, Integer vid) {
+        if (vid == null || vid <= 0) {
+            throw new BusinessException(400, "视频参数不合法");
+        }
+
+        Video video = videoMapper.selectByVid(vid);
+        if (video == null) {
+            throw new BusinessException(404, "视频不存在");
+        }
+
+        VideoStatus videoStatus = videoStatusMapper.selectByVid(vid);
+        if (videoStatus == null) {
+            throw new BusinessException(500, "视频统计数据异常");
+        }
+
+        UserVideo userVideo = currentUserId == null
+                ? null
+                : userVideoMapper.selectByUidAndVid(currentUserId, vid);
+
+        return buildVideoDetailVO(video, videoStatus, userVideo);
+    }
+
+    @Override
+    public CursorPageVO<VideoListItemVO> getVideoFeed(String cursor, Integer size) {
+        String[] string = parseCursor(cursor);
+
+        LocalDateTime cursorCreatedAt = null;
+        Integer cursorVid = null;
+
+        if(cursor != null) {
+            cursorCreatedAt = LocalDateTime.parse(string[0]);
+            cursorVid = Integer.parseInt(string[1]);
+        }
+
+        List<VideoListItemVO> list = videoMapper.selectFeed(cursorCreatedAt, cursorVid, size + 1);
+
+        boolean hasMore = list.size() > size;
+        if(hasMore) {
+            list = list.subList(0, size);
+        }
+        String nextCursor = null;
+        if(hasMore && !list.isEmpty()) {
+            VideoListItemVO last = list.get(list.size() - 1);
+
+            nextCursor = last.getCreatedAt().toString() + "_" + last.getVid().toString();
+        }
+
+        CursorPageVO<VideoListItemVO> cursorPageVO = new CursorPageVO<>();
+        cursorPageVO.setItems(list);
+        cursorPageVO.setNextCursor(nextCursor);
+        cursorPageVO.setHasMore(hasMore);
+
+        return cursorPageVO;
+    }
+
+    private String[] parseCursor(String cursor) {
+        if(!StringUtils.hasText(cursor)) {
+            return null;
+        }
+
+        try {
+            int separatorIndex = cursor.lastIndexOf("_");
+
+            if(separatorIndex <= 0 || separatorIndex == cursor.length() - 1) {
+                throw new BusinessException(500, "游标格式有误");
+            }
+
+            String createdAtText = cursor.substring(0, separatorIndex);
+            String vidText = cursor.substring(separatorIndex + 1);
+
+            return new String[]{createdAtText, vidText};
+
+        } catch (Exception e) {
             throw new BusinessException(500, e.getMessage());
         }
     }
@@ -230,5 +317,45 @@ public class VideoServiceImpl implements VideoService {
         } catch (RuntimeException e) {
             log.warn("删除临时文件失败：{}", objectKey, e);
         }
+    }
+
+    private VideoDetailVO buildVideoDetailVO(Video video, VideoStatus videoStatus, UserVideo userVideo) {
+        VideoDetailVO vo = new VideoDetailVO();
+        vo.setVid(video.getVid());
+        vo.setUid(video.getUid());
+        vo.setTitle(video.getTitle());
+        vo.setSourceType(video.getSourceType());
+        vo.setVisibility(video.getVisibility());
+        vo.setDuration(video.getDuration());
+        vo.setMcId(video.getMcId());
+        vo.setScId(video.getScId());
+        vo.setTags(video.getTags());
+        vo.setDescription(video.getDescription());
+        vo.setCoverUrl(video.getCoverUrl());
+        vo.setVideoUrl(video.getVideoUrl());
+        vo.setStatus(video.getStatus());
+        vo.setCreatedAt(video.getCreatedAt());
+
+        vo.setPlayTimes(videoStatus.getPlayTimes());
+        vo.setLikeTimes(videoStatus.getLikeTimes());
+        vo.setCoinTimes(videoStatus.getCoinTimes());
+        vo.setCollectTimes(videoStatus.getCollectTimes());
+        vo.setCommentTimes(videoStatus.getCommentTimes());
+        vo.setDanmuTimes(videoStatus.getDanmuTimes());
+        vo.setShareTimes(videoStatus.getShareTimes());
+
+        if (userVideo == null) {
+            vo.setLiked(false);
+            vo.setCoin((byte) 0);
+            vo.setCollected(false);
+            vo.setPlayTime(0D);
+        } else {
+            vo.setLiked(Boolean.TRUE.equals(userVideo.getLiked()));
+            vo.setCoin(userVideo.getCoin() == null ? (byte) 0 : userVideo.getCoin());
+            vo.setCollected(Boolean.TRUE.equals(userVideo.getCollect()));
+            vo.setPlayTime(userVideo.getPlayTime() == null ? 0D : userVideo.getPlayTime());
+        }
+
+        return vo;
     }
 }

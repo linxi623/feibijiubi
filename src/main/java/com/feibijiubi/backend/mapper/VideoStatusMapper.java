@@ -13,14 +13,18 @@ public interface VideoStatusMapper {
 
     int increasePlayTimes(Integer vid);
 
-    int increaseLikeTimes(Integer vid);
+    int increaseLikeTimes(@Param("vid")Integer vid,
+                          @Param("isLike")Boolean isLike);
 
-    int decreaseLikeTimes(Integer vid);
+    int decreaseLikeTimes(@Param("vid")Integer vid,
+                          @Param("isLike")Boolean isLike);
 
     int increaseCoinTimes(@Param("vid")Integer vid,
-                          @Param("coin")Integer coin);
+                          @Param("coin")Byte coin);
 
     int increaseCollectTimes(Integer vid);
 
     int decreaseCollectTimes(Integer vid);
+
+    int increaseShareTimes(Integer vid);
 }

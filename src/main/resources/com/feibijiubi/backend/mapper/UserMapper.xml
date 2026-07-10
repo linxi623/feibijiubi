@@ -106,4 +106,19 @@
         WHERE id = #{currentUserId}
             AND deleted_at IS NULL
     </update>
+
+    <update id="decreaseCoin">
+        UPDATE users
+        SET coin = coin - #{coin},
+        WHERE id = #{currentUserId}
+            AND deleted_at IS NULL
+    </update>
+
+    <update id="increaseCoin">
+        UPDATE users
+        SET coin = coin + #{coin},
+            WHERE id = #{currentUserId}
+                AND deleted_at IS NULL
+    </update>
+
 </mapper>

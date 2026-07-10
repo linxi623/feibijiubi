@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS `user_video`;
 DROP TABLE IF EXISTS `video_status`;
 DROP TABLE IF EXISTS `video`;
 DROP TABLE IF EXISTS `users`;
+DROP TABLE IF EXISTS `upload_temp_file`;
 
 CREATE TABLE `users` (
     `id` INT NOT NULL AUTO_INCREMENT COMMENT '用户ID',

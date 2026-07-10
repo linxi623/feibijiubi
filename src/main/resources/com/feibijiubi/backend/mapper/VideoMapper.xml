@@ -86,4 +86,36 @@
         WHERE status = 1
         ORDER BY created_at DESC
     </select>
+
+    <select id="selectFeed"
+            resultType="com.feibijiubi.backend.vo.VideoListItemVO">
+        SELECT
+            v.vid,
+            v.uid,
+            v.title,
+            v.cover_url,
+            v.duration,
+            vs.play_times,
+            vs.comment_times,
+            v.created_at
+        FROM video v
+        INNER JOIN video_status vs ON vs.vid = v.vid
+        WHERE v.status = 1
+        AND v.visibility = 0
+        AND v.deleted_at IS NULL
+
+        <if test="cursorCreatedAt != null and cursorVid != null">
+            AND (
+                v.created_at &lt; #{cursorCreatedAt}
+                OR (
+                    v.created_at = #{cursorCreatedAt}
+                    AND v.vid &lt; #{cursorVid}
+                )
+            )
+        </if>
+
+        ORDER BY v.created_at DESC, v.vid DESC
+        LIMIT #{limit}
+    </select>
+
 </mapper>

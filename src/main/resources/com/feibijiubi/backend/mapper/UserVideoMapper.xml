@@ -4,32 +4,10 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.feibijiubi.backend.mapper.UserVideoMapper">
-    <insert id="insert"
-            useGeneratedKeys="true"
-            keyProperty="id">
-        INSERT INTO user_video(
-            vid,
-            uid,
-            play_time,
-            liked,
-            unliked,
-            coin,
-            collect,
-            played_at,
-            liked_at,
-            coined_at
-        ) VALUES (
-            #{vid},
-            #{uid},
-            #{playTime},
-            #{liked},
-            #{unliked},
-            #{coin},
-            #{collect},
-            #{playedAt},
-            #{likedAt},
-            #{coinedAt}
-        )
+    <insert id="ensureExists">
+        INSERT INTO user_video(vid, uid)
+        VALUES (#{vid}, #{uid})
+        ON DUPLICATE KEY UPDATE id = id
     </insert>
 
     <update id="updatePlay">
@@ -45,6 +23,7 @@
         UPDATE user_video
         <set>
             <if test="liked != null">liked = #{liked},</if>
+            <if test="unliked != null">unliked = #{unliked}</if>
             <if test="likedAt != null"> liked_at = #{likedAt},</if>
         </set>
         WHERE vid = #{vid} AND uid = #{uid}
