@@ -40,11 +40,12 @@
 
     <update id="updateCollect">
         UPDATE user_video
-        <set>
-            <if test="collect != null">collect = #{collect}</if>
-        </set>
-        WHERE vid = #{vid} AND uid = #{uid}
+        SET collect = #{collect}
+        WHERE vid = #{vid}
+          AND uid = #{uid}
+          AND collect != #{collect}
     </update>
+
 
     <select id="selectByUidAndVid" resultType="com.feibijiubi.backend.entity.UserVideo">
         SELECT
@@ -61,5 +62,6 @@
             coined_at
         FROM user_video
         WHERE vid = #{vid} AND uid = #{uid}
+        FOR UPDATE
     </select>
 </mapper>

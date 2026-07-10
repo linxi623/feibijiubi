@@ -111,6 +111,7 @@
         UPDATE users
         SET coin = coin - #{coin}
         WHERE id = #{currentUserId}
+            AND coin >= #{coin}
             AND deleted_at IS NULL
     </update>
 
