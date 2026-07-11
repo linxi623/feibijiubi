@@ -1,7 +1,6 @@
 package com.feibijiubi.backend.service.impl.user;
 
 import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.config.TencentCosProperties;
 import com.feibijiubi.backend.converter.UserConverter;
 import com.feibijiubi.backend.dto.UserChangePasswordDTO;
 import com.feibijiubi.backend.dto.UserProfileDTO;
@@ -95,15 +94,6 @@ public class UserServiceImpl implements UserService {
     private void validateChangePasswordRequest(UserChangePasswordDTO request){
         if(request == null) {
             throw new BusinessException(400, "请求参数不能为空");
-        }
-        if(request.getOldPassword() == null) {
-            throw new BusinessException(400, "旧密码不能为空");
-        }
-        if(request.getNewPassword() == null) {
-            throw new BusinessException(400, "新密码不能为空");
-        }
-        if(request.getConfirmedPassword() == null) {
-            throw new BusinessException(400, "确认密码不能为空");
         }
         if(!Objects.equals(request.getNewPassword(), request.getConfirmedPassword())) {
             throw new BusinessException(400, "两次密码不一致");

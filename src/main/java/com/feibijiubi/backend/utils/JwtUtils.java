@@ -52,6 +52,17 @@ public class JwtUtils {
         return Integer.valueOf(userId.toString());
     }
 
+    public static Byte getRole(String token, String secret) {
+        Claims claims = parseToken(token, secret);
+        Object role = claims.get("role");
+
+        if (role == null) {
+            return null;
+        }
+
+        return Byte.valueOf(role.toString());
+    }
+
     private static SecretKey createSecretKey(String secret) {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }

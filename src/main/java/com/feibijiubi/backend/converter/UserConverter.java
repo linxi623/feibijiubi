@@ -3,7 +3,10 @@ package com.feibijiubi.backend.converter;
 import com.feibijiubi.backend.entity.User;
 import com.feibijiubi.backend.vo.UserVO;
 
-public class UserConverter {
+import java.util.Collections;
+import java.util.List;
+
+public final class UserConverter {
     private UserConverter() {
     }
 
@@ -29,6 +32,16 @@ public class UserConverter {
         userVO.setAuthMsg(user.getAuthMsg());
         userVO.setCreatedAt(user.getCreatedAt());
         return userVO;
+    }
+
+    public static List<UserVO> toUserVOList(List<User> users) {
+        if (users == null || users.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return users.stream()
+                .map(UserConverter::toUserVO)
+                .toList();
     }
 
     private static Integer toInteger(Byte value) {

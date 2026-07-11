@@ -216,12 +216,6 @@ public class TencentCosStorageServiceImpl implements FileStorageService{
         if (request == null) {
             throw new BusinessException(400, "请求参数不能为空");
         }
-        if (!StringUtils.hasText(request.getFileName())) {
-            throw new BusinessException(400, "文件名不能为空");
-        }
-        if (!StringUtils.hasText(request.getContentType())) {
-            throw new BusinessException(400, "文件类型不能为空");
-        }
         if (!ALLOWED_VIDEO_CONTENT_EXTENSIONS.contains(request.getContentType())) {
             throw new BusinessException(400, "该视频文件格式不支持");
         }

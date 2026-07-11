@@ -21,4 +21,9 @@ public interface VideoMapper {
                                      @Param("cursorVid")Integer cursorVid,
                                      @Param("size")Integer size);
 
+    int updateReviewStatus(
+            @Param("vid") Integer vid,
+            @Param("oldStatus") Integer oldStatus,
+            @Param("newStatus") Integer newStatus
+    );
 }

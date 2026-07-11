@@ -44,7 +44,9 @@ public class UserAccountServiceImpl implements UserAccountService {
 
     @Override
     public UserLoginVO login(UserLoginDTO request) {
-        validateLoginRequest(request);
+        if (request == null) {
+            throw new BusinessException(400, "请求参数不能为空");
+        }
         User user = userMapper.selectByUsernameForLogin(request.getUsername());
         if (user == null ||
                 !Objects.equals(request.getPassword(), user.getPasswordHash())) {
@@ -65,29 +67,9 @@ public class UserAccountServiceImpl implements UserAccountService {
         if (request == null) {
             throw new BusinessException(400, "请求参数不能为空");
         }
-        if (!StringUtils.hasText(request.getUsername())) {
-            throw new BusinessException(400, "用户名不能为空");
-        }
-        if (!StringUtils.hasText(request.getPassword())) {
-            throw new BusinessException(400, "密码不能为空");
-        }
-        if (!StringUtils.hasText(request.getConfirmedPassword())) {
-            throw new BusinessException(400, "确认密码不能为空");
-        }
         if (!Objects.equals(request.getPassword(), request.getConfirmedPassword())) {
             throw new BusinessException(400, "前后两次密码输入不一致");
         }
     }
 
-    private void validateLoginRequest(UserLoginDTO request) {
-        if (request == null) {
-            throw new BusinessException(400, "请求参数不能为空");
-        }
-        if (!StringUtils.hasText(request.getUsername())) {
-            throw new BusinessException(400, "用户名不能为空");
-        }
-        if (!StringUtils.hasText(request.getPassword())) {
-            throw new BusinessException(400, "密码不能为空");
-        }
-    }
 }

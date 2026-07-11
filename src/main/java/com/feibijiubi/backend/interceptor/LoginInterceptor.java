@@ -5,12 +5,12 @@ import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.service.auth.TokenService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-@Configuration
+@Component
 public class LoginInterceptor implements HandlerInterceptor {
     private final TokenService tokenService;
 
@@ -22,7 +22,7 @@ public class LoginInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request,
                              HttpServletResponse response,
                              Object handler) {
-boolean optionalLogin = handler instanceof HandlerMethod handlerMethod
+    boolean optionalLogin = handler instanceof HandlerMethod handlerMethod
                 && handlerMethod.hasMethodAnnotation(OptionalLogin.class);
 
         String authorization = request.getHeader("Authorization");
@@ -42,7 +42,9 @@ boolean optionalLogin = handler instanceof HandlerMethod handlerMethod
         }
 
         Integer userId = tokenService.getUserId(token);
+        Byte role = tokenService.getRole(token);
         request.setAttribute("currentUserId", userId);
+        request.setAttribute("currentRole", role);
 
         return true;
     }

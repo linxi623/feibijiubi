@@ -6,4 +6,6 @@ public interface TokenService {
     String createToken(User user);
 
     Integer getUserId(String token);
+
+    Byte getRole(String token);
 }

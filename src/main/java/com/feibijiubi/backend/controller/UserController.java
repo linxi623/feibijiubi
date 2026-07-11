@@ -6,6 +6,7 @@ import com.feibijiubi.backend.dto.UserProfileDTO;
 import com.feibijiubi.backend.service.user.UserService;
 import com.feibijiubi.backend.vo.UserVO;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -27,7 +28,7 @@ public class UserController {
 
     @PutMapping("/me")
     public ApiResponse<Void> updateProfile(HttpServletRequest httprequest,
-                                             @RequestBody UserProfileDTO request) {
+                                             @Valid @RequestBody UserProfileDTO request) {
         Integer currentUserId = (Integer) httprequest.getAttribute("currentUserId");
         userService.updateProfile(currentUserId, request);
         return ApiResponse.successMessage("修改成功");
@@ -35,7 +36,7 @@ public class UserController {
 
     @PutMapping("/me/password")
     public ApiResponse<Void> updatePassword(HttpServletRequest httprequest,
-                                            @RequestBody UserChangePasswordDTO request) {
+                                            @Valid @RequestBody UserChangePasswordDTO request) {
         Integer currentUserId = (Integer) httprequest.getAttribute("currentUserId");
         userService.updatePassword(currentUserId, request);
         return ApiResponse.successMessage("修改成功");
@@ -43,7 +44,7 @@ public class UserController {
 
     @PutMapping("/me/avatar")
     public ApiResponse<UserVO> updateAvatar(HttpServletRequest httprequest,
-                                          @RequestParam("file") MultipartFile file) {
+                                           @RequestParam("file") MultipartFile file) {
         Integer currentUserId = (Integer) httprequest.getAttribute("currentUserId");
         String avatarUrl = userService.updateAvatar(currentUserId, file);
         UserVO user = userService.getCurrentUser(currentUserId);

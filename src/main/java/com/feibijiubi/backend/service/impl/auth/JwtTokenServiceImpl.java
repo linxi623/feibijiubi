@@ -38,4 +38,17 @@ public class JwtTokenServiceImpl implements TokenService {
             throw new BusinessException(401, "请先登录");
         }
     }
+
+    @Override
+    public Byte getRole(String token) {
+        try {
+            Byte role = JwtUtils.getRole(token, jwtProperties.getSecret());
+            if (role == null) {
+                throw new BusinessException(401, "角色错误");
+            }
+            return role;
+        } catch (Exception e) {
+            throw new BusinessException(401, "角色错误");
+        }
+    }
 }

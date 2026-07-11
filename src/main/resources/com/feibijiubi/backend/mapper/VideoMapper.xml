@@ -42,6 +42,13 @@
             #{createdAt}
         )
     </insert>
+    <update id="updateReviewStatus">
+        UPDATE video
+        SET status = #{newStatus}
+        WHERE vid = #{vid}
+            AND status = #{oldStatus}
+            AND deleted_at IS NULL
+    </update>
     <select id="selectByVid"
             resultType="com.feibijiubi.backend.entity.Video">
         SELECT

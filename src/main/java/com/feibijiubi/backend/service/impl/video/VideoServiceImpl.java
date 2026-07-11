@@ -1,11 +1,13 @@
 package com.feibijiubi.backend.service.impl.video;
 
 import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.converter.VideoConverter;
 import com.feibijiubi.backend.dto.VideoSubmitDTO;
 import com.feibijiubi.backend.entity.UploadTempFile;
 import com.feibijiubi.backend.entity.UserVideo;
 import com.feibijiubi.backend.entity.Video;
 import com.feibijiubi.backend.entity.VideoStatus;
+import com.feibijiubi.backend.enums.VideoReviewStatus;
 import com.feibijiubi.backend.mapper.UploadTempFileMapper;
 import com.feibijiubi.backend.mapper.UserVideoMapper;
 import com.feibijiubi.backend.mapper.VideoMapper;
@@ -32,7 +34,7 @@ public class VideoServiceImpl implements VideoService {
     private static final byte FILE_TYPE_VIDEO = 1;
     private static final byte FILE_TYPE_COVER = 2;
     private static final byte TEMP_STATUS_WAIT_SUBMIT = 0;
-    private static final int VIDEO_STATUS_REVIEWING = 0;
+
 
     private final UploadTempFileMapper uploadTempFileMapper;
     private final VideoMapper videoMapper;
@@ -126,7 +128,7 @@ public class VideoServiceImpl implements VideoService {
             deleteTempObjectQuietly(tempVideoKey);
             deleteTempObjectQuietly(tempCoverKey);
 
-            return buildSubmitVO(video);
+            return VideoConverter.toVideoSubmitVO(video);
         } catch (RuntimeException e) {
             deleteFormalObjectQuietly(copiedVideoKey);
             deleteFormalObjectQuietly(copiedCoverKey);
@@ -154,7 +156,7 @@ public class VideoServiceImpl implements VideoService {
                 ? null
                 : userVideoMapper.selectByUidAndVid(currentUserId, vid);
 
-        return buildVideoDetailVO(video, videoStatus, userVideo);
+        return VideoConverter.toVideoDetailVO(video, videoStatus, userVideo);
     }
 
     @Override
@@ -219,20 +221,8 @@ public class VideoServiceImpl implements VideoService {
         if (request == null) {
             throw new BusinessException(400, "请求参数不能为空");
         }
-        if (!StringUtils.hasText(request.getTitle())) {
-            throw new BusinessException(400, "标题不能为空");
-        }
-        if (!StringUtils.hasText(request.getMcId()) || !StringUtils.hasText(request.getScId())) {
-            throw new BusinessException(400, "分区不能为空");
-        }
         if (request.getDuration() == null || request.getDuration() <= 0) {
             throw new BusinessException(400, "视频时长不合法");
-        }
-        if (!StringUtils.hasText(request.getTempVideoKey())) {
-            throw new BusinessException(400, "视频不能为空");
-        }
-        if (!StringUtils.hasText(request.getTempCoverKey())) {
-            throw new BusinessException(400, "封面不能为空");
         }
 
         String videoPrefix = "temp/videos/" + currentUserId + "/";
@@ -285,20 +275,11 @@ public class VideoServiceImpl implements VideoService {
         video.setCoverUrl(fileStorageService.Key2Url(formalCoverKey));
         video.setVideoKey(formalVideoKey);
         video.setVideoUrl(fileStorageService.Key2Url(formalVideoKey));
-        video.setStatus(VIDEO_STATUS_REVIEWING);
+        video.setStatus(VideoReviewStatus.PENDING.getCode());
         video.setCreatedAt(LocalDateTime.now());
         return video;
     }
 
-    private VideoSubmitVO buildSubmitVO(Video video) {
-        VideoSubmitVO vo = new VideoSubmitVO();
-        vo.setVid(video.getVid());
-        vo.setTitle(video.getTitle());
-        vo.setCoverUrl(video.getCoverUrl());
-        vo.setVideoUrl(video.getVideoUrl());
-        vo.setStatus(video.getStatus());
-        return vo;
-    }
 
     private void deleteFormalObjectQuietly(String objectKey) {
         if (!StringUtils.hasText(objectKey)) {
@@ -317,45 +298,5 @@ public class VideoServiceImpl implements VideoService {
         } catch (RuntimeException e) {
             log.warn("删除临时文件失败：{}", objectKey, e);
         }
-    }
-
-    private VideoDetailVO buildVideoDetailVO(Video video, VideoStatus videoStatus, UserVideo userVideo) {
-        VideoDetailVO vo = new VideoDetailVO();
-        vo.setVid(video.getVid());
-        vo.setUid(video.getUid());
-        vo.setTitle(video.getTitle());
-        vo.setSourceType(video.getSourceType());
-        vo.setVisibility(video.getVisibility());
-        vo.setDuration(video.getDuration());
-        vo.setMcId(video.getMcId());
-        vo.setScId(video.getScId());
-        vo.setTags(video.getTags());
-        vo.setDescription(video.getDescription());
-        vo.setCoverUrl(video.getCoverUrl());
-        vo.setVideoUrl(video.getVideoUrl());
-        vo.setStatus(video.getStatus());
-        vo.setCreatedAt(video.getCreatedAt());
-
-        vo.setPlayTimes(videoStatus.getPlayTimes());
-        vo.setLikeTimes(videoStatus.getLikeTimes());
-        vo.setCoinTimes(videoStatus.getCoinTimes());
-        vo.setCollectTimes(videoStatus.getCollectTimes());
-        vo.setCommentTimes(videoStatus.getCommentTimes());
-        vo.setDanmuTimes(videoStatus.getDanmuTimes());
-        vo.setShareTimes(videoStatus.getShareTimes());
-
-        if (userVideo == null) {
-            vo.setLiked(false);
-            vo.setCoin((byte) 0);
-            vo.setCollected(false);
-            vo.setPlayTime(0D);
-        } else {
-            vo.setLiked(Boolean.TRUE.equals(userVideo.getLiked()));
-            vo.setCoin(userVideo.getCoin() == null ? (byte) 0 : userVideo.getCoin());
-            vo.setCollected(Boolean.TRUE.equals(userVideo.getCollect()));
-            vo.setPlayTime(userVideo.getPlayTime() == null ? 0D : userVideo.getPlayTime());
-        }
-
-        return vo;
     }
 }

@@ -35,6 +35,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- 参数校验：@Valid、@NotBlank、@Size等 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
         <!-- MyBatis -->
         <dependency>
             <groupId>org.mybatis.spring.boot</groupId>
@@ -94,6 +99,7 @@
             <artifactId>cos-sts_api</artifactId>
             <version>3.1.1</version>
         </dependency>
+
     </dependencies>
 
     <build>
