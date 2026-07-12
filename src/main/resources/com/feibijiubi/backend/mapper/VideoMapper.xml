@@ -49,14 +49,13 @@
             AND status = #{oldStatus}
             AND deleted_at IS NULL
     </update>
-    <select id="selectByVid"
+    <select id="selectPublishedByVid"
             resultType="com.feibijiubi.backend.entity.Video">
         SELECT
             vid,
             uid,
             title,
             source_type,
-            visibility,
             duration,
             mc_id,
             sc_id,
@@ -64,11 +63,12 @@
             description,
             cover_url,
             video_url,
-            status,
             created_at,
-            deleted_at
         FROM video
         WHERE vid = #{vid}
+        AND status = 1
+        AND visibility = 0
+        AND deleted_at IS NULL
     </select>
 
     <select id="selectPublishedList"
@@ -91,6 +91,7 @@
             deleted_at
         FROM video
         WHERE status = 1
+        AND visibility = 0
         ORDER BY created_at DESC
     </select>
 
@@ -123,6 +124,37 @@
 
         ORDER BY v.created_at DESC, v.vid DESC
         LIMIT #{size}
+    </select>
+    <select id="selectByVid" resultType="com.feibijiubi.backend.entity.Video">
+        SELECT
+            vid,
+            uid,
+            title,
+            source_type,
+            visibility,
+            duration,
+            mc_id,
+            sc_id,
+            tags,
+            description,
+            cover_url,
+            video_url,
+            status,
+            created_at
+        FROM video
+        WHERE vid = #{vid}
+    </select>
+    <select id="selectUnpub" resultType="com.feibijiubi.backend.vo.UnpubVideoListItemVO">
+        SELECT
+            vid,
+            uid,
+            title,
+            coverUrl,
+            duration,
+            created_at
+        FROM video
+        WHERE status = #{status}
+        ORDER BY created_at
     </select>
 
 </mapper>

@@ -17,7 +17,7 @@ public enum UserGender {
     /**
      * 根绝数据库中的状态码获取对应枚举
      */
-    public static UserGender fromCode(Integer code) {
+    public static UserGender fromCode(Byte code) {
         if(code == null) {
             throw new BusinessException(500, "性别不能为空");
         }

@@ -9,5 +9,4 @@ public class VideoSubmitVO {
     private String title;
     private String coverUrl;
     private String videoUrl;
-    private Integer status;
 }

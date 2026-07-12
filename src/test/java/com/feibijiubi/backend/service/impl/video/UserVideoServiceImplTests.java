@@ -42,7 +42,7 @@ class UserVideoServiceImplTests {
 
     @Test
     void increasePlayCountWorksWithoutUserRecord() {
-        when(videoMapper.selectByVid(1)).thenReturn(videoWithDuration(120D));
+        when(videoMapper.selectPublishedByVid(1)).thenReturn(videoWithDuration(120D));
         when(videoStatusMapper.increasePlayTimes(1)).thenReturn(1);
 
         userVideoService.increasePlayCount(1);
@@ -54,7 +54,7 @@ class UserVideoServiceImplTests {
 
     @Test
     void increasePlayCountRejectsMissingVideo() {
-        when(videoMapper.selectByVid(1)).thenReturn(null);
+        when(videoMapper.selectPublishedByVid(1)).thenReturn(null);
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> userVideoService.increasePlayCount(1));
@@ -65,7 +65,7 @@ class UserVideoServiceImplTests {
 
     @Test
     void increasePlayCountRejectsFailedStatusUpdate() {
-        when(videoMapper.selectByVid(1)).thenReturn(videoWithDuration(120D));
+        when(videoMapper.selectPublishedByVid(1)).thenReturn(videoWithDuration(120D));
         when(videoStatusMapper.increasePlayTimes(1)).thenReturn(0);
 
         BusinessException exception = assertThrows(BusinessException.class,
@@ -76,7 +76,7 @@ class UserVideoServiceImplTests {
 
     @Test
     void savePlayProgressUpdatesRecordWithoutIncreasingCount() {
-        when(videoMapper.selectByVid(1)).thenReturn(videoWithDuration(120D));
+        when(videoMapper.selectPublishedByVid(1)).thenReturn(videoWithDuration(120D));
         when(userVideoMapper.selectByUidAndVid(2, 1)).thenReturn(userVideo(2, 1));
         when(userVideoMapper.updatePlay(any(UserVideo.class))).thenReturn(1);
 
@@ -99,7 +99,7 @@ class UserVideoServiceImplTests {
                 () -> userVideoService.savePlayProgress(1, null, 10D));
 
         assertEquals(401, exception.getCode());
-        verify(videoMapper, never()).selectByVid(any());
+        verify(videoMapper, never()).selectPublishedByVid(any());
         verify(userVideoMapper, never()).ensureExists(any(), any());
     }
 
@@ -109,12 +109,12 @@ class UserVideoServiceImplTests {
                 () -> userVideoService.savePlayProgress(1, 2, Double.NaN));
 
         assertEquals(400, exception.getCode());
-        verify(videoMapper, never()).selectByVid(any());
+        verify(videoMapper, never()).selectPublishedByVid(any());
     }
 
     @Test
     void savePlayProgressRejectsProgressBeyondDuration() {
-        when(videoMapper.selectByVid(1)).thenReturn(videoWithDuration(120D));
+        when(videoMapper.selectPublishedByVid(1)).thenReturn(videoWithDuration(120D));
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> userVideoService.savePlayProgress(1, 2, 121D));
@@ -126,7 +126,7 @@ class UserVideoServiceImplTests {
 
     @Test
     void savePlayProgressStopsWhenRecordUpdateFails() {
-        when(videoMapper.selectByVid(1)).thenReturn(videoWithDuration(120D));
+        when(videoMapper.selectPublishedByVid(1)).thenReturn(videoWithDuration(120D));
         when(userVideoMapper.selectByUidAndVid(2, 1)).thenReturn(userVideo(2, 1));
         when(userVideoMapper.updatePlay(any(UserVideo.class))).thenReturn(0);
 

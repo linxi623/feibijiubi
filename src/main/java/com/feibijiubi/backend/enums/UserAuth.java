@@ -18,7 +18,7 @@ public enum UserAuth {
     /**
      * 根绝数据库中的状态码获取对应枚举
      */
-    public static UserAuth fromCode(Integer code) {
+    public static UserAuth fromCode(Byte code) {
         if(code == null) {
             throw new BusinessException(500, "视频审核转态不能为空");
         }

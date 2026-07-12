@@ -44,9 +44,9 @@ http://localhost:8080
 | 403 | 无权限或账号状态异常 |
 | 500 | 服务器内部错误 |
 
-### 1.4 登录鉴权
+### 1.4 登录与权限说明
 
-除注册、登录接口外，当前 `/api/**` 下的接口都会经过登录拦截器校验。
+除注册、登录以及标注“可选登录”的接口外，当前 `/api/**` 下的接口都会经过登录拦截器校验。
 
 需要登录的接口必须在请求头携带：
 
@@ -64,23 +64,35 @@ Authorization: Bearer <登录接口返回的 token>
 }
 ```
 
+标注为“可选登录”的接口允许不携带 `Authorization` 请求头；如果携带了请求头，token 仍然必须合法。
+
+标注为“管理员”的接口除了需要有效 token，还要求当前用户角色为管理员或超级管理员。
+
 ### 1.5 当前接口清单
 
-| 模块 | 方法 | 路径 | 是否需要登录 |
-|---|---:|---|---|
-| 账号 | POST | `/api/auth/register` | 否 |
-| 账号 | POST | `/api/auth/login` | 否 |
-| 用户 | GET | `/api/users/me` | 是 |
-| 用户 | PUT | `/api/users/me` | 是 |
-| 用户 | PUT | `/api/users/me/password` | 是 |
-| 用户 | PUT | `/api/users/me/avatar` | 是 |
-| 视频 | POST | `/api/videos/upload-url` | 是 |
-| 视频 | POST | `/api/videos/cover` | 是 |
-| 视频 | POST | `/api/videos` | 是 |
-| 视频 | GET | `/api/videos/{vid}` | 可选登录 |
-| 视频 | GET | `/api/videos/feed` | 是 |
-| 用户视频 | POST | `/api/videos/{vid}/play-count` | 否 |
-| 用户视频 | PUT | `/api/videos/{vid}/progress` | 是 |
+| 模块 | 方法 | 路径                               | 权限要求 |
+|---|---:|----------------------------------|---|
+| 账号 | POST | `/api/auth/register`             | 公开 |
+| 账号 | POST | `/api/auth/login`                | 公开 |
+| 用户 | GET | `/api/users/me`                  | 登录 |
+| 用户 | PUT | `/api/users/me`                  | 登录 |
+| 用户 | PUT | `/api/users/me/password`         | 登录 |
+| 用户 | PUT | `/api/users/me/avatar`           | 登录 |
+| 视频 | POST | `/api/videos/upload-url`         | 登录 |
+| 视频 | POST | `/api/videos/cover`              | 登录 |
+| 视频 | POST | `/api/videos`                    | 登录 |
+| 视频 | GET | `/api/videos/{vid}`              | 可选登录 |
+| 视频 | GET | `/api/videos/feed`               | 登录 |
+| 用户视频 | POST | `/api/videos/{vid}/play-count`   | 可选登录 |
+| 用户视频 | PUT | `/api/videos/{vid}/progress`     | 登录 |
+| 用户视频 | PUT | `/api/videos/{vid}/islike`       | 登录 |
+| 用户视频 | PUT | `/api/videos/{vid}/coin`         | 登录 |
+| 用户视频 | PUT | `/api/videos/{vid}/share`        | 可选登录 |
+| 用户视频 | POST | `/api/videos/{vid}/collect`      | 登录 |
+| 视频审核 | PUT | `/api/admin/videos/{vid}/review` | 管理员 |
+| 视频审核 | GET | `/api/admin/videos/{vid}`        | 管理员 |
+| 视频审核 | GET | `/api/admin/videospage/page`     | 管理员 |
+
 
 ---
 
@@ -598,13 +610,13 @@ curl -X POST "http://localhost:8080/api/videos/upload-url" \
 
 #### 基本信息
 
-| 项 | 内容 |
-|---|---|
-| 请求方法 | `POST` |
-| 请求路径 | `/api/videos/cover` |
-| Content-Type | `multipart/form-data` |
-| 是否需要登录 | 是 |
-| 说明 | 上传视频封面图片到临时目录，返回封面 URL |
+| 项 | 内容                           |
+|---|------------------------------|
+| 请求方法 | `POST`                       |
+| 请求路径 | `/api/videos/cover`          |
+| Content-Type | `multipart/form-data`        |
+| 是否需要登录 | 是                            |
+| 说明 | 上传视频封面图片到临时目录，返回封面 objectKey |
 
 #### 请求头
 
@@ -635,10 +647,6 @@ Authorization: Bearer <token>
 }
 ```
 
-> 投稿接口需要传的是 `tempCoverKey`，不是完整 URL。当前后端的临时封面 key 可以通过去掉 COS `base-url` 前缀得到，例如：
->
-> 完整 URL：`https://example-cos-domain/temp/covers/1/20260709/xxx.png`
-> tempCoverKey：`temp/covers/1/20260709/xxx.png`
 
 #### curl 示例
 
@@ -710,11 +718,12 @@ Authorization: Bearer <token>
     "vid": 1,
     "title": "我的第一个视频",
     "coverUrl": "https://example-cos-domain/covers/1/20260709/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.png",
-    "videoUrl": "https://example-cos-domain/videos/1/20260709/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.mp4",
-    "status": 0
+    "videoUrl": "https://example-cos-domain/videos/1/20260709/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.mp4"
   }
 }
 ```
+
+> 投稿成功后，视频初始状态为 `PENDING`（数据库值为 `0`），但当前 `VideoSubmitVO` 不返回 `status` 字段。
 
 #### 视频状态说明
 
@@ -762,7 +771,136 @@ curl -X POST "http://localhost:8080/api/videos" \
 
 ---
 
-### 4.4 增加播放量
+### 4.4 获取视频详情
+
+#### 基本信息
+
+| 项 | 内容 |
+|---|---|
+| 请求方法 | `GET` |
+| 请求路径 | `/api/videos/{vid}` |
+| 是否需要登录 | 可选登录 |
+| 说明 | 查询已发布视频详情；登录后还会返回当前用户的互动状态和播放进度 |
+
+#### 请求参数
+
+| 参数 | 位置 | 类型 | 是否必填 | 说明 |
+|---|---|---|---|---|
+| vid | 路径 | number | 是 | 视频 ID |
+
+#### 成功响应
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "vid": 1,
+    "uid": 2,
+    "title": "我的第一个视频",
+    "sourceType": 1,
+    "duration": 120.5,
+    "mcId": "douga",
+    "scId": "mad",
+    "tags": "测试,菲比啾比,投稿",
+    "description": "这是视频简介",
+    "coverUrl": "https://example-cos-domain/covers/1/cover.png",
+    "videoUrl": "https://example-cos-domain/videos/1/video.mp4",
+    "createdAt": "2026-07-12T10:00:00",
+    "playTimes": 100,
+    "likeTimes": 20,
+    "coinTimes": 3,
+    "collectTimes": 8,
+    "commentTimes": 0,
+    "danmuTimes": 0,
+    "shareTimes": 5,
+    "liked": true,
+    "coin": 1,
+    "collected": false,
+    "playTime": 35.5
+  }
+}
+```
+
+未登录时，`liked`、`coin`、`collected` 和 `playTime` 等用户状态字段可能为 `null`。
+
+#### curl 示例
+
+```bash
+curl -X GET "http://localhost:8080/api/videos/1"
+```
+
+携带登录状态：
+
+```bash
+curl -X GET "http://localhost:8080/api/videos/1" \
+  -H "Authorization: Bearer <token>"
+```
+
+---
+
+### 4.5 获取视频 Feed
+
+#### 基本信息
+
+| 项 | 内容 |
+|---|---|
+| 请求方法 | `GET` |
+| 请求路径 | `/api/videos/feed` |
+| 是否需要登录 | 是 |
+| 说明 | 使用游标分页查询已发布视频列表 |
+
+#### 请求参数
+
+| 参数 | 位置 | 类型 | 是否必填 | 说明 |
+|---|---|---|---|---|
+| cursor | Query | string | 否 | 下一页游标；首次查询不传 |
+| size | Query | number | 否 | 每页数量，默认 `15` |
+
+#### 成功响应
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "items": [
+      {
+        "vid": 1,
+        "uid": 2,
+        "title": "我的第一个视频",
+        "coverUrl": "https://example-cos-domain/covers/1/cover.png",
+        "duration": 120.5,
+        "playTimes": 100,
+        "commentTimes": 0,
+        "createdAt": "2026-07-12T10:00:00"
+      }
+    ],
+    "nextCursor": "下一页游标示例",
+    "hasMore": true
+  }
+}
+```
+
+#### curl 示例
+
+```bash
+curl -X GET "http://localhost:8080/api/videos/feed?size=15" \
+  -H "Authorization: Bearer <token>"
+```
+
+下一页请求：
+
+```bash
+curl -X GET "http://localhost:8080/api/videos/feed?cursor=<nextCursor>&size=15" \
+  -H "Authorization: Bearer <token>"
+```
+
+---
+
+## 5. 用户视频互动接口
+
+### 5.1 增加播放量
 
 #### 基本信息
 
@@ -770,7 +908,7 @@ curl -X POST "http://localhost:8080/api/videos" \
 |---|---|
 | 请求方法 | `POST` |
 | 请求路径 | `/api/videos/{vid}/play-count` |
-| 是否需要登录 | 否 |
+| 是否需要登录 | 可选登录 |
 | 负责模块 | `UserVideo` 用户—视频关系模块 |
 | 说明 | 将指定视频的总播放量增加一次，不保存用户播放进度 |
 
@@ -796,7 +934,7 @@ curl -X POST "http://localhost:8080/api/videos/1/play-count"
 
 ---
 
-### 4.5 保存播放进度
+### 5.2 保存播放进度
 
 #### 基本信息
 
@@ -861,9 +999,416 @@ curl -X PUT "http://localhost:8080/api/videos/1/progress?playTime=35.5" \
 
 ---
 
-## 5. 推荐测试顺序
+### 5.3 点赞、取消点赞、点踩或取消点踩
 
-### 5.1 用户基础功能测试
+#### 基本信息
+
+| 项 | 内容 |
+|---|---|
+| 请求方法 | `PUT` |
+| 请求路径 | `/api/videos/{vid}/islike` |
+| Content-Type | 无请求体，使用查询参数 |
+| 是否需要登录 | 是 |
+| 说明 | 修改当前用户对视频的点赞或点踩状态；重复设置相同状态时不重复更新统计 |
+
+#### 请求参数
+
+| 参数 | 位置 | 类型 | 是否必填 | 说明 |
+|---|---|---|---|---|
+| vid | 路径 | number | 是 | 已发布视频 ID |
+| islike | Query | boolean | 是 | `true` 表示操作点赞状态，`false` 表示操作点踩状态 |
+| isSet | Query | boolean | 是 | `true` 表示设置，`false` 表示取消 |
+
+参数组合：
+
+| islike | isSet | 操作 |
+|---|---|---|
+| true | true | 点赞 |
+| true | false | 取消点赞 |
+| false | true | 点踩 |
+| false | false | 取消点踩 |
+
+#### 成功响应
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+#### curl 示例
+
+点赞：
+
+```bash
+curl -X PUT "http://localhost:8080/api/videos/1/islike?islike=true&isSet=true" \
+  -H "Authorization: Bearer <token>"
+```
+
+取消点赞：
+
+```bash
+curl -X PUT "http://localhost:8080/api/videos/1/islike?islike=true&isSet=false" \
+  -H "Authorization: Bearer <token>"
+```
+
+---
+
+### 5.4 视频投币
+
+#### 基本信息
+
+| 项 | 内容 |
+|---|---|
+| 请求方法 | `PUT` |
+| 请求路径 | `/api/videos/{vid}/coin` |
+| Content-Type | 无请求体，使用查询参数 |
+| 是否需要登录 | 是 |
+| 说明 | 当前用户给视频投币，同时扣减用户硬币余额并更新视频投币统计 |
+
+#### 请求参数
+
+| 参数 | 位置 | 类型 | 是否必填 | 说明 |
+|---|---|---|---|---|
+| vid | 路径 | number | 是 | 已发布视频 ID |
+| coin | Query | number | 是 | 单次只能传 `1` 或 `2`；当前实现不允许对同一视频重复投币 |
+
+#### 成功响应
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+#### 常见失败响应
+
+```json
+{
+  "code": 400,
+  "message": "单次只能投一个或两个硬币",
+  "data": null
+}
+```
+
+```json
+{
+  "code": 400,
+  "message": "硬币数量不够",
+  "data": null
+}
+```
+
+```json
+{
+  "code": 400,
+  "message": "用户无法对同一个视频多次投币",
+  "data": null
+}
+```
+
+#### curl 示例
+
+```bash
+curl -X PUT "http://localhost:8080/api/videos/1/coin?coin=1" \
+  -H "Authorization: Bearer <token>"
+```
+
+---
+
+### 5.5 增加分享量
+
+#### 基本信息
+
+| 项 | 内容 |
+|---|---|
+| 请求方法 | `PUT` |
+| 请求路径 | `/api/videos/{vid}/share` |
+| 是否需要登录 | 可选登录 |
+| 说明 | 将指定已发布视频的分享次数增加一次 |
+
+#### 成功响应
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+#### curl 示例
+
+```bash
+curl -X PUT "http://localhost:8080/api/videos/1/share"
+```
+
+> 当前接口尚未进行用户、IP 或时间窗口去重，重复调用会重复增加分享量。
+
+---
+
+### 5.6 收藏或取消收藏
+
+#### 基本信息
+
+| 项 | 内容 |
+|---|---|
+| 请求方法 | `POST` |
+| 请求路径 | `/api/videos/{vid}/collect` |
+| Content-Type | 无请求体，使用查询参数 |
+| 是否需要登录 | 是 |
+| 说明 | 修改当前用户对视频的收藏状态；重复设置相同状态时不重复更新统计 |
+
+#### 请求参数
+
+| 参数 | 位置 | 类型 | 是否必填 | 说明 |
+|---|---|---|---|---|
+| vid | 路径 | number | 是 | 已发布视频 ID |
+| isCollect | Query | boolean | 是 | `true` 收藏，`false` 取消收藏 |
+
+#### 成功响应
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+#### curl 示例
+
+收藏：
+
+```bash
+curl -X POST "http://localhost:8080/api/videos/1/collect?isCollect=true" \
+  -H "Authorization: Bearer <token>"
+```
+
+取消收藏：
+
+```bash
+curl -X POST "http://localhost:8080/api/videos/1/collect?isCollect=false" \
+  -H "Authorization: Bearer <token>"
+```
+
+---
+
+## 6. 管理员视频审核接口
+
+> 以下接口要求当前用户角色为管理员或超级管理员。
+
+### 6.1 审核视频
+
+#### 基本信息
+
+| 项 | 内容 |
+|---|---|
+| 请求方法 | `PUT` |
+| 请求路径 | `/api/admin/videos/{vid}/review` |
+| Content-Type | `application/json` |
+| 权限要求 | 管理员 |
+| 说明 | 将视频审核为通过或驳回，状态不允许流转时返回 `409` |
+
+#### 请求体
+
+审核通过：
+
+```json
+{
+  "result": "APPROVED",
+  "reason": null
+}
+```
+
+审核驳回：
+
+```json
+{
+  "result": "REJECTED",
+  "reason": "标题或投稿信息不符合要求"
+}
+```
+
+#### 请求字段说明
+
+| 字段 | 类型 | 是否必填 | 说明 |
+|---|---|---|---|
+| result | string | 是 | 只能是 `APPROVED` 或 `REJECTED`，大小写不敏感 |
+| reason | string | 条件必填 | `REJECTED` 时必须填写驳回原因 |
+
+#### 成功响应
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": null
+}
+```
+
+#### 常见失败响应
+
+```json
+{
+  "code": 400,
+  "message": "审核结果只能是 APPROVED 或 REJECTED",
+  "data": null
+}
+```
+
+```json
+{
+  "code": 400,
+  "message": "驳回视频必须存在原因",
+  "data": null
+}
+```
+
+```json
+{
+  "code": 409,
+  "message": "视频已经由其他管理员审核，请刷新后重试",
+  "data": null
+}
+```
+
+#### curl 示例
+
+```bash
+curl -X PUT "http://localhost:8080/api/admin/videos/1/review" \
+  -H "Authorization: Bearer <管理员token>" \
+  -H "Content-Type: application/json" \
+  -d '{"result":"APPROVED","reason":null}'
+```
+
+---
+
+### 6.2 管理员查询视频完整信息
+
+#### 基本信息
+
+| 项 | 内容 |
+|---|---|
+| 请求方法 | `GET` |
+| 请求路径 | `/api/admin/videos/{vid}` |
+| 权限要求 | 管理员 |
+| 说明 | 查询视频实体和对应的全部视频统计，不受公开视频状态限制 |
+
+#### 成功响应
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "video": {
+      "vid": 1,
+      "uid": 2,
+      "title": "待审核视频",
+      "sourceType": 1,
+      "visibility": 0,
+      "duration": 120.5,
+      "mcId": "douga",
+      "scId": "mad",
+      "tags": "测试,投稿",
+      "description": "视频简介",
+      "coverUrl": "https://example-cos-domain/covers/1/cover.png",
+      "coverKey": "covers/1/cover.png",
+      "videoUrl": "https://example-cos-domain/videos/1/video.mp4",
+      "videoKey": "videos/1/video.mp4",
+      "status": 0,
+      "createdAt": "2026-07-12T10:00:00",
+      "deletedAt": null
+    },
+    "videoStatus": {
+      "vid": 1,
+      "playTimes": 0,
+      "likeTimes": 0,
+      "unlikeTimes": 0,
+      "commentTimes": 0,
+      "coinTimes": 0,
+      "shareTimes": 0,
+      "collectTimes": 0,
+      "danmuTimes": 0
+    }
+  }
+}
+```
+
+#### curl 示例
+
+```bash
+curl -X GET "http://localhost:8080/api/admin/videos/1" \
+  -H "Authorization: Bearer <管理员token>"
+```
+
+---
+
+### 6.3 分页查询指定状态的视频
+
+#### 基本信息
+
+| 项 | 内容                           |
+|---|------------------------------|
+| 请求方法 | `GET`                        |
+| 当前请求路径 | `/api/admin/videospage/page` |
+| 权限要求 | 管理员                          |
+| 说明 | 分页查询指定审核状态的视频                |
+
+
+#### 请求参数
+
+| 参数 | 位置 | 类型 | 是否必填 | 说明 |
+|---|---|---|---|---|
+| page | Query | number | 是 | 当前实现中实际表示页码，从 `1` 开始 |
+| status | Query | number | 否 | 视频状态，Controller 默认 `1` |
+| quantity | Query | number | 否 | 每页数量，默认 `10` |
+
+状态说明：
+
+| status | 含义 |
+|---:|---|
+| 0 | 待审核 |
+| 1 | 审核通过 |
+| 2 | 审核驳回 |
+| 3 | 违规删除 |
+
+#### 成功响应
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "vid": 1,
+      "uid": 2,
+      "title": "待审核视频",
+      "coverUrl": "https://example-cos-domain/covers/1/cover.png",
+      "duration": 120.5,
+      "createdAt": "2026-07-12T10:00:00"
+    }
+  ]
+}
+```
+
+#### curl 示例
+
+```bash
+curl -X GET "http://localhost:8080/api/admin/videospage?pageSize=1&status=0&quantity=10" \
+  -H "Authorization: Bearer <管理员token>"
+```
+
+---
+
+## 7. 推荐测试顺序
+
+### 7.1 用户基础功能测试
 
 1. 调用 `POST /api/auth/register` 注册用户。
 2. 调用 `POST /api/auth/login` 登录用户。
@@ -879,7 +1424,7 @@ Authorization: Bearer <token>
 7. 调用 `PUT /api/users/me/password` 修改密码。
 8. 使用新密码重新调用登录接口。
 
-### 5.2 视频投稿流程测试
+### 7.2 视频投稿流程测试
 
 1. 登录并获取 token。
 2. 调用 `POST /api/videos/upload-url` 获取视频临时上传凭证和 `tempKey`。
@@ -889,15 +1434,40 @@ Authorization: Bearer <token>
 6. 调用 `POST /api/videos` 投稿：
    - `tempVideoKey` 使用第 2 步返回的 `data.tempKey`。
    - `tempCoverKey` 使用第 5 步得到的封面 key。
-7. 成功后返回正式视频 `vid`、`coverUrl`、`videoUrl` 和审核状态。
+7. 成功后返回正式视频 `vid`、`title`、`coverUrl` 和 `videoUrl`。视频会以待审核状态保存，但当前投稿响应不包含 `status` 字段。
+
+### 7.3 视频浏览与互动测试
+
+1. 使用管理员账号审核投稿视频为 `APPROVED`。
+2. 调用 `GET /api/videos/{vid}` 查询视频详情。
+3. 调用 `GET /api/videos/feed` 验证视频出现在 Feed 中。
+4. 调用 `POST /api/videos/{vid}/play-count` 增加播放量。
+5. 登录后调用 `PUT /api/videos/{vid}/progress` 保存播放进度。
+6. 调用 `PUT /api/videos/{vid}/islike` 测试点赞、取消点赞、点踩和取消点踩。
+7. 调用 `PUT /api/videos/{vid}/coin` 测试投币和用户余额扣减。
+8. 调用 `PUT /api/videos/{vid}/share` 增加分享量。
+9. 调用 `POST /api/videos/{vid}/collect` 测试收藏和取消收藏。
+10. 再次查询视频详情，核对统计字段和当前用户互动字段。
+
+### 7.4 管理员审核流程测试
+
+1. 使用管理员账号登录并获取 token。
+2. 调用管理员视频分页接口查询 `status=0` 的待审核视频。
+3. 调用 `GET /api/admin/videos/{vid}` 查询待审核视频完整信息。
+4. 调用 `PUT /api/admin/videos/{vid}/review`，传入 `APPROVED` 或 `REJECTED`。
+5. 驳回时必须提供 `reason`。
+6. 对同一待审核状态并发发起两个审核请求，预期只有一个成功，另一个返回 `409`。
 
 ---
 
-## 6. 测试注意事项
+## 8. 测试注意事项
 
 1. 当前密码逻辑仍是明文比对，适合学习阶段测试；正式项目需要使用 BCrypt 等方式保存密码摘要。
-2. 当前返回的用户角色 `role` 是数字：`0` 普通用户，`1` 管理员，`2` 超级管理员。
+2. 当前返回的用户角色 `role` 是数字：`0` 普通用户，`1` 管理员，`2` 超级管理*员*。
 3. 当前用户状态 `status` 是数字：`0` 正常，`1` 封禁，`2` 注销。
 4. 视频投稿依赖腾讯云 COS 配置，测试视频接口前要确认 COS 配置可用。
 5. `POST /api/videos` 会校验 COS 中临时视频和临时封面对象是否真实存在，所以只传数据库记录但没有实际上传文件会投稿失败。
-6. 全局异常处理会把未处理异常包装成：`code = 500`，`message = "服务器内部错误" + 异常信息`。
+6. 视频详情和互动接口只操作审核通过的已发布视频；未发布视频需要通过管理员接口查询。
+7. `POST /play-count` 和 `PUT /share` 目前没有去重机制，重复调用会重复增加统计。
+8. 当前 `LoginInterceptor` 写入的角色属性名是 `currentRole`，而 `AdminInterceptor` 读取的是 `currentUserRole`。在修复该属性名不一致之前，管理员接口可能无法正常通过权限校验。
+9. 全局异常处理会把未处理异常包装为 `code = 500` 的统一响应，具体提示以当前全局异常处理器实现为准。

@@ -28,7 +28,7 @@ public enum VideoReviewStatus {
     /**
      * 根绝数据库中的状态码获取对应枚举
      */
-    public static VideoReviewStatus fromCode(Integer code) {
+    public static VideoReviewStatus fromCode(Byte code) {
         if(code == null) {
             throw new BusinessException(500, "视频审核转态不能为空");
         }

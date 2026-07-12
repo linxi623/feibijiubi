@@ -4,9 +4,13 @@ import com.feibijiubi.backend.annotation.AdminOnly;
 import com.feibijiubi.backend.common.ApiResponse;
 import com.feibijiubi.backend.dto.VideoReviewDTO;
 import com.feibijiubi.backend.service.video.VideoReviewService;
+import com.feibijiubi.backend.vo.AllVideoDetailVO;
+import com.feibijiubi.backend.vo.UnpubVideoListItemVO;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/videos")
@@ -27,5 +31,25 @@ public class VideoReviewController {
         videoReviewService.videoReview(currentUserId, vid, request);
         return ApiResponse.success(null);
     }
+
+    @AdminOnly
+    @GetMapping("/{vid}")
+    public ApiResponse<AllVideoDetailVO> getVideo(@PathVariable Integer vid,
+                                                        HttpServletRequest request) {
+        Integer currentUserId = (Integer) request.getAttribute("currentUserId");
+        AllVideoDetailVO allVideoDetailVO = videoReviewService.getVideo(currentUserId, vid);
+        return ApiResponse.success(allVideoDetailVO);
+    }
+
+    @AdminOnly
+    @GetMapping("/page")
+    public ApiResponse<List<UnpubVideoListItemVO>> getVideoPage(@RequestParam("page")Integer page,
+                                                                @RequestParam(value = "status", defaultValue = "1")Byte status,
+                                                                @RequestParam(value = "quantity", defaultValue = "10")Integer quantity) {
+        List<UnpubVideoListItemVO> vo = videoReviewService.getVideoList(page, status, quantity);
+        return ApiResponse.success(vo);
+    }
+
+
 
 }

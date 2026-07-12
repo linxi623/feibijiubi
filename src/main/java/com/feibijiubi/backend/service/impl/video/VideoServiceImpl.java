@@ -7,7 +7,6 @@ import com.feibijiubi.backend.entity.UploadTempFile;
 import com.feibijiubi.backend.entity.UserVideo;
 import com.feibijiubi.backend.entity.Video;
 import com.feibijiubi.backend.entity.VideoStatus;
-import com.feibijiubi.backend.enums.VideoReviewStatus;
 import com.feibijiubi.backend.mapper.UploadTempFileMapper;
 import com.feibijiubi.backend.mapper.UserVideoMapper;
 import com.feibijiubi.backend.mapper.VideoMapper;
@@ -72,7 +71,7 @@ public class VideoServiceImpl implements VideoService {
         uploadTempFile.setStatus(TEMP_STATUS_WAIT_SUBMIT);
         uploadTempFile.setExpireAt(LocalDateTime.now().plusDays(1));
         uploadTempFileMapper.insert(uploadTempFile);
-        return url;
+        return objectKey;
     }
 
     @Override
@@ -142,9 +141,13 @@ public class VideoServiceImpl implements VideoService {
             throw new BusinessException(400, "视频参数不合法");
         }
 
-        Video video = videoMapper.selectByVid(vid);
+        Video video = videoMapper.selectPublishedByVid(vid);
         if (video == null) {
             throw new BusinessException(404, "视频不存在");
+        }
+
+        if(video.getVisibility() == 1 && !video.getUid().equals(currentUserId)) {
+            throw new BusinessException(403, "你无权查看此视频");
         }
 
         VideoStatus videoStatus = videoStatusMapper.selectByVid(vid);
@@ -206,6 +209,12 @@ public class VideoServiceImpl implements VideoService {
 
             String createdAtText = cursor.substring(0, separatorIndex);
             String vidText = cursor.substring(separatorIndex + 1);
+            if(!StringUtils.hasText(createdAtText)) {
+                throw new BusinessException(500, "加载视频的创建时间不能为空");
+            }
+            if(!StringUtils.hasText(vidText)) {
+                throw new BusinessException(500, "加载视频的vid不能为空");
+            }
 
             return new String[]{createdAtText, vidText};
 
@@ -265,7 +274,6 @@ public class VideoServiceImpl implements VideoService {
         video.setUid(currentUserId);
         video.setTitle(request.getTitle());
         video.setSourceType(request.getSourceType());
-        video.setVisibility(request.getVisibility());
         video.setDuration(request.getDuration());
         video.setMcId(request.getMcId());
         video.setScId(request.getScId());
@@ -275,7 +283,6 @@ public class VideoServiceImpl implements VideoService {
         video.setCoverUrl(fileStorageService.Key2Url(formalCoverKey));
         video.setVideoKey(formalVideoKey);
         video.setVideoUrl(fileStorageService.Key2Url(formalVideoKey));
-        video.setStatus(VideoReviewStatus.PENDING.getCode());
         video.setCreatedAt(LocalDateTime.now());
         return video;
     }

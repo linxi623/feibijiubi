@@ -214,7 +214,7 @@ public class UserVideoServiceImpl implements UserVideoService {
             throw new BusinessException(400, "视频参数不合法");
         }
 
-        Video video = videoMapper.selectByVid(vid);
+        Video video = videoMapper.selectPublishedByVid(vid);
         if (video == null) {
             throw new BusinessException(404, "视频不存在");
         }

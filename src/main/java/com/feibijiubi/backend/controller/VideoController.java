@@ -37,8 +37,8 @@ public class VideoController {
     public ApiResponse<String> uploadCover(HttpServletRequest request,
                                            @RequestParam("file") MultipartFile file) {
         Integer currentUserId = (Integer) request.getAttribute("currentUserId");
-        String url = videoService.uploadCover(currentUserId, file);
-        return ApiResponse.success(url);
+        String objectKey = videoService.uploadCover(currentUserId, file);
+        return ApiResponse.success(objectKey);
     }
 
     @PostMapping()

@@ -11,7 +11,6 @@ public class VideoDetailVO {
     private Integer uid;
     private String title;
     private Integer sourceType;
-    private Integer visibility;
     private Double duration;
     private String mcId;
     private String scId;
@@ -19,7 +18,6 @@ public class VideoDetailVO {
     private String description;
     private String coverUrl;
     private String videoUrl;
-    private Integer status;
     private LocalDateTime createdAt;
 
     private Integer playTimes;

@@ -17,7 +17,7 @@ public enum UserRole {
     /**
      * 根绝数据库中的状态码获取对应枚举
      */
-    public static UserRole fromCode(Integer code) {
+    public static UserRole fromCode(Byte code) {
         if(code == null) {
             throw new BusinessException(500, "用户角色不能为空");
         }

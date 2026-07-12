@@ -16,7 +16,7 @@ public class Video {
     private Integer uid;
     private String title;
     private Integer sourceType;
-    private Integer visibility;
+    private Byte visibility;
     private Double duration;
     private String mcId;   // 主分区ID
     private String scId;   // 子分区ID
@@ -26,7 +26,7 @@ public class Video {
     private String coverKey;
     private String videoUrl;
     private String videoKey;
-    private Integer status;     // 0审核中 1通过审核 2打回整改（指投稿信息不符） 3视频违规删除（视频内容违规）
+    private Byte status;     // 0审核中 1通过审核 2打回整改（指投稿信息不符） 3视频违规删除（视频内容违规）
     private LocalDateTime createdAt;
     private LocalDateTime deletedAt;
 }

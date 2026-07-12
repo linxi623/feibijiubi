@@ -3,6 +3,7 @@ package com.feibijiubi.backend.converter;
 import com.feibijiubi.backend.entity.UserVideo;
 import com.feibijiubi.backend.entity.Video;
 import com.feibijiubi.backend.entity.VideoStatus;
+import com.feibijiubi.backend.vo.AllVideoDetailVO;
 import com.feibijiubi.backend.vo.VideoDetailVO;
 import com.feibijiubi.backend.vo.VideoListItemVO;
 import com.feibijiubi.backend.vo.VideoSubmitVO;
@@ -12,6 +13,12 @@ import java.util.List;
 
 public final class VideoConverter {
     private VideoConverter() {
+    }
+    public static AllVideoDetailVO toAllVideoDetailVO(Video video, VideoStatus videoStatus) {
+        AllVideoDetailVO vo = new AllVideoDetailVO();
+        vo.setVideo(video);
+        vo.setVideoStatus(videoStatus);
+        return vo;
     }
 
     public static VideoSubmitVO toVideoSubmitVO(Video video) {
@@ -24,7 +31,6 @@ public final class VideoConverter {
         vo.setTitle(video.getTitle());
         vo.setCoverUrl(video.getCoverUrl());
         vo.setVideoUrl(video.getVideoUrl());
-        vo.setStatus(video.getStatus());
         return vo;
     }
 
@@ -70,7 +76,6 @@ public final class VideoConverter {
         vo.setUid(video.getUid());
         vo.setTitle(video.getTitle());
         vo.setSourceType(video.getSourceType());
-        vo.setVisibility(video.getVisibility());
         vo.setDuration(video.getDuration());
         vo.setMcId(video.getMcId());
         vo.setScId(video.getScId());
@@ -78,7 +83,6 @@ public final class VideoConverter {
         vo.setDescription(video.getDescription());
         vo.setCoverUrl(video.getCoverUrl());
         vo.setVideoUrl(video.getVideoUrl());
-        vo.setStatus(video.getStatus());
         vo.setCreatedAt(video.getCreatedAt());
 
         setVideoStatus(vo, videoStatus);

@@ -19,7 +19,7 @@ public enum UserVip {
     /**
      * 根绝数据库中的状态码获取对应枚举
      */
-    public static UserVip fromCode(Integer code) {
+    public static UserVip fromCode(Byte code) {
         if(code == null) {
             throw new BusinessException(500, "用户会员情况不能为空");
         }

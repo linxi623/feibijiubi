@@ -44,7 +44,7 @@ public class LoginInterceptor implements HandlerInterceptor {
         Integer userId = tokenService.getUserId(token);
         Byte role = tokenService.getRole(token);
         request.setAttribute("currentUserId", userId);
-        request.setAttribute("currentRole", role);
+        request.setAttribute("currentUserRole", role);
 
         return true;
     }
