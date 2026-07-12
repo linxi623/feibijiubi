@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.mapper;
 
 import com.feibijiubi.backend.entity.Video;
-import com.feibijiubi.backend.vo.UnpubVideoListItemVO;
+import com.feibijiubi.backend.vo.AdminVideoListItemVO;
 import com.feibijiubi.backend.vo.VideoListItemVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -23,7 +23,7 @@ public interface VideoMapper {
                                      @Param("cursorVid")Integer cursorVid,
                                      @Param("size")Integer size);
 
-    List<UnpubVideoListItemVO> selectUnpub(Byte status);
+    List<AdminVideoListItemVO> selectByStatus(Byte status);
 
     int updateReviewStatus(
             @Param("vid") Integer vid,

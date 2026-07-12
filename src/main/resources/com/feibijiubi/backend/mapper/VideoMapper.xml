@@ -150,7 +150,7 @@
         WHERE vid = #{vid}
     </select>
 
-    <select id="selectUnpub" resultType="com.feibijiubi.backend.vo.UnpubVideoListItemVO">
+    <select id="selectByStatus" resultType="com.feibijiubi.backend.vo.AdminVideoListItemVO">
         SELECT
             vid AS vid,
             uid AS uid,

@@ -5,7 +5,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-public class UnpubVideoListItemVO {
+public class AdminVideoListItemVO {
     private Integer vid;
     private Integer uid;
     private String title;

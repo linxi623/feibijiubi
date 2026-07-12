@@ -297,7 +297,14 @@ Authorization: Bearer <token>
     "role": 0,
     "auth": 0,
     "authMsg": null,
-    "createdAt": "2026-07-09T10:00:00"
+    "createdAt": "2026-07-09T10:00:00",
+    "userCount": {
+      "fansCount": 0,
+      "starCount": 0,
+      "loveCount": 0,
+      "videoCount": 0
+    },
+    "subscribed": false
   }
 }
 ```
@@ -495,7 +502,14 @@ Authorization: Bearer <token>
     "role": 0,
     "auth": 0,
     "authMsg": null,
-    "createdAt": "2026-07-09T10:00:00"
+    "createdAt": "2026-07-09T10:00:00",
+    "userCount": {
+      "fansCount": 0,
+      "starCount": 0,
+      "loveCount": 0,
+      "videoCount": 0
+    },
+    "subscribed": false
   }
 }
 ```
@@ -1297,7 +1311,7 @@ curl -X PUT "http://localhost:8080/api/admin/videos/1/review" \
 | 请求方法 | `GET` |
 | 请求路径 | `/api/admin/videos/{vid}` |
 | 权限要求 | 管理员 |
-| 说明 | 查询视频实体和对应的全部视频统计，不受公开视频状态限制 |
+| 说明 | 查询管理员审核所需的视频、统计和作者信息，不受公开视频状态限制 |
 
 #### 成功响应
 
@@ -1306,36 +1320,32 @@ curl -X PUT "http://localhost:8080/api/admin/videos/1/review" \
   "code": 200,
   "message": "success",
   "data": {
-    "video": {
-      "vid": 1,
-      "uid": 2,
-      "title": "待审核视频",
-      "sourceType": 1,
-      "visibility": 0,
-      "duration": 120.5,
-      "mcId": "douga",
-      "scId": "mad",
-      "tags": "测试,投稿",
-      "description": "视频简介",
-      "coverUrl": "https://example-cos-domain/covers/1/cover.png",
-      "coverKey": "covers/1/cover.png",
-      "videoUrl": "https://example-cos-domain/videos/1/video.mp4",
-      "videoKey": "videos/1/video.mp4",
-      "status": 0,
-      "createdAt": "2026-07-12T10:00:00",
-      "deletedAt": null
-    },
-    "videoStatus": {
-      "vid": 1,
-      "playTimes": 0,
-      "likeTimes": 0,
-      "unlikeTimes": 0,
-      "commentTimes": 0,
-      "coinTimes": 0,
-      "shareTimes": 0,
-      "collectTimes": 0,
-      "danmuTimes": 0
-    }
+    "vid": 1,
+    "uid": 2,
+    "title": "待审核视频",
+    "sourceType": 1,
+    "visibility": 0,
+    "duration": 120.5,
+    "mcId": "douga",
+    "scId": "mad",
+    "tags": "测试,投稿",
+    "description": "视频简介",
+    "coverUrl": "https://example-cos-domain/covers/1/cover.png",
+    "videoUrl": "https://example-cos-domain/videos/1/video.mp4",
+    "status": 0,
+    "createdAt": "2026-07-12T10:00:00",
+    "playTimes": 0,
+    "likeTimes": 0,
+    "unlikeTimes": 0,
+    "commentTimes": 0,
+    "coinTimes": 0,
+    "shareTimes": 0,
+    "collectTimes": 0,
+    "danmuTimes": 0,
+    "avatarUrl": "https://example-cos-domain/avatar/2.png",
+    "nickname": "投稿用户",
+    "videoCount": 1,
+    "fansCount": 0
   }
 }
 ```
@@ -1356,7 +1366,7 @@ curl -X GET "http://localhost:8080/api/admin/videos/1" \
 | 项 | 内容                           |
 |---|------------------------------|
 | 请求方法 | `GET`                        |
-| 当前请求路径 | `/api/admin/videospage/page` |
+| 当前请求路径 | `/api/admin/videos/page` |
 | 权限要求 | 管理员                          |
 | 说明 | 分页查询指定审核状态的视频                |
 

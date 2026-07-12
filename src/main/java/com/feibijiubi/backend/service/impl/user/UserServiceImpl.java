@@ -12,7 +12,6 @@ import com.feibijiubi.backend.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.service.storage.FileStorageService;
 import com.feibijiubi.backend.service.user.UserService;
 import com.feibijiubi.backend.vo.UserCountVO;
-import com.feibijiubi.backend.vo.UserPublicProfileVO;
 import com.feibijiubi.backend.vo.UserVO;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -55,8 +54,7 @@ public class UserServiceImpl implements UserService {
                 videoStatusMapper.countLikeByUid(currentUserId),
                 videoMapper.countVideoByUid(currentUserId)
         );
-        UserPublicProfileVO publicProfile = UserConverter.toUserPublicProfileVO(user, userCount, false);
-        return UserConverter.toUserVO(user, publicProfile);
+        return UserConverter.toUserVO(user, userCount, false);
     }
 
     @Override

@@ -12,8 +12,8 @@ import com.feibijiubi.backend.mapper.UserMapper;
 import com.feibijiubi.backend.mapper.VideoMapper;
 import com.feibijiubi.backend.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.service.video.VideoReviewService;
-import com.feibijiubi.backend.vo.AllVideoDetailVO;
-import com.feibijiubi.backend.vo.UnpubVideoListItemVO;
+import com.feibijiubi.backend.vo.AdminVideoDetailVO;
+import com.feibijiubi.backend.vo.AdminVideoListItemVO;
 import com.github.pagehelper.PageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -83,7 +83,7 @@ public class VideoReviewImpl implements VideoReviewService {
     }
 
     @Override
-    public AllVideoDetailVO getVideo(Integer currentUserId, Integer vid) {
+    public AdminVideoDetailVO getVideo(Integer currentUserId, Integer vid) {
         if(currentUserId == null) {
             throw new BusinessException(401, "请先登录");
         }
@@ -104,7 +104,7 @@ public class VideoReviewImpl implements VideoReviewService {
             throw new BusinessException(500, "视频作者数据异常");
         }
 
-        return VideoConverter.toAllVideoDetailVO(
+        return VideoConverter.toAdminVideoDetailVO(
                 video,
                 videoStatus,
                 author,
@@ -114,7 +114,7 @@ public class VideoReviewImpl implements VideoReviewService {
     }
 
     @Override
-    public List<UnpubVideoListItemVO> getVideoList(Integer page, Byte status, Integer quantity) {
+    public List<AdminVideoListItemVO> getVideoList(Integer page, Byte status, Integer quantity) {
         if(page == null){
             page = 1;
         }
@@ -125,7 +125,7 @@ public class VideoReviewImpl implements VideoReviewService {
             status = 0;
         }
         PageHelper.startPage(page, quantity);
-        return videoMapper.selectUnpub(status);
+        return videoMapper.selectByStatus(status);
     }
 
     private VideoReviewStatus parseTargetStatus(String result) {

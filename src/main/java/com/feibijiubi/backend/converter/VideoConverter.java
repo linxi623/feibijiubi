@@ -4,7 +4,7 @@ import com.feibijiubi.backend.entity.User;
 import com.feibijiubi.backend.entity.UserVideo;
 import com.feibijiubi.backend.entity.Video;
 import com.feibijiubi.backend.entity.VideoStatus;
-import com.feibijiubi.backend.vo.AllVideoDetailVO;
+import com.feibijiubi.backend.vo.AdminVideoDetailVO;
 import com.feibijiubi.backend.vo.VideoDetailVO;
 import com.feibijiubi.backend.vo.VideoListItemVO;
 import com.feibijiubi.backend.vo.VideoSubmitVO;
@@ -15,15 +15,39 @@ import java.util.List;
 public final class VideoConverter {
     private VideoConverter() {
     }
-    public static AllVideoDetailVO toAllVideoDetailVO(Video video, VideoStatus videoStatus,
-                                                      User author, Integer videoCount,
-                                                      Integer fansCount) {
+    public static AdminVideoDetailVO toAdminVideoDetailVO(Video video, VideoStatus videoStatus,
+                                                          User author, Integer videoCount,
+                                                          Integer fansCount) {
         if (video == null) {
             return null;
         }
-        AllVideoDetailVO vo = new AllVideoDetailVO();
-        vo.setVideo(video);
-        vo.setVideoStatus(videoStatus);
+
+        AdminVideoDetailVO vo = new AdminVideoDetailVO();
+        vo.setVid(video.getVid());
+        vo.setUid(video.getUid());
+        vo.setTitle(video.getTitle());
+        vo.setSourceType(video.getSourceType());
+        vo.setVisibility(video.getVisibility());
+        vo.setDuration(video.getDuration());
+        vo.setMcId(video.getMcId());
+        vo.setScId(video.getScId());
+        vo.setTags(video.getTags());
+        vo.setDescription(video.getDescription());
+        vo.setCoverUrl(video.getCoverUrl());
+        vo.setVideoUrl(video.getVideoUrl());
+        vo.setStatus(video.getStatus());
+        vo.setCreatedAt(video.getCreatedAt());
+
+        if (videoStatus != null) {
+            vo.setPlayTimes(videoStatus.getPlayTimes());
+            vo.setLikeTimes(videoStatus.getLikeTimes());
+            vo.setUnlikeTimes(videoStatus.getUnlikeTimes());
+            vo.setCommentTimes(videoStatus.getCommentTimes());
+            vo.setCoinTimes(videoStatus.getCoinTimes());
+            vo.setShareTimes(videoStatus.getShareTimes());
+            vo.setCollectTimes(videoStatus.getCollectTimes());
+            vo.setDanmuTimes(videoStatus.getDanmuTimes());
+        }
         if (author != null) {
             vo.setAvatarUrl(author.getAvatarUrl());
             vo.setNickname(author.getNickname());
