@@ -25,6 +25,7 @@
         WHERE vid = #{vid}
     </select>
 
+
     <update id="increasePlayTimes">
         UPDATE video_status
         SET   play_times = play_times + 1
@@ -66,6 +67,16 @@
         SET   collect_times = GREATEST(collect_times - 1, 0)
         WHERE vid = #{vid}
     </update>
+
+    <select id="countLikeByUid" resultType="java.lang.Integer">
+        SELECT COALESCE(SUM(vs.like_times), 0)
+        FROM video_status vs
+        INNER JOIN video v ON v.vid = vs.vid
+        WHERE v.uid = #{uid}
+        AND v.status = 1
+        AND v.visibility = 0
+        AND v.deleted_at IS NULL
+    </select>
 
     <update id="increaseShareTimes">
         UPDATE video_status

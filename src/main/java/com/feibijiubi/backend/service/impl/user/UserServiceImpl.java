@@ -5,9 +5,14 @@ import com.feibijiubi.backend.converter.UserConverter;
 import com.feibijiubi.backend.dto.UserChangePasswordDTO;
 import com.feibijiubi.backend.dto.UserProfileDTO;
 import com.feibijiubi.backend.entity.User;
+import com.feibijiubi.backend.mapper.UserFollowMapper;
 import com.feibijiubi.backend.mapper.UserMapper;
+import com.feibijiubi.backend.mapper.VideoMapper;
+import com.feibijiubi.backend.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.service.storage.FileStorageService;
 import com.feibijiubi.backend.service.user.UserService;
+import com.feibijiubi.backend.vo.UserCountVO;
+import com.feibijiubi.backend.vo.UserPublicProfileVO;
 import com.feibijiubi.backend.vo.UserVO;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,10 +24,18 @@ import java.util.Objects;
 public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final FileStorageService fileStorageService;
+    private final UserFollowMapper userFollowMapper;
+    private final VideoMapper videoMapper;
+    private final VideoStatusMapper videoStatusMapper;
 
-    public UserServiceImpl(UserMapper userMapper, FileStorageService fileStorageService) {
+    public UserServiceImpl(UserMapper userMapper, FileStorageService fileStorageService,
+                           UserFollowMapper userFollowMapper, VideoMapper videoMapper,
+                           VideoStatusMapper videoStatusMapper) {
         this.userMapper = userMapper;
         this.fileStorageService = fileStorageService;
+        this.userFollowMapper = userFollowMapper;
+        this.videoMapper = videoMapper;
+        this.videoStatusMapper = videoStatusMapper;
     }
 
     @Override
@@ -36,7 +49,14 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(403, "账号状态异常，无法访问");
         }
 
-        return UserConverter.toUserVO(user);
+        UserCountVO userCount = UserConverter.toUserCountVO(
+                userFollowMapper.countFans(currentUserId),
+                userFollowMapper.countStar(currentUserId),
+                videoStatusMapper.countLikeByUid(currentUserId),
+                videoMapper.countVideoByUid(currentUserId)
+        );
+        UserPublicProfileVO publicProfile = UserConverter.toUserPublicProfileVO(user, userCount, false);
+        return UserConverter.toUserVO(user, publicProfile);
     }
 
     @Override

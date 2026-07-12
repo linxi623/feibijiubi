@@ -1,5 +1,6 @@
 package com.feibijiubi.backend.converter;
 
+import com.feibijiubi.backend.entity.User;
 import com.feibijiubi.backend.entity.UserVideo;
 import com.feibijiubi.backend.entity.Video;
 import com.feibijiubi.backend.entity.VideoStatus;
@@ -14,10 +15,21 @@ import java.util.List;
 public final class VideoConverter {
     private VideoConverter() {
     }
-    public static AllVideoDetailVO toAllVideoDetailVO(Video video, VideoStatus videoStatus) {
+    public static AllVideoDetailVO toAllVideoDetailVO(Video video, VideoStatus videoStatus,
+                                                      User author, Integer videoCount,
+                                                      Integer fansCount) {
+        if (video == null) {
+            return null;
+        }
         AllVideoDetailVO vo = new AllVideoDetailVO();
         vo.setVideo(video);
         vo.setVideoStatus(videoStatus);
+        if (author != null) {
+            vo.setAvatarUrl(author.getAvatarUrl());
+            vo.setNickname(author.getNickname());
+        }
+        vo.setVideoCount(defaultZero(videoCount));
+        vo.setFansCount(defaultZero(fansCount));
         return vo;
     }
 
@@ -66,7 +78,11 @@ public final class VideoConverter {
 
     public static VideoDetailVO toVideoDetailVO(Video video,
                                                 VideoStatus videoStatus,
-                                                UserVideo userVideo) {
+                                                UserVideo userVideo,
+                                                User author,
+                                                Integer videoCount,
+                                                Integer fansCount,
+                                                Boolean subscribed) {
         if (video == null) {
             return null;
         }
@@ -87,7 +103,18 @@ public final class VideoConverter {
 
         setVideoStatus(vo, videoStatus);
         setUserVideoStatus(vo, userVideo);
+        if (author != null) {
+            vo.setAvatarUrl(author.getAvatarUrl());
+            vo.setNickname(author.getNickname());
+        }
+        vo.setVideoCount(defaultZero(videoCount));
+        vo.setFansCount(defaultZero(fansCount));
+        vo.setSubscribed(Boolean.TRUE.equals(subscribed));
         return vo;
+    }
+
+    private static Integer defaultZero(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private static void setVideoStatus(VideoDetailVO vo, VideoStatus videoStatus) {

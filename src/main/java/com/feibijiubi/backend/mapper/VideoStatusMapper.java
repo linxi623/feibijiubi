@@ -27,4 +27,7 @@ public interface VideoStatusMapper {
     int decreaseCollectTimes(Integer vid);
 
     int increaseShareTimes(Integer vid);
+
+    int countLikeByUid(Integer uid);
+
 }

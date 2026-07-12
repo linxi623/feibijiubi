@@ -4,10 +4,14 @@ import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.converter.VideoConverter;
 import com.feibijiubi.backend.dto.VideoSubmitDTO;
 import com.feibijiubi.backend.entity.UploadTempFile;
+import com.feibijiubi.backend.entity.User;
 import com.feibijiubi.backend.entity.UserVideo;
 import com.feibijiubi.backend.entity.Video;
 import com.feibijiubi.backend.entity.VideoStatus;
+import com.feibijiubi.backend.enums.VideoReviewStatus;
 import com.feibijiubi.backend.mapper.UploadTempFileMapper;
+import com.feibijiubi.backend.mapper.UserFollowMapper;
+import com.feibijiubi.backend.mapper.UserMapper;
 import com.feibijiubi.backend.mapper.UserVideoMapper;
 import com.feibijiubi.backend.mapper.VideoMapper;
 import com.feibijiubi.backend.mapper.VideoStatusMapper;
@@ -25,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 
 
 @Slf4j
@@ -40,16 +45,23 @@ public class VideoServiceImpl implements VideoService {
     private final VideoStatusMapper videoStatusMapper;
     private final FileStorageService fileStorageService;
     private final UserVideoMapper userVideoMapper;
+    private final UserMapper userMapper;
+    private final UserFollowMapper userFollowMapper;
 
     public VideoServiceImpl(UploadTempFileMapper uploadTempFileMapper,
                             VideoMapper videoMapper,
                             VideoStatusMapper videoStatusMapper,
-                            FileStorageService fileStorageService, UserVideoMapper userVideoMapper) {
+                            FileStorageService fileStorageService,
+                            UserVideoMapper userVideoMapper,
+                            UserMapper userMapper,
+                            UserFollowMapper userFollowMapper) {
         this.uploadTempFileMapper = uploadTempFileMapper;
         this.videoMapper = videoMapper;
         this.videoStatusMapper = videoStatusMapper;
         this.fileStorageService = fileStorageService;
         this.userVideoMapper = userVideoMapper;
+        this.userMapper = userMapper;
+        this.userFollowMapper = userFollowMapper;
     }
 
     @Override
@@ -146,7 +158,8 @@ public class VideoServiceImpl implements VideoService {
             throw new BusinessException(404, "视频不存在");
         }
 
-        if(video.getVisibility() == 1 && !video.getUid().equals(currentUserId)) {
+        if (Objects.equals(video.getVisibility(), (byte) 1)
+                && !Objects.equals(video.getUid(), currentUserId)) {
             throw new BusinessException(403, "你无权查看此视频");
         }
 
@@ -158,8 +171,19 @@ public class VideoServiceImpl implements VideoService {
         UserVideo userVideo = currentUserId == null
                 ? null
                 : userVideoMapper.selectByUidAndVid(currentUserId, vid);
+        User author = userMapper.selectById(video.getUid());
+        if (author == null) {
+            throw new BusinessException(500, "视频作者数据异常");
+        }
+        Integer videoCount = videoMapper.countVideoByUid(video.getUid());
+        Integer fansCount = userFollowMapper.countFans(video.getUid());
+        boolean subscribed = currentUserId != null
+                && !Objects.equals(currentUserId, video.getUid())
+                && Boolean.TRUE.equals(userFollowMapper.checkExist(currentUserId, video.getUid()));
 
-        return VideoConverter.toVideoDetailVO(video, videoStatus, userVideo);
+        return VideoConverter.toVideoDetailVO(
+                video, videoStatus, userVideo, author, videoCount, fansCount, subscribed
+        );
     }
 
     @Override
@@ -233,6 +257,10 @@ public class VideoServiceImpl implements VideoService {
         if (request.getDuration() == null || request.getDuration() <= 0) {
             throw new BusinessException(400, "视频时长不合法");
         }
+        if (request.getVisibility() == null
+                || (request.getVisibility() != 0 && request.getVisibility() != 1)) {
+            throw new BusinessException(400, "视频可见性不合法");
+        }
 
         String videoPrefix = "temp/videos/" + currentUserId + "/";
         if (!request.getTempVideoKey().startsWith(videoPrefix)) {
@@ -274,6 +302,7 @@ public class VideoServiceImpl implements VideoService {
         video.setUid(currentUserId);
         video.setTitle(request.getTitle());
         video.setSourceType(request.getSourceType());
+        video.setVisibility(request.getVisibility().byteValue());
         video.setDuration(request.getDuration());
         video.setMcId(request.getMcId());
         video.setScId(request.getScId());
@@ -283,6 +312,7 @@ public class VideoServiceImpl implements VideoService {
         video.setCoverUrl(fileStorageService.Key2Url(formalCoverKey));
         video.setVideoKey(formalVideoKey);
         video.setVideoUrl(fileStorageService.Key2Url(formalVideoKey));
+        video.setStatus((byte) VideoReviewStatus.PENDING.getCode());
         video.setCreatedAt(LocalDateTime.now());
         return video;
     }

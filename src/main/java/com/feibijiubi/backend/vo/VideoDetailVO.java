@@ -32,4 +32,10 @@ public class VideoDetailVO {
     private Byte coin;
     private Boolean collected;
     private Double playTime;
+
+    private String avatarUrl;
+    private String nickname;
+    private Integer videoCount;
+    private Integer fansCount;
+    private Boolean subscribed;
 }

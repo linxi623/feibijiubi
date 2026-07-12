@@ -3,9 +3,12 @@ package com.feibijiubi.backend.service.impl.video;
 import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.converter.VideoConverter;
 import com.feibijiubi.backend.dto.VideoReviewDTO;
+import com.feibijiubi.backend.entity.User;
 import com.feibijiubi.backend.entity.Video;
 import com.feibijiubi.backend.entity.VideoStatus;
 import com.feibijiubi.backend.enums.VideoReviewStatus;
+import com.feibijiubi.backend.mapper.UserFollowMapper;
+import com.feibijiubi.backend.mapper.UserMapper;
 import com.feibijiubi.backend.mapper.VideoMapper;
 import com.feibijiubi.backend.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.service.video.VideoReviewService;
@@ -22,10 +25,15 @@ import java.util.Locale;
 public class VideoReviewImpl implements VideoReviewService {
     private final VideoMapper videoMapper;
     private final VideoStatusMapper videoStatusMapper;
+    private final UserMapper userMapper;
+    private final UserFollowMapper userFollowMapper;
 
-    public VideoReviewImpl(final VideoMapper videoMapper, VideoStatusMapper videoStatusMapper) {
+    public VideoReviewImpl(VideoMapper videoMapper, VideoStatusMapper videoStatusMapper,
+                           UserMapper userMapper, UserFollowMapper userFollowMapper) {
         this.videoMapper = videoMapper;
         this.videoStatusMapper = videoStatusMapper;
+        this.userMapper = userMapper;
+        this.userFollowMapper = userFollowMapper;
     }
 
     @Override
@@ -35,6 +43,9 @@ public class VideoReviewImpl implements VideoReviewService {
         }
         if(vid == null || vid <= 0){
             throw new BusinessException(400, "视频参数不合法");
+        }
+        if (request == null || !StringUtils.hasText(request.getResult())) {
+            throw new BusinessException(400, "审核结果不能为空");
         }
 
         VideoReviewStatus targetStatus = parseTargetStatus(request.getResult());
@@ -83,13 +94,23 @@ public class VideoReviewImpl implements VideoReviewService {
         if(video == null){
             throw new BusinessException(404, "视频不存在");
         }
-        VideoStatus videoStatus =  videoStatusMapper.selectByVid(vid);
+        VideoStatus videoStatus = videoStatusMapper.selectByVid(vid);
 
         if(videoStatus == null){
             throw new BusinessException(404, "视频状态为空");
         }
+        User author = userMapper.selectById(video.getUid());
+        if (author == null) {
+            throw new BusinessException(500, "视频作者数据异常");
+        }
 
-        return VideoConverter.toAllVideoDetailVO(video, videoStatus);
+        return VideoConverter.toAllVideoDetailVO(
+                video,
+                videoStatus,
+                author,
+                videoMapper.countVideoByUid(video.getUid()),
+                userFollowMapper.countFans(video.getUid())
+        );
     }
 
     @Override

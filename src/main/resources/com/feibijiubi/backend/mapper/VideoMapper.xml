@@ -49,6 +49,7 @@
             AND status = #{oldStatus}
             AND deleted_at IS NULL
     </update>
+
     <select id="selectPublishedByVid"
             resultType="com.feibijiubi.backend.entity.Video">
         SELECT
@@ -56,6 +57,7 @@
             uid,
             title,
             source_type,
+            visibility,
             duration,
             mc_id,
             sc_id,
@@ -63,11 +65,11 @@
             description,
             cover_url,
             video_url,
-            created_at,
+            status,
+            created_at
         FROM video
         WHERE vid = #{vid}
         AND status = 1
-        AND visibility = 0
         AND deleted_at IS NULL
     </select>
 
@@ -92,22 +94,25 @@
         FROM video
         WHERE status = 1
         AND visibility = 0
+        AND deleted_at IS NULL
         ORDER BY created_at DESC
     </select>
 
     <select id="selectFeed"
             resultType="com.feibijiubi.backend.vo.VideoListItemVO">
         SELECT
-            v.vid,
-            v.uid,
-            v.title,
-            v.cover_url,
-            v.duration,
-            vs.play_times,
-            vs.comment_times,
-            v.created_at
+            v.vid AS vid,
+            v.uid AS uid,
+            v.title AS title,
+            v.cover_url AS coverUrl,
+            v.duration AS duration,
+            vs.play_times AS playTimes,
+            vs.comment_times AS commentTimes,
+            v.created_at AS createdAt,
+            u.nickname AS nickname
         FROM video v
         INNER JOIN video_status vs ON vs.vid = v.vid
+        INNER JOIN users u ON u.id = v.uid
         WHERE v.status = 1
         AND v.visibility = 0
         AND v.deleted_at IS NULL
@@ -144,17 +149,28 @@
         FROM video
         WHERE vid = #{vid}
     </select>
+
     <select id="selectUnpub" resultType="com.feibijiubi.backend.vo.UnpubVideoListItemVO">
         SELECT
-            vid,
-            uid,
-            title,
-            coverUrl,
-            duration,
-            created_at
+            vid AS vid,
+            uid AS uid,
+            title AS title,
+            cover_url AS coverUrl,
+            duration AS duration,
+            created_at AS createdAt
         FROM video
         WHERE status = #{status}
+        AND deleted_at IS NULL
         ORDER BY created_at
+    </select>
+
+    <select id="countVideoByUid" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM video
+        WHERE uid = #{uid}
+        AND status = 1
+        AND visibility = 0
+        AND deleted_at IS NULL
     </select>
 
 </mapper>

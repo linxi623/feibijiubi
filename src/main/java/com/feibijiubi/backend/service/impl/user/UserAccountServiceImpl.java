@@ -59,7 +59,6 @@ public class UserAccountServiceImpl implements UserAccountService {
 
         UserLoginVO loginVO = new UserLoginVO();
         loginVO.setToken(tokenService.createToken(user));
-        loginVO.setUser(UserConverter.toUserVO(user));
         return loginVO;
     }
 

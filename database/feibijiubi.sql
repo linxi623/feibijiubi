@@ -4,6 +4,7 @@ CREATE DATABASE IF NOT EXISTS `feibijiubi`
 
 USE `feibijiubi`;
 
+DROP TABLE IF EXISTS `user_follow`;
 DROP TABLE IF EXISTS `upload_temp_file`;
 DROP TABLE IF EXISTS `user_video`;
 DROP TABLE IF EXISTS `video_status`;
@@ -110,3 +111,17 @@ CREATE TABLE `upload_temp_file` (
     KEY `idx_upload_temp_file_uid_status_expire` (`uid`, `status`, `expire_at`),
     CONSTRAINT `fk_upload_temp_file_uid` FOREIGN KEY (`uid`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='上传临时文件表';
+
+CREATE TABLE `user_follow` (
+    `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '唯一标识',
+    `follower_id` INT NOT NULL COMMENT '关注者用户id',
+    `followed_id` INT NOT NULL COMMENT '被关注者id',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '关注时间',
+
+    UNIQUE KEY uk_follower_followed (follower_id, followed_id),
+    KEY idx_followed_id (followed_id),
+    CONSTRAINT `fk_user_follow_follower_id` FOREIGN KEY (`follower_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_user_follow_followed_id` FOREIGN KEY (`followed_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `ck_user_follow_not_self`
+        CHECK (`follower_id` <> `followed_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户关系表';

@@ -1,6 +1,8 @@
 package com.feibijiubi.backend.converter;
 
 import com.feibijiubi.backend.entity.User;
+import com.feibijiubi.backend.vo.UserCountVO;
+import com.feibijiubi.backend.vo.UserPublicProfileVO;
 import com.feibijiubi.backend.vo.UserVO;
 
 import java.util.Collections;
@@ -10,41 +12,56 @@ public final class UserConverter {
     private UserConverter() {
     }
 
-    public static UserVO toUserVO(User user) {
+    public static UserCountVO toUserCountVO(Integer fansCount, Integer starCount,
+                                          Integer loveCount, Integer videoCount) {
+        UserCountVO userCountVO = new UserCountVO();
+        userCountVO.setFansCount(defaultZero(fansCount));
+        userCountVO.setStarCount(defaultZero(starCount));
+        userCountVO.setLoveCount(defaultZero(loveCount));
+        userCountVO.setVideoCount(defaultZero(videoCount));
+        return userCountVO;
+    }
+
+    public static UserVO toUserVO(User user, UserPublicProfileVO userPublicProfileVO) {
         if (user == null) {
             return null;
         }
-
         UserVO userVO = new UserVO();
-        userVO.setId(user.getId());
         userVO.setUsername(user.getUsername());
-        userVO.setNickname(user.getNickname());
-        userVO.setAvatarUrl(user.getAvatarUrl());
-        userVO.setBackgroundUrl(user.getBackgroundUrl());
-        userVO.setGender(toInteger(user.getGender()));
-        userVO.setDescription(user.getDescription());
-        userVO.setExperience(user.getExperience());
         userVO.setCoin(user.getCoin());
-        userVO.setVip(toInteger(user.getVip()));
-        userVO.setStatus(toInteger(user.getStatus()));
-        userVO.setRole(toInteger(user.getRole()));
-        userVO.setAuth(toInteger(user.getAuth()));
-        userVO.setAuthMsg(user.getAuthMsg());
         userVO.setCreatedAt(user.getCreatedAt());
+        userVO.setUserPublicProfile(userPublicProfileVO);
         return userVO;
-    }
-
-    public static List<UserVO> toUserVOList(List<User> users) {
-        if (users == null || users.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        return users.stream()
-                .map(UserConverter::toUserVO)
-                .toList();
     }
 
     private static Integer toInteger(Byte value) {
         return value == null ? null : value.intValue();
+    }
+
+    private static Integer defaultZero(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    public static UserPublicProfileVO toUserPublicProfileVO(User user, UserCountVO userCountVO, Boolean subscribed) {
+        if (user == null) {
+            return null;
+        }
+        UserPublicProfileVO userPublicProfileVO = new UserPublicProfileVO();
+        userPublicProfileVO.setId(user.getId());
+        userPublicProfileVO.setNickname(user.getNickname());
+        userPublicProfileVO.setAvatarUrl(user.getAvatarUrl());
+        userPublicProfileVO.setBackgroundUrl(user.getBackgroundUrl());
+        userPublicProfileVO.setGender(toInteger(user.getGender()));
+        userPublicProfileVO.setDescription(user.getDescription());
+        userPublicProfileVO.setExperience(user.getExperience());
+        userPublicProfileVO.setVip(user.getVip());
+        userPublicProfileVO.setStatus(user.getStatus());
+        userPublicProfileVO.setRole(user.getRole());
+        userPublicProfileVO.setAuth(user.getAuth());
+        userPublicProfileVO.setAuthMsg(user.getAuthMsg());
+        userPublicProfileVO.setUserCount(userCountVO);
+        userPublicProfileVO.setSubscribed(subscribed);
+
+        return userPublicProfileVO;
     }
 }

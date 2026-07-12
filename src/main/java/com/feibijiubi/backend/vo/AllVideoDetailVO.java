@@ -8,4 +8,8 @@ import lombok.Data;
 public class AllVideoDetailVO {
     private Video video;
     private VideoStatus videoStatus;
+    private String avatarUrl;
+    private String nickname;
+    private Integer videoCount;
+    private Integer fansCount;
 }

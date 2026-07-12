@@ -1,0 +1,39 @@
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.feibijiubi.backend.mapper.UserFollowMapper">
+
+    <insert id="insert">
+        INSERT INTO user_follow (
+            follower_id,
+            followed_id,
+            created_at
+        ) VALUES (
+            #{followerId},
+            #{followedId},
+            #{createdAt}
+        )
+    </insert>
+
+    <select id="checkExist" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM user_follow
+            WHERE follower_id = #{followerId}
+            AND followed_id = #{followedId}
+        )
+    </select>
+
+    <select id="countFans" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM user_follow
+        WHERE followed_id = #{userId}
+    </select>
+
+    <select id="countStar" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM user_follow
+        WHERE follower_id = #{userId}
+    </select>
+</mapper>

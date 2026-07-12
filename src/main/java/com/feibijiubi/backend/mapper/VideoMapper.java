@@ -30,4 +30,6 @@ public interface VideoMapper {
             @Param("oldStatus") Integer oldStatus,
             @Param("newStatus") Integer newStatus
     );
+
+    int countVideoByUid(Integer uid);
 }

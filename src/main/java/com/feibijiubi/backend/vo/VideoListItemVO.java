@@ -15,4 +15,6 @@ public class VideoListItemVO {
     private Integer playTimes;
     private Integer commentTimes;
     private LocalDateTime createdAt;
+
+    private String nickname;
 }
