@@ -16,6 +16,12 @@
         )
     </insert>
 
+    <delete id="delete">
+        DELETE FROM user_follow
+        WHERE follower_id = #{followerId}
+          AND followed_id = #{followedId}
+    </delete>
+
     <select id="checkExist" resultType="boolean">
         SELECT EXISTS(
             SELECT 1

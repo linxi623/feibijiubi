@@ -5,6 +5,7 @@ import com.feibijiubi.backend.converter.UserConverter;
 import com.feibijiubi.backend.dto.UserChangePasswordDTO;
 import com.feibijiubi.backend.dto.UserProfileDTO;
 import com.feibijiubi.backend.entity.User;
+import com.feibijiubi.backend.entity.UserFollow;
 import com.feibijiubi.backend.mapper.UserFollowMapper;
 import com.feibijiubi.backend.mapper.UserMapper;
 import com.feibijiubi.backend.mapper.VideoMapper;
@@ -41,7 +42,7 @@ public class UserServiceImpl implements UserService {
     public UserVO getCurrentUser(Integer currentUserId) {
         User user = userMapper.selectById(currentUserId);
         if (user == null) {
-            throw new BusinessException(401, "登录状态异常，请重新登录");
+            throw new BusinessException(401, "查询用户异常");
         }
 
         if (user.getStatus() != null && user.getStatus() != 0) {
@@ -108,6 +109,48 @@ public class UserServiceImpl implements UserService {
 
         return avatarUrl;
     }
+
+    @Override
+    public void subscribe(Integer currentUserId, Integer uid, Boolean isSet) {
+        if (currentUserId == null) {
+            throw new BusinessException(401, "请重新登录");
+        }
+        if (uid == null || isSet == null) {
+            throw new BusinessException(400, "请求参数不能为空");
+        }
+
+        boolean isExist = userFollowMapper.checkExist(currentUserId, uid);
+
+        // 设置为关注状态
+        if (isSet) {
+            if (isExist) {
+                throw new BusinessException(400, "不能重复关注");
+            }
+
+            UserFollow userFollow = new UserFollow();
+            userFollow.setFollowerId(currentUserId);
+            userFollow.setFollowedId(uid);
+            userFollow.setCreatedAt(LocalDateTime.now());
+
+            int rows = userFollowMapper.insert(userFollow);
+            if (rows != 1) {
+                throw new BusinessException(500, "关注失败");
+            }
+
+            return;
+        }
+
+        // 设置为未关注状态
+        if (!isExist) {
+            throw new BusinessException(400, "不能重复取消关注");
+        }
+
+        int rows = userFollowMapper.delete(currentUserId, uid);
+        if (rows != 1) {
+            throw new BusinessException(500, "取消关注失败");
+        }
+    }
+
 
     private void validateChangePasswordRequest(UserChangePasswordDTO request){
         if(request == null) {

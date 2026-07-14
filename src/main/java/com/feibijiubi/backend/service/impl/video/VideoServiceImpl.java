@@ -24,6 +24,8 @@ import com.feibijiubi.backend.vo.VideoSubmitVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -217,6 +219,45 @@ public class VideoServiceImpl implements VideoService {
         cursorPageVO.setHasMore(hasMore);
 
         return cursorPageVO;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteVideo(Integer currentUserId, Integer vid) {
+        if(currentUserId == null) {
+            throw new BusinessException(401, "请重新登录");
+        }
+        if(vid == null || vid <= 0) {
+            throw new BusinessException(400, "视频参数不合法");
+        }
+        Video video = videoMapper.selectByVid(vid);
+        if (video == null) {
+            throw new BusinessException(404, "视频不存在");
+        }
+        if (video.getDeletedAt() != null) {
+            throw new BusinessException(404, "视频已经删除");
+        }
+        if(!Objects.equals(currentUserId, video.getUid())) {
+            throw new BusinessException(403, "你无权删除该视频");
+        }
+        // 防范并发错误
+        int rows = videoMapper.softDeleteByOwner(vid, currentUserId, LocalDateTime.now());
+        if (rows != 1) {
+            throw new BusinessException(409, "视频已经被删除，请勿重复操作");
+        }
+        // 事务提交后再删除cos的视频资源
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            throw new BusinessException(500, "视频删除事务未正确开启");
+        }
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        deleteFormalObjectQuietly(video.getCoverKey());
+                        deleteFormalObjectQuietly(video.getVideoKey());
+                    }
+                }
+        );
     }
 
     private String[] parseCursor(String cursor) {

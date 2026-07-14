@@ -5,6 +5,7 @@ import com.feibijiubi.backend.dto.UserLoginDTO;
 import com.feibijiubi.backend.dto.UserRegisterDTO;
 import com.feibijiubi.backend.service.user.UserAccountService;
 import com.feibijiubi.backend.vo.UserLoginVO;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -31,4 +32,12 @@ public class UserAccountController {
         UserLoginVO loginResult = userAccountService.login(request);
         return ApiResponse.success("登录成功", loginResult);
     }
+
+    @PostMapping("/logout")
+    public ApiResponse<Void> logout(HttpServletRequest request) {
+        Integer currentUserId = (Integer) request.getAttribute("currentUserId");
+        userAccountService.logout(currentUserId);
+        return ApiResponse.successMessage("退出成功");
+    }
+
 }

@@ -8,4 +8,6 @@ public interface UserAccountService {
     void register(UserRegisterDTO request);
 
     UserLoginVO login(UserLoginDTO request);
+
+    void logout(Integer currentUserId);
 }

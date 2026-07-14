@@ -71,27 +71,27 @@ Authorization: Bearer <登录接口返回的 token>
 ### 1.5 当前接口清单
 
 | 模块 | 方法 | 路径                               | 权限要求 |
-|---|---:|----------------------------------|---|
-| 账号 | POST | `/api/auth/register`             | 公开 |
-| 账号 | POST | `/api/auth/login`                | 公开 |
-| 用户 | GET | `/api/users/me`                  | 登录 |
-| 用户 | PUT | `/api/users/me`                  | 登录 |
-| 用户 | PUT | `/api/users/me/password`         | 登录 |
-| 用户 | PUT | `/api/users/me/avatar`           | 登录 |
-| 视频 | POST | `/api/videos/upload-url`         | 登录 |
-| 视频 | POST | `/api/videos/cover`              | 登录 |
-| 视频 | POST | `/api/videos`                    | 登录 |
+|---|---:|----------------------------------|------|
+| 账号 | POST | `/api/auth/register`             | 公开   |
+| 账号 | POST | `/api/auth/login`                | 公开   |
+| 用户 | GET | `/api/users/me`                  | 登录   |
+| 用户 | PUT | `/api/users/me`                  | 登录   |
+| 用户 | PUT | `/api/users/me/password`         | 登录   |
+| 用户 | PUT | `/api/users/me/avatar`           | 登录   |
+| 视频 | POST | `/api/videos/upload-url`         | 登录   |
+| 视频 | POST | `/api/videos/cover`              | 登录   |
+| 视频 | POST | `/api/videos`                    | 登录   |
 | 视频 | GET | `/api/videos/{vid}`              | 可选登录 |
-| 视频 | GET | `/api/videos/feed`               | 登录 |
+| 视频 | GET | `/api/videos/feed`               | 可选登录 |
 | 用户视频 | POST | `/api/videos/{vid}/play-count`   | 可选登录 |
-| 用户视频 | PUT | `/api/videos/{vid}/progress`     | 登录 |
-| 用户视频 | PUT | `/api/videos/{vid}/islike`       | 登录 |
-| 用户视频 | PUT | `/api/videos/{vid}/coin`         | 登录 |
+| 用户视频 | PUT | `/api/videos/{vid}/progress`     | 登录   |
+| 用户视频 | PUT | `/api/videos/{vid}/islike`       | 登录   |
+| 用户视频 | PUT | `/api/videos/{vid}/coin`         | 登录   |
 | 用户视频 | PUT | `/api/videos/{vid}/share`        | 可选登录 |
-| 用户视频 | POST | `/api/videos/{vid}/collect`      | 登录 |
-| 视频审核 | PUT | `/api/admin/videos/{vid}/review` | 管理员 |
-| 视频审核 | GET | `/api/admin/videos/{vid}`        | 管理员 |
-| 视频审核 | GET | `/api/admin/videospage/page`     | 管理员 |
+| 用户视频 | POST | `/api/videos/{vid}/collect`      | 登录   |
+| 视频审核 | PUT | `/api/admin/videos/{vid}/review` | 管理员  |
+| 视频审核 | GET | `/api/admin/videos/{vid}`        | 管理员  |
+| 视频审核 | GET | `/api/admin/videospage/page`     | 管理员  |
 
 
 ---
@@ -488,28 +488,7 @@ Authorization: Bearer <token>
   "code": 200,
   "message": "修改成功",
   "data": {
-    "id": 1,
-    "username": "linxi",
-    "nickname": "新的昵称",
-    "avatarUrl": "https://example-cos-domain/avatar/1/20260709/xxx.png",
-    "backgroundUrl": null,
-    "gender": 1,
-    "description": "这是我的个人简介",
-    "experience": 0,
-    "coin": 0,
-    "vip": 0,
-    "status": 0,
-    "role": 0,
-    "auth": 0,
-    "authMsg": null,
-    "createdAt": "2026-07-09T10:00:00",
-    "userCount": {
-      "fansCount": 0,
-      "starCount": 0,
-      "loveCount": 0,
-      "videoCount": 0
-    },
-    "subscribed": false
+    "avatarUrl": "https://example-cos-domain/avatar/1/20260709/xxx.png"
   }
 }
 ```
@@ -657,7 +636,7 @@ Authorization: Bearer <token>
 {
   "code": 200,
   "message": "success",
-  "data": "https://example-cos-domain/temp/covers/1/20260709/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.png"
+  "data": "temp/covers/1/20260709/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.png"
 }
 ```
 

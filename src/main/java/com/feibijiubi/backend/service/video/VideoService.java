@@ -16,4 +16,6 @@ public interface VideoService {
     VideoDetailVO getVideoDetail(Integer currentUserId, Integer vid);
 
     CursorPageVO<VideoListItemVO> getVideoFeed(String cursor, Integer size);
+
+    void deleteVideo(Integer currentUserId, Integer vid);
 }

@@ -14,4 +14,7 @@ public interface UserFollowMapper {
     int countFans(Integer userId);
 
     int countStar(Integer userId);
+
+    int delete(@Param("followerId") Integer followerId,
+               @Param("followedId") Integer followedId);
 }

@@ -62,6 +62,11 @@ public class UserAccountServiceImpl implements UserAccountService {
         return loginVO;
     }
 
+    @Override
+    public void logout(Integer currentUserId) {
+        return;
+    }
+
     private void validateRegisterRequest(UserRegisterDTO request) {
         if (request == null) {
             throw new BusinessException(400, "请求参数不能为空");

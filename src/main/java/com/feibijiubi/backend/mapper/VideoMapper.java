@@ -32,4 +32,10 @@ public interface VideoMapper {
     );
 
     int countVideoByUid(Integer uid);
+
+    int updateVideo(Video video);
+
+    int softDeleteByOwner(@Param("vid") Integer vid,
+                          @Param("uid") Integer uid,
+                          @Param("deletedAt") LocalDateTime deletedAt);
 }

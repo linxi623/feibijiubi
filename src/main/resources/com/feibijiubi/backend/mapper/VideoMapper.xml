@@ -49,6 +49,35 @@
             AND status = #{oldStatus}
             AND deleted_at IS NULL
     </update>
+    <update id="updateVideo">
+        UPDATE video
+        <set>
+            <if test="title != null and title != ''">title = #{title},</if>
+            <if test="sourceType != null">source_type = #{sourceType},</if>
+            <if test="visibility != null">visibility = #{visibility},</if>
+            <if test="duration != null">duration = #{duration},</if>
+            <if test="mcId != null and mcId != ''">mc_id = #{mcId},</if>
+            <if test="scId != null and scId != ''">sc_id = #{scId},</if>
+            <if test="tags != null">tags = #{tags},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="coverUrl != null and coverUrl != ''">cover_url = #{coverUrl},</if>
+            <if test="coverKey != null and coverKey != ''">cover_key = #{coverKey},</if>
+            <if test="videoUrl != null and videoUrl != ''">video_url = #{videoUrl},</if>
+            <if test="videoKey != null and videoKey != ''">video_key = #{videoKey},</if>
+            <if test="deletedAt != null">deleted_at = #{deletedAt},</if>
+        </set>
+        WHERE vid = #{vid}
+          AND uid = #{uid}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="softDeleteByOwner">
+        UPDATE video
+        SET deleted_at = #{deletedAt}
+        WHERE vid = #{vid}
+          AND uid = #{uid}
+          AND deleted_at IS NULL
+    </update>
 
     <select id="selectPublishedByVid"
             resultType="com.feibijiubi.backend.entity.Video">
@@ -143,9 +172,12 @@
             tags,
             description,
             cover_url,
+            cover_key,
             video_url,
+            video_key,
             status,
-            created_at
+            created_at,
+            deleted_at
         FROM video
         WHERE vid = #{vid}
     </select>

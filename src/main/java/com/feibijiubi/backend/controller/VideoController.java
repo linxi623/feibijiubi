@@ -49,6 +49,13 @@ public class VideoController {
         return ApiResponse.success("投稿成功", vo);
     }
 
+    @DeleteMapping("/{vid}/delete")
+    public ApiResponse<Void> deleteVideo(HttpServletRequest httprequest, @PathVariable Integer vid) {
+        Integer currentUserId = (Integer) httprequest.getAttribute("currentUserId");
+        videoService.deleteVideo(currentUserId, vid);
+        return ApiResponse.successMessage("删除成功");
+    }
+
     @OptionalLogin
     @GetMapping("/{vid}")
     public ApiResponse<VideoDetailVO> getVideoDetail(HttpServletRequest httprequest,
@@ -58,6 +65,7 @@ public class VideoController {
         return ApiResponse.success(vo);
     }
 
+    @OptionalLogin
     @GetMapping("/feed")
     public ApiResponse<CursorPageVO<VideoListItemVO>> getVideoFeed(@RequestParam(required = false) String cursor,
                                                   @RequestParam(defaultValue = "15") Integer size) {

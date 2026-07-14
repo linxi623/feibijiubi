@@ -13,4 +13,6 @@ public interface UserService {
     void updatePassword(Integer currentUserId, UserChangePasswordDTO request);
 
     String updateAvatar(Integer currentUserId, MultipartFile file);
+
+    void subscribe(Integer currentUserId, Integer uid, Boolean isSet);
 }

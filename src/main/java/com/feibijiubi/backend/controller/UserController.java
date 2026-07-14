@@ -1,5 +1,6 @@
 package com.feibijiubi.backend.controller;
 
+import com.feibijiubi.backend.annotation.OptionalLogin;
 import com.feibijiubi.backend.common.ApiResponse;
 import com.feibijiubi.backend.dto.UserChangePasswordDTO;
 import com.feibijiubi.backend.dto.UserProfileDTO;
@@ -26,6 +27,13 @@ public class UserController {
         return ApiResponse.success("查询成功", user);
     }
 
+    @OptionalLogin
+    @GetMapping("/{uid}")
+    public ApiResponse<UserVO> getUser(@PathVariable Integer uid) {
+        UserVO vo = userService.getCurrentUser(uid);
+        return ApiResponse.success("查询成功", vo);
+    }
+
     @PutMapping("/me")
     public ApiResponse<Void> updateProfile(HttpServletRequest httprequest,
                                              @Valid @RequestBody UserProfileDTO request) {
@@ -43,12 +51,20 @@ public class UserController {
     }
 
     @PutMapping("/me/avatar")
-    public ApiResponse<UserVO> updateAvatar(HttpServletRequest httprequest,
+    public ApiResponse<String> updateAvatar(HttpServletRequest httprequest,
                                            @RequestParam("file") MultipartFile file) {
         Integer currentUserId = (Integer) httprequest.getAttribute("currentUserId");
         String avatarUrl = userService.updateAvatar(currentUserId, file);
-        UserVO user = userService.getCurrentUser(currentUserId);
-        return ApiResponse.success("修改成功", user);
+        return ApiResponse.success("修改成功", avatarUrl);
+    }
+
+    @PostMapping("/{uid}/subscribe")
+    public ApiResponse<Void> subscribe(HttpServletRequest request,
+                                       @PathVariable Integer uid,
+                                       @RequestParam("isSet") Boolean isSet) {
+        Integer currentUserId = (Integer) request.getAttribute("currentUserId");
+        userService.subscribe(currentUserId, uid, isSet);
+        return ApiResponse.success(null);
     }
 
 }
