@@ -14,4 +14,12 @@ public class RedisKeyUtils {
     public static String jwtToken(String jti) {
         return RedisConstants.JWT_TOKEN_PREFIX + jti;
     }
+
+    public static String rateUpload(Integer uid) {
+        return RedisConstants.RATE_UPLOAD_PREFIX + uid;
+    }
+
+    public static String loginFailTimes(String username) {
+        return RedisConstants.LOGIN_FAIL_PREFIX + username;
+    }
 }

@@ -3,11 +3,13 @@ package com.feibijiubi.backend.service.impl.user;
 import com.feibijiubi.backend.mapper.UserMapper;
 import com.feibijiubi.backend.service.auth.TokenContext;
 import com.feibijiubi.backend.service.auth.TokenService;
+import com.feibijiubi.backend.utils.redis.RedisUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.time.Duration;
 import java.util.Date;
@@ -23,12 +25,14 @@ class UserAccountServiceImplTests {
     private UserMapper userMapper;
     @Mock
     private TokenService tokenService;
+    @Mock
+    private RedisUtils redisUtils;
 
     private UserAccountServiceImpl userAccountService;
 
     @BeforeEach
     void setUp() {
-        userAccountService = new UserAccountServiceImpl(userMapper, tokenService);
+        userAccountService = new UserAccountServiceImpl(userMapper, tokenService, redisUtils);
     }
 
     @Test

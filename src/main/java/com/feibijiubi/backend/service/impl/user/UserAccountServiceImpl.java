@@ -9,7 +9,12 @@ import com.feibijiubi.backend.mapper.UserMapper;
 import com.feibijiubi.backend.service.auth.TokenContext;
 import com.feibijiubi.backend.service.auth.TokenService;
 import com.feibijiubi.backend.service.user.UserAccountService;
+import com.feibijiubi.backend.utils.redis.RedisConstants;
+import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
+import com.feibijiubi.backend.utils.redis.RedisUtils;
 import com.feibijiubi.backend.vo.UserLoginVO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -17,14 +22,12 @@ import java.time.Duration;
 import java.util.Objects;
 
 @Service
+@RequiredArgsConstructor
 public class UserAccountServiceImpl implements UserAccountService {
     private final UserMapper userMapper;
     private final TokenService tokenService;
+    private final RedisUtils redisUtils;
 
-    public UserAccountServiceImpl(UserMapper userMapper, TokenService tokenService) {
-        this.userMapper = userMapper;
-        this.tokenService = tokenService;
-    }
 
     @Override
     public void register(UserRegisterDTO request) {
@@ -49,11 +52,32 @@ public class UserAccountServiceImpl implements UserAccountService {
         if (request == null) {
             throw new BusinessException(400, "请求参数不能为空");
         }
-        User user = userMapper.selectByUsernameForLogin(request.getUsername());
+        String username = request.getUsername();
+        String password = request.getPassword();
+
+        String failKey = RedisKeyUtils.loginFailTimes(username);
+        String failCountStr = redisUtils.getString(failKey);
+        int failTimes = 0;
+        if (StringUtils.hasText(failCountStr)) {
+            failTimes = Integer.parseInt(failCountStr);
+        }
+
+        if(failTimes >= 10) {
+            throw new BusinessException(429, "登录失败次数过多，请等" +
+                    RedisConstants.LOGIN_FAIL_EXPIRE_TIME / 60 + "分钟后重试");
+        }
+
+        User user = userMapper.selectByUsernameForLogin(username);
+
         if (user == null ||
-                !Objects.equals(request.getPassword(), user.getPasswordHash())) {
+                !Objects.equals(password, user.getPasswordHash())) {
+            failTimes++;
+            redisUtils.setString(failKey, String.valueOf(failTimes),
+                    Duration.ofSeconds(RedisConstants.LOGIN_FAIL_EXPIRE_TIME));
             throw new BusinessException(400, "用户名或密码错误");
         }
+
+        redisUtils.delete(failKey);
 
         if (user.getStatus() != null && user.getStatus() != 0) {
             throw new BusinessException(403, "账号状态异常，无法登录");
