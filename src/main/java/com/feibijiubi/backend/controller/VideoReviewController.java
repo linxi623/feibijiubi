@@ -23,7 +23,7 @@ public class VideoReviewController {
     }
 
     @AdminOnly
-    @PutMapping("/{vid}/review")
+    @PostMapping("/{vid}/review")
     public ApiResponse<Void> videoReview(HttpServletRequest httprequest,
                                          @PathVariable Integer vid,
                                          @Valid @RequestBody VideoReviewDTO request) {

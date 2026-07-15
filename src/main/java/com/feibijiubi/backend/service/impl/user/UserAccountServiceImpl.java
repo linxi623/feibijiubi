@@ -6,12 +6,14 @@ import com.feibijiubi.backend.dto.UserLoginDTO;
 import com.feibijiubi.backend.dto.UserRegisterDTO;
 import com.feibijiubi.backend.entity.User;
 import com.feibijiubi.backend.mapper.UserMapper;
+import com.feibijiubi.backend.service.auth.TokenContext;
 import com.feibijiubi.backend.service.auth.TokenService;
 import com.feibijiubi.backend.service.user.UserAccountService;
 import com.feibijiubi.backend.vo.UserLoginVO;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.util.Objects;
 
 @Service
@@ -63,8 +65,21 @@ public class UserAccountServiceImpl implements UserAccountService {
     }
 
     @Override
-    public void logout(Integer currentUserId) {
-        return;
+    public void logout(TokenContext tokenContext) {
+        if (tokenContext == null || !StringUtils.hasText(tokenContext.jti())) {
+            throw new BusinessException(401, "登录状态失效");
+        }
+        if (tokenService.isBlacklisted(tokenContext.jti())) {
+            return;
+        }
+
+        Duration remainingTtl = Duration.ofMillis(
+                tokenContext.expireTime().getTime() - System.currentTimeMillis()
+        );
+        if (remainingTtl.isZero() || remainingTtl.isNegative()) {
+            throw new BusinessException(401, "登录状态已失效");
+        }
+        tokenService.blacklist(tokenContext.jti(), remainingTtl);
     }
 
     private void validateRegisterRequest(UserRegisterDTO request) {

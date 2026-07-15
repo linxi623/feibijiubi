@@ -27,7 +27,7 @@ public class UserVideoController {
         return ApiResponse.success(null);
     }
 
-    @PutMapping("/{vid}/progress")
+    @PostMapping("/{vid}/progress")
     public ApiResponse<Void> savePlayProgress(@PathVariable Integer vid,
                                               HttpServletRequest request,
                                               @RequestParam("playTime") Double playTime) {
@@ -36,7 +36,7 @@ public class UserVideoController {
         return ApiResponse.success(null);
     }
 
-    @PutMapping("/{vid}/islike")
+    @PostMapping("/{vid}/islike")
     public ApiResponse<Void> recordLike(@PathVariable Integer vid,
                                         HttpServletRequest request,
                                         @RequestParam("islike")Boolean islike,
@@ -46,7 +46,7 @@ public class UserVideoController {
         return ApiResponse.success(null);
     }
 
-    @PutMapping("/{vid}/coin")
+    @PostMapping("/{vid}/coin")
     public ApiResponse<Void> increaseCoin(@PathVariable Integer vid,
                                           HttpServletRequest request,
                                           @RequestParam("coin")Byte coin) {
@@ -56,7 +56,7 @@ public class UserVideoController {
     }
 
     @OptionalLogin
-    @PutMapping("/{vid}/share")
+    @PostMapping("/{vid}/share")
     public ApiResponse<Void> increaseShare(@PathVariable Integer vid) {
         userVideoService.increaseShare(vid);
         return ApiResponse.success(null);

@@ -49,7 +49,7 @@ public class VideoController {
         return ApiResponse.success("投稿成功", vo);
     }
 
-    @DeleteMapping("/{vid}/delete")
+    @PostMapping("/{vid}/delete")
     public ApiResponse<Void> deleteVideo(HttpServletRequest httprequest, @PathVariable Integer vid) {
         Integer currentUserId = (Integer) httprequest.getAttribute("currentUserId");
         videoService.deleteVideo(currentUserId, vid);

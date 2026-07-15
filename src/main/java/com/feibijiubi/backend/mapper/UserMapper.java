@@ -27,6 +27,11 @@ public interface UserMapper {
     User selectById(Integer id);
 
     /**
+     * 查询认证所需的当前用户状态。
+     */
+    User selectAuthStateById(Integer id);
+
+    /**
      * 根据用户 id 修改用户信息
      */
     int updateProfileById(User user);
@@ -35,7 +40,7 @@ public interface UserMapper {
      * 根据用户 id 更改密码
      * @param user
      */
-    void updatePassword(User user);
+    int updatePassword(User user);
 
     /**
      * 根据用户 id 更新头像

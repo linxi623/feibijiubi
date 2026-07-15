@@ -34,7 +34,7 @@ public class UserController {
         return ApiResponse.success("查询成功", vo);
     }
 
-    @PutMapping("/me")
+    @PostMapping("/me")
     public ApiResponse<Void> updateProfile(HttpServletRequest httprequest,
                                              @Valid @RequestBody UserProfileDTO request) {
         Integer currentUserId = (Integer) httprequest.getAttribute("currentUserId");
@@ -42,7 +42,7 @@ public class UserController {
         return ApiResponse.successMessage("修改成功");
     }
 
-    @PutMapping("/me/password")
+    @PostMapping("/me/password")
     public ApiResponse<Void> updatePassword(HttpServletRequest httprequest,
                                             @Valid @RequestBody UserChangePasswordDTO request) {
         Integer currentUserId = (Integer) httprequest.getAttribute("currentUserId");
@@ -50,7 +50,7 @@ public class UserController {
         return ApiResponse.successMessage("修改成功");
     }
 
-    @PutMapping("/me/avatar")
+    @PostMapping("/me/avatar")
     public ApiResponse<String> updateAvatar(HttpServletRequest httprequest,
                                            @RequestParam("file") MultipartFile file) {
         Integer currentUserId = (Integer) httprequest.getAttribute("currentUserId");

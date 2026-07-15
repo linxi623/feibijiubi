@@ -7,6 +7,7 @@ import io.jsonwebtoken.security.Keys;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 
 public class JwtUtils {
     private JwtUtils() {}
@@ -15,6 +16,7 @@ public class JwtUtils {
             Integer userId,
             String username,
             Byte role,
+            Integer tokenVersion,
             String secret,
             Long expireMinutes) {
         Date now = new Date();
@@ -25,9 +27,11 @@ public class JwtUtils {
                 .claim("userId", userId)
                 .claim("username", username)
                 .claim("role", role)
+                .claim("tokenVersion", tokenVersion == null ? 0 : tokenVersion)
                 .setIssuedAt(now)
                 .setExpiration(expireTime)
                 .signWith(secretKey)
+                .setId(UUID.randomUUID().toString())
                 .compact();
     }
 
@@ -41,26 +45,12 @@ public class JwtUtils {
                 .getBody();
     }
 
-    public static Integer getUserId(String token, String secret) {
-        Claims claims = parseToken(token, secret);
-        Object userId = claims.get("userId");
-
-        if (userId == null) {
-            return null;
+    public static Integer getTokenVersion(Claims claims) {
+        Object tokenVersion = claims.get("tokenVersion");
+        if (tokenVersion == null) {
+            return 0;
         }
-
-        return Integer.valueOf(userId.toString());
-    }
-
-    public static Byte getRole(String token, String secret) {
-        Claims claims = parseToken(token, secret);
-        Object role = claims.get("role");
-
-        if (role == null) {
-            return null;
-        }
-
-        return Byte.valueOf(role.toString());
+        return Integer.valueOf(tokenVersion.toString());
     }
 
     private static SecretKey createSecretKey(String secret) {

@@ -2,6 +2,7 @@ package com.feibijiubi.backend.service.user;
 
 import com.feibijiubi.backend.dto.UserLoginDTO;
 import com.feibijiubi.backend.dto.UserRegisterDTO;
+import com.feibijiubi.backend.service.auth.TokenContext;
 import com.feibijiubi.backend.vo.UserLoginVO;
 
 public interface UserAccountService {
@@ -9,5 +10,5 @@ public interface UserAccountService {
 
     UserLoginVO login(UserLoginDTO request);
 
-    void logout(Integer currentUserId);
+    void logout(TokenContext tokenContext);
 }

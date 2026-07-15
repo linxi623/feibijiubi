@@ -96,7 +96,10 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(400, "新密码不能与旧密码一致");
         }
         user.setPasswordHash(request.getNewPassword());
-        userMapper.updatePassword(user);
+        int updatedRows = userMapper.updatePassword(user);
+        if (updatedRows != 1) {
+            throw new BusinessException(500, "修改密码失败");
+        }
     }
 
     @Override

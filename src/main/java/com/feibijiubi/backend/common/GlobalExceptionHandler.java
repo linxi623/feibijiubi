@@ -1,6 +1,8 @@
 package com.feibijiubi.backend.common;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -12,12 +14,14 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
-    public ApiResponse<Void> handleBusinessException(BusinessException e) {
-        return ApiResponse.fail(e.getCode(), e.getMessage());
+    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e) {
+        HttpStatus status = resolveStatus(e.getCode());
+        return ResponseEntity.status(status)
+                .body(ApiResponse.fail(status.value(), e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ApiResponse<Void> handleValidation(
+    public ResponseEntity<ApiResponse<Void>> handleValidation(
             MethodArgumentNotValidException e
     ) {
         String message = e.getBindingResult()
@@ -27,20 +31,40 @@ public class GlobalExceptionHandler {
                 .map(error -> error.getDefaultMessage())
                 .orElse("请求参数不合法");
 
-        return ApiResponse.fail(400, message);
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.fail(HttpStatus.BAD_REQUEST.value(), message));
     }
 
     @ExceptionHandler({
             MethodArgumentTypeMismatchException.class,
             MissingServletRequestParameterException.class
     })
-    public ApiResponse<Void> handleRequestParameterException(Exception e) {
-        return ApiResponse.fail(400, "请求参数格式不正确");
+    public ResponseEntity<ApiResponse<Void>> handleRequestParameterException(Exception e) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.fail(
+                        HttpStatus.BAD_REQUEST.value(),
+                        "请求参数格式不正确"
+                ));
     }
 
     @ExceptionHandler(Exception.class)
-    public ApiResponse<Void> handleException(Exception e) {
+    public ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
         log.error("服务器内部异常", e);
-        return ApiResponse.fail(500, "服务器内部错误");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.fail(
+                        HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                        "服务器内部错误"
+                ));
+    }
+
+    private HttpStatus resolveStatus(Integer code) {
+        if (code == null) {
+            return HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        try {
+            return HttpStatus.valueOf(code);
+        } catch (IllegalArgumentException e) {
+            return HttpStatus.INTERNAL_SERVER_ERROR;
+        }
     }
 }

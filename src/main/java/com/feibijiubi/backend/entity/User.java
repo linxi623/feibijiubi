@@ -24,6 +24,7 @@ public class User {
     private Byte vip;// 0 普通用户，1 月度大会员，2 季度大会员，3 年度大会员
     private Byte status;// 0 正常，1 封禁中，2 已注销
     private Byte role;// 0 普通用户，1 普通管理员，2 超级管理员
+    private Integer tokenVersion;// Token 版本，安全状态变化时递增，使旧 Token 失效
     private Byte auth;// 0 普通用户，1 个人认证，2 机构认证
     private String authMsg;// 认证信息，如 feibijiubi官方账号
 

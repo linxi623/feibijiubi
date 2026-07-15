@@ -1,8 +1,11 @@
 package com.feibijiubi.backend.controller;
 
+import com.feibijiubi.backend.annotation.AllowRevokedToken;
 import com.feibijiubi.backend.common.ApiResponse;
 import com.feibijiubi.backend.dto.UserLoginDTO;
 import com.feibijiubi.backend.dto.UserRegisterDTO;
+import com.feibijiubi.backend.interceptor.LoginInterceptor;
+import com.feibijiubi.backend.service.auth.TokenContext;
 import com.feibijiubi.backend.service.user.UserAccountService;
 import com.feibijiubi.backend.vo.UserLoginVO;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,10 +36,13 @@ public class UserAccountController {
         return ApiResponse.success("登录成功", loginResult);
     }
 
+    @AllowRevokedToken
     @PostMapping("/logout")
     public ApiResponse<Void> logout(HttpServletRequest request) {
-        Integer currentUserId = (Integer) request.getAttribute("currentUserId");
-        userAccountService.logout(currentUserId);
+        TokenContext tokenContext = (TokenContext) request.getAttribute(
+                LoginInterceptor.TOKEN_CONTEXT_ATTRIBUTE
+        );
+        userAccountService.logout(tokenContext);
         return ApiResponse.successMessage("退出成功");
     }
 

@@ -41,6 +41,7 @@
             vip,
             status,
             role,
+            token_version,
             auth,
             auth_msg,
             created_at,
@@ -67,10 +68,24 @@
             vip,
             status,
             role,
+            token_version,
             auth,
             auth_msg,
             created_at,
             updated_at,
+            deleted_at
+        FROM users
+        WHERE id = #{id}
+          AND deleted_at IS NULL
+    </select>
+
+    <select id="selectAuthStateById"
+            resultType="com.feibijiubi.backend.entity.User">
+        SELECT
+            id,
+            status,
+            role,
+            token_version,
             deleted_at
         FROM users
         WHERE id = #{id}
@@ -91,11 +106,10 @@
 
     <update id="updatePassword">
         UPDATE users
-        <set>
-            <if test="passwordHash != null and passwordHash != ''">password_hash = #{passwordHash},</if>
-        </set>
+        SET password_hash = #{passwordHash},
+            token_version = token_version + 1
         WHERE id = #{id}
-            AND deleted_at IS NULL
+          AND deleted_at IS NULL
     </update>
 
     <update id="updateAvatar">
