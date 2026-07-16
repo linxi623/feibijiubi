@@ -144,6 +144,11 @@
         INNER JOIN users u ON u.id = v.uid
         WHERE v.status = 1
         AND v.visibility = 0
+        AND
+        <set>
+            <if test="mcId != null">mc_id = #{mcId},</if>
+            <if test="scId != null">sc_id = #{scId},</if>
+        </set>
         AND v.deleted_at IS NULL
 
         <if test="cursorCreatedAt != null and cursorVid != null">

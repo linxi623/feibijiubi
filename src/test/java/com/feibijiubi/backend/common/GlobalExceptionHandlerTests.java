@@ -20,6 +20,21 @@ class GlobalExceptionHandlerTests {
     }
 
     @Test
+    void mapsRedisFailureToServiceUnavailable() {
+        ResponseEntity<ApiResponse<Void>> response =
+                exceptionHandler.handleRedisOperationException(
+                        new RedisOperationException(
+                                "Redis 操作失败",
+                                new RuntimeException("connection failed")
+                        )
+                );
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
+        assertEquals(503, response.getBody().getCode());
+        assertEquals("缓存服务暂不可用，请稍后再试", response.getBody().getMessage());
+    }
+
+    @Test
     void fallsBackToInternalServerErrorForInvalidCode() {
         ResponseEntity<ApiResponse<Void>> response = exceptionHandler.handleBusinessException(
                 new BusinessException(999, "非法状态码")

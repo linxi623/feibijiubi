@@ -8,13 +8,10 @@ import com.feibijiubi.backend.entity.User;
 import com.feibijiubi.backend.mapper.UserMapper;
 import com.feibijiubi.backend.service.auth.TokenContext;
 import com.feibijiubi.backend.service.auth.TokenService;
+import com.feibijiubi.backend.service.ratelimit.RateLimitService;
 import com.feibijiubi.backend.service.user.UserAccountService;
-import com.feibijiubi.backend.utils.redis.RedisConstants;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
-import com.feibijiubi.backend.utils.redis.RedisUtils;
 import com.feibijiubi.backend.vo.UserLoginVO;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -26,7 +23,7 @@ import java.util.Objects;
 public class UserAccountServiceImpl implements UserAccountService {
     private final UserMapper userMapper;
     private final TokenService tokenService;
-    private final RedisUtils redisUtils;
+    private final RateLimitService rateLimitService;
 
 
     @Override
@@ -55,33 +52,20 @@ public class UserAccountServiceImpl implements UserAccountService {
         String username = request.getUsername();
         String password = request.getPassword();
 
-        String failKey = RedisKeyUtils.loginFailTimes(username);
-        String failCountStr = redisUtils.getString(failKey);
-        int failTimes = 0;
-        if (StringUtils.hasText(failCountStr)) {
-            failTimes = Integer.parseInt(failCountStr);
-        }
-
-        if(failTimes >= 10) {
-            throw new BusinessException(429, "登录失败次数过多，请等" +
-                    RedisConstants.LOGIN_FAIL_EXPIRE_TIME / 60 + "分钟后重试");
-        }
+        rateLimitService.checkLoginFailureLimit(username);
 
         User user = userMapper.selectByUsernameForLogin(username);
 
-        if (user == null ||
-                !Objects.equals(password, user.getPasswordHash())) {
-            failTimes++;
-            redisUtils.setString(failKey, String.valueOf(failTimes),
-                    Duration.ofSeconds(RedisConstants.LOGIN_FAIL_EXPIRE_TIME));
+        if(user == null || !Objects.equals(password, user.getPasswordHash())) {
+            rateLimitService.recordLoginFailure(username);
             throw new BusinessException(400, "用户名或密码错误");
         }
-
-        redisUtils.delete(failKey);
 
         if (user.getStatus() != null && user.getStatus() != 0) {
             throw new BusinessException(403, "账号状态异常，无法登录");
         }
+
+        rateLimitService.clearLoginFailures(username);
 
         UserLoginVO loginVO = new UserLoginVO();
         loginVO.setToken(tokenService.createToken(user));

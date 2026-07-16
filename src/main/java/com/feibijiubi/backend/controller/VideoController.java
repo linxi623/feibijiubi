@@ -3,6 +3,7 @@ package com.feibijiubi.backend.controller;
 
 import com.feibijiubi.backend.annotation.OptionalLogin;
 import com.feibijiubi.backend.common.ApiResponse;
+import com.feibijiubi.backend.dto.CursorDTO;
 import com.feibijiubi.backend.dto.VideoSubmitDTO;
 import com.feibijiubi.backend.dto.VideoUploadPrepareDTO;
 import com.feibijiubi.backend.service.ratelimit.RateLimitService;
@@ -66,9 +67,8 @@ public class VideoController {
 
     @OptionalLogin
     @GetMapping("/feed")
-    public ApiResponse<CursorPageVO<VideoListItemVO>> getVideoFeed(@RequestParam(required = false) String cursor,
-                                                  @RequestParam(defaultValue = "15") Integer size) {
-        CursorPageVO<VideoListItemVO> vo = videoService.getVideoFeed(cursor, size);
+    public ApiResponse<CursorPageVO<VideoListItemVO>> getVideoFeed(@Valid CursorDTO request) {
+        CursorPageVO<VideoListItemVO> vo = videoService.getVideoFeed(request);
         return ApiResponse.success(vo);
     }
 }

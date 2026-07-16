@@ -22,4 +22,8 @@ public class RedisKeyUtils {
     public static String loginFailTimes(String username) {
         return RedisConstants.LOGIN_FAIL_PREFIX + username;
     }
+
+    public static String categoryTree() {
+        return RedisConstants.CATEGORY_PREFIX;
+    }
 }

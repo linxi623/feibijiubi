@@ -2,6 +2,7 @@ package com.feibijiubi.backend.service.impl.video;
 
 import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.converter.VideoConverter;
+import com.feibijiubi.backend.dto.CursorDTO;
 import com.feibijiubi.backend.dto.VideoSubmitDTO;
 import com.feibijiubi.backend.entity.UploadTempFile;
 import com.feibijiubi.backend.entity.User;
@@ -21,6 +22,7 @@ import com.feibijiubi.backend.vo.CursorPageVO;
 import com.feibijiubi.backend.vo.VideoDetailVO;
 import com.feibijiubi.backend.vo.VideoListItemVO;
 import com.feibijiubi.backend.vo.VideoSubmitVO;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +38,7 @@ import java.util.Objects;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class VideoServiceImpl implements VideoService {
     private static final byte FILE_TYPE_VIDEO = 1;
     private static final byte FILE_TYPE_COVER = 2;
@@ -49,22 +52,6 @@ public class VideoServiceImpl implements VideoService {
     private final UserVideoMapper userVideoMapper;
     private final UserMapper userMapper;
     private final UserFollowMapper userFollowMapper;
-
-    public VideoServiceImpl(UploadTempFileMapper uploadTempFileMapper,
-                            VideoMapper videoMapper,
-                            VideoStatusMapper videoStatusMapper,
-                            FileStorageService fileStorageService,
-                            UserVideoMapper userVideoMapper,
-                            UserMapper userMapper,
-                            UserFollowMapper userFollowMapper) {
-        this.uploadTempFileMapper = uploadTempFileMapper;
-        this.videoMapper = videoMapper;
-        this.videoStatusMapper = videoStatusMapper;
-        this.fileStorageService = fileStorageService;
-        this.userVideoMapper = userVideoMapper;
-        this.userMapper = userMapper;
-        this.userFollowMapper = userFollowMapper;
-    }
 
     @Override
     public String uploadCover(Integer currentUserId, MultipartFile file) {
@@ -189,7 +176,12 @@ public class VideoServiceImpl implements VideoService {
     }
 
     @Override
-    public CursorPageVO<VideoListItemVO> getVideoFeed(String cursor, Integer size) {
+    public CursorPageVO<VideoListItemVO> getVideoFeed(CursorDTO request) {
+        String cursor = request.getCursor();
+        Integer size = request.getSize();
+        String mcId = request.getMcId();
+        String scId = request.getScId();
+
         String[] string = parseCursor(cursor);
 
         LocalDateTime cursorCreatedAt = null;
@@ -200,7 +192,7 @@ public class VideoServiceImpl implements VideoService {
             cursorVid = Integer.parseInt(string[1]);
         }
 
-        List<VideoListItemVO> list = videoMapper.selectFeed(cursorCreatedAt, cursorVid, size + 1);
+        List<VideoListItemVO> list = videoMapper.selectFeed(cursorCreatedAt, cursorVid, size + 1, mcId, scId);
 
         boolean hasMore = list.size() > size;
         if(hasMore) {

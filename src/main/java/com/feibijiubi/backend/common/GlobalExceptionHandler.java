@@ -47,6 +47,18 @@ public class GlobalExceptionHandler {
                 ));
     }
 
+    @ExceptionHandler(RedisOperationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRedisOperationException(
+            RedisOperationException e
+    ) {
+        log.error("Redis 服务异常", e);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiResponse.fail(
+                        HttpStatus.SERVICE_UNAVAILABLE.value(),
+                        "缓存服务暂不可用，请稍后再试"
+                ));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
         log.error("服务器内部异常", e);

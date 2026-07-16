@@ -6,10 +6,12 @@ import com.feibijiubi.backend.dto.UserLoginDTO;
 import com.feibijiubi.backend.dto.UserRegisterDTO;
 import com.feibijiubi.backend.interceptor.LoginInterceptor;
 import com.feibijiubi.backend.service.auth.TokenContext;
+import com.feibijiubi.backend.service.ratelimit.RateLimitService;
 import com.feibijiubi.backend.service.user.UserAccountService;
 import com.feibijiubi.backend.vo.UserLoginVO;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,12 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
+@RequiredArgsConstructor
 public class UserAccountController {
     private final UserAccountService userAccountService;
-
-    public UserAccountController(UserAccountService userAccountService) {
-        this.userAccountService = userAccountService;
-    }
 
     @PostMapping("/register")
     public ApiResponse<Void> register(@Valid @RequestBody UserRegisterDTO request) {

@@ -21,7 +21,9 @@ public interface VideoMapper {
 
     List<VideoListItemVO> selectFeed(@Param("cursorCreatedAt")LocalDateTime cursorCreatedAt,
                                      @Param("cursorVid")Integer cursorVid,
-                                     @Param("size")Integer size);
+                                     @Param("size")Integer size,
+                                     @Param("mcId")String mcId,
+                                     @Param("scId")String scId);
 
     List<AdminVideoListItemVO> selectByStatus(Byte status);
 

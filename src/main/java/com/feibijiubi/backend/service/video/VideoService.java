@@ -1,5 +1,6 @@
 package com.feibijiubi.backend.service.video;
 
+import com.feibijiubi.backend.dto.CursorDTO;
 import com.feibijiubi.backend.dto.VideoSubmitDTO;
 import com.feibijiubi.backend.vo.CursorPageVO;
 import com.feibijiubi.backend.vo.VideoDetailVO;
@@ -15,7 +16,7 @@ public interface VideoService {
 
     VideoDetailVO getVideoDetail(Integer currentUserId, Integer vid);
 
-    CursorPageVO<VideoListItemVO> getVideoFeed(String cursor, Integer size);
+    CursorPageVO<VideoListItemVO> getVideoFeed(CursorDTO request);
 
     void deleteVideo(Integer currentUserId, Integer vid);
 }
