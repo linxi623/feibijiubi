@@ -1,6 +1,7 @@
 package com.feibijiubi.backend.mapper;
 
 import com.feibijiubi.backend.entity.VideoStatus;
+import com.feibijiubi.backend.event.VideoStatusDelta;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -29,5 +30,11 @@ public interface VideoStatusMapper {
     int increaseShareTimes(Integer vid);
 
     int countLikeByUid(Integer uid);
+
+    int applyDelta(
+            @Param("vid") Integer vid,
+            @Param("sequence") Long sequence,
+            @Param("delta") VideoStatusDelta delta
+    );
 
 }

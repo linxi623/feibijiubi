@@ -83,4 +83,26 @@
         SET   share_times = share_times + 1
         WHERE vid = #{vid}
     </update>
+    <update id="applyDelta">
+        UPDATE video_status
+        SET play_times = play_times + #{delta.playDelta},
+            like_times = like_times + #{delta.likeDelta},
+            unlike_times = unlike_times + #{delta.unlikeDelta},
+            comment_times = comment_times + #{delta.commentDelta},
+            coin_times = coin_times + #{delta.coinDelta},
+            share_times = share_times + #{delta.shareDelta},
+            collect_times = collect_times + #{delta.collectDelta},
+            danmu_times = danmu_times + #{delta.danmuDelta},
+            applied_sequence = #{sequence}
+        WHERE vid = #{vid}
+          AND applied_sequence + 1 = #{sequence}
+          AND play_times + #{delta.playDelta} >= 0
+          AND like_times + #{delta.likeDelta} >= 0
+          AND unlike_times + #{delta.unlikeDelta} >= 0
+          AND comment_times + #{delta.commentDelta} >= 0
+          AND coin_times + #{delta.coinDelta} >= 0
+          AND share_times + #{delta.shareDelta} >= 0
+          AND collect_times + #{delta.collectDelta} >= 0
+          AND danmu_times + #{delta.danmuDelta} >= 0
+    </update>
 </mapper>

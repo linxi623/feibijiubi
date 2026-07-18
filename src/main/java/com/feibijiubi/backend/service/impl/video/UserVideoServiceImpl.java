@@ -1,43 +1,46 @@
 package com.feibijiubi.backend.service.impl.video;
 
 import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.config.VideoStatusProperties;
 import com.feibijiubi.backend.entity.User;
 import com.feibijiubi.backend.entity.UserVideo;
 import com.feibijiubi.backend.entity.Video;
+import com.feibijiubi.backend.event.VideoStatusEventType;
 import com.feibijiubi.backend.mapper.UserMapper;
 import com.feibijiubi.backend.mapper.UserVideoMapper;
 import com.feibijiubi.backend.mapper.VideoMapper;
 import com.feibijiubi.backend.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.service.video.UserVideoService;
+import com.feibijiubi.backend.service.video.VideoStatusService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
 @Service
+@RequiredArgsConstructor
 public class UserVideoServiceImpl implements UserVideoService {
     private final VideoMapper videoMapper;
     private final VideoStatusMapper videoStatusMapper;
     private final UserVideoMapper userVideoMapper;
     private final UserMapper userMapper;
 
-    public UserVideoServiceImpl(VideoMapper videoMapper,
-                                VideoStatusMapper videoStatusMapper,
-                                UserVideoMapper userVideoMapper, UserMapper userMapper) {
-        this.videoMapper = videoMapper;
-        this.videoStatusMapper = videoStatusMapper;
-        this.userVideoMapper = userVideoMapper;
-        this.userMapper = userMapper;
-    }
+    private final VideoStatusService videoStatusService;
+    private final VideoStatusProperties videoStatusProperties;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void increasePlayCount(Integer vid) {
         validateVideo(vid);
 
-        int statusRows = videoStatusMapper.increasePlayTimes(vid);
-        if (statusRows != 1) {
-            throw new BusinessException(500, "播放量更新失败");
-        }
+        recordStatus(vid, VideoStatusEventType.PLAY, 1,
+                () -> {
+                    int rows = videoStatusMapper.increasePlayTimes(vid);
+                    if(rows != 1) {
+                        throw new BusinessException(500, "播放量更新失败");
+                    }
+                });
     }
 
     @Override
@@ -101,15 +104,21 @@ public class UserVideoServiceImpl implements UserVideoService {
             throw new BusinessException(500, "点赞状态更新失败");
         }
 
-        int statusRows = isSet
-                ? videoStatusMapper.increaseLikeTimes(vid, isLike)
-                : videoStatusMapper.decreaseLikeTimes(vid, isLike);
+        long delta = isSet ? 1L : -1L;
+        VideoStatusEventType type = isLike
+                ? VideoStatusEventType.LIKE
+                : VideoStatusEventType.UNLIKE;
 
-        if (statusRows != 1) {
-            throw new BusinessException(500, "视频点赞统计更新失败");
-        }
-
-
+        recordStatus(vid, type, delta,
+                () -> {
+                    int rows = isSet
+                            ? videoStatusMapper.increaseLikeTimes(vid, isLike)
+                            : videoStatusMapper.decreaseLikeTimes(vid, isLike);
+                    if (rows != 1) {
+                        throw new BusinessException(500, "视频点赞统计更新失败");
+                    }
+                }
+        );
     }
 
     @Override
@@ -141,9 +150,9 @@ public class UserVideoServiceImpl implements UserVideoService {
         if (userVideo.getCoin() != null && userVideo.getCoin() != 0) {
             throw new BusinessException(400, "用户无法对同一个视频多次投币");
         }
-        int statusRows = videoStatusMapper.increaseCoinTimes(vid, coin);
+
         int userRows = userMapper.decreaseCoin(currentUserId, coin);
-        if (statusRows != 1 || userRows != 1) {
+        if (userRows != 1) {
             throw new BusinessException(500, "视频投币失败");
         }
 
@@ -153,16 +162,29 @@ public class UserVideoServiceImpl implements UserVideoService {
         if (userVideoRows != 1) {
             throw new BusinessException(500, "视频投币失败");
         }
+
+        recordStatus(
+                vid, VideoStatusEventType.COIN, coin.longValue(),
+                () -> {
+                    if (videoStatusMapper.increaseCoinTimes(vid, coin) != 1) {
+                        throw new BusinessException(500, "视频投币失败");
+                    }
+                }
+        );
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void increaseShare(Integer vid) {
         validateVideo(vid);
 
-        int statusRows = videoStatusMapper.increaseShareTimes(vid);
-        if (statusRows != 1) {
-            throw new BusinessException(500, "分享失败");
-        }
+        recordStatus(vid, VideoStatusEventType.SHARE, 1,
+                () -> {
+                    if (videoStatusMapper.increaseShareTimes(vid) != 1) {
+                        throw new BusinessException(500, "分享失败");
+                    }
+                }
+        );
     }
 
     @Override
@@ -189,13 +211,17 @@ public class UserVideoServiceImpl implements UserVideoService {
             throw new BusinessException(500, "收藏状态更新失败");
         }
 
-        int statusRows = isCollect
-                ? videoStatusMapper.increaseCollectTimes(vid)
-                : videoStatusMapper.decreaseCollectTimes(vid);
-
-        if (statusRows != 1) {
-            throw new BusinessException(500, "收藏统计更新失败");
-        }
+        long delta = isCollect ? 1L : -1L;
+        recordStatus(vid, VideoStatusEventType.COLLECT, delta,
+                () -> {
+                    int rows = isCollect
+                            ? videoStatusMapper.increaseCollectTimes(vid)
+                            : videoStatusMapper.decreaseCollectTimes(vid);
+                    if (rows != 1) {
+                        throw new BusinessException(500, "收藏统计更新失败");
+                    }
+                }
+        );
 
     }
 
@@ -222,5 +248,18 @@ public class UserVideoServiceImpl implements UserVideoService {
             throw new BusinessException(500, "视频时长数据异常");
         }
         return video;
+    }
+
+    private void recordStatus(
+            Integer vid,
+            VideoStatusEventType type,
+            long delta,
+            Runnable synchronousFallback
+    ) {
+        if (videoStatusProperties.isAsyncEnabled()) {
+            videoStatusService.createEvent(vid, type, delta);
+            return;
+        }
+        synchronousFallback.run();
     }
 }

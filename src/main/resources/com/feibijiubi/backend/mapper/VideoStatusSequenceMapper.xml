@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.feibijiubi.backend.mapper.VideoStatusSequenceMapper">
+    <insert id="ensureExists">
+        INSERT INTO video_stats_sequence(vid, last_sequence)
+        VALUES (#{vid}, 0)
+        ON DUPLICATE KEY UPDATE vid = VALUES(vid)
+    </insert>
+
+    <update id="increase">
+        UPDATE video_stats_sequence
+        SET last_sequence = last_sequence + 1
+        WHERE vid = #{vid}
+    </update>
+
+    <select id="selectCurrent" resultType="java.lang.Long">
+        SELECT last_sequence
+        FROM video_stats_sequence
+        WHERE vid = #{vid}
+    </select>
+</mapper>

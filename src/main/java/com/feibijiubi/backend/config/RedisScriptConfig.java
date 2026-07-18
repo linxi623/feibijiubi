@@ -12,10 +12,19 @@ public class RedisScriptConfig {
     @Bean
     public DefaultRedisScript<Long> fixedWindowRateLimitScript() {
         DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>();
-        redisScript.setScriptSource(new ResourceScriptSource(
+        redisScript.setLocation(
                 new ClassPathResource("lua/fixed-window-rate-limit.lua")
-        ));
+        );
         redisScript.setResultType(Long.class);
+        return redisScript;
+    }
+
+    @Bean DefaultRedisScript<String> videoStatusIncrementScript() {
+        DefaultRedisScript<String> redisScript = new DefaultRedisScript<>();
+        redisScript.setLocation(
+                new ClassPathResource("lua/video-status-increment.lua")
+        );
+        redisScript.setResultType(String.class);
         return redisScript;
     }
 }

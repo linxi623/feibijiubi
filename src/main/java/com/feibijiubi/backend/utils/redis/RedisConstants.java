@@ -1,12 +1,17 @@
 package com.feibijiubi.backend.utils.redis;
 
 public final class RedisConstants {
-    public static final String LOGIN_CODE_PREFIX = "auth:login-code:";
     public static final String JWT_TOKEN_PREFIX = "auth:jwt-token:";
     public static final String LOGIN_FAIL_PREFIX = "auth:login-fail:";
-    public static final String VIDEO_DETAIL_PREFIX = "video:detail:v1:";
     public static final String RATE_UPLOAD_PREFIX = "rate:upload-token:user:";
-    public static final String CATEGORY_PREFIX = "category:tree:v1:";
+    public static final String CATEGORY_PREFIX = "category:tree:v1";
+    public static final String VIDEO_STATUS_PREFIX = "video:status:v1:";
+    public static final String PROCESSED_PREFIX = "video:status:process:v1:";
+    public static final String FEED_HOT_VIDEOS_PREFIX = "feed:hot:videos:v1";
+
+
+
+
 
     public static final long CATEGORY_EXPIRE_TIME = 60 * 60 * 24;
 

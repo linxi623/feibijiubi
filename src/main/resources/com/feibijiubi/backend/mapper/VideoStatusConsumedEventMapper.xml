@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper">
+    <insert id="insertReceived">
+        INSERT INTO video_stats_consumed_event(
+            event_id,
+            vid,
+            aggregate_sequence,
+            event_type,
+            delta,
+            payload_hash,
+            process_status,
+            consumed_at
+        ) VALUES (
+                     #{eventId},
+                     #{vid},
+                     #{aggregateSequence},
+                     #{eventType},
+                     #{delta},
+                     #{payloadHash},
+                     0,
+                     NOW(3)
+                 )
+    </insert>
+
+    <select id="selectByEventId"
+            resultType="com.feibijiubi.backend.entity.VideoStatusConsumedEvent">
+        SELECT id,
+               event_id,
+               vid,
+               aggregate_sequence,
+               event_type,
+               delta,
+               payload_hash,
+               process_status,
+               last_error,
+               consumed_at,
+               committed_at
+        FROM video_stats_consumed_event
+        WHERE event_id = #{eventId}
+    </select>
+
+    <update id="markCommitted">
+        UPDATE video_stats_consumed_event
+        SET process_status = 1,
+            committed_at = NOW(3),
+            last_error = NULL
+        WHERE event_id = #{eventId}
+          AND process_status != 1
+    </update>
+
+    <update id="markRepairRequired">
+        UPDATE video_stats_consumed_event
+        SET process_status = 2,
+            last_error = #{lastError}
+        WHERE event_id = #{eventId}
+          AND process_status != 1
+    </update>
+</mapper>

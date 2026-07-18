@@ -201,6 +201,7 @@ CREATE TABLE `video_status` (
     `share_times` INT NOT NULL DEFAULT 0 COMMENT '分享次数',
     `collect_times` INT NOT NULL DEFAULT 0 COMMENT '收藏次数',
     `danmu_times` INT NOT NULL DEFAULT 0 COMMENT '弹幕次数',
+    `applied_sequence` INT NOT NULL DEFAULT 0 COMMENT '已经持久化的最后统计事件序号',
     PRIMARY KEY (`vid`),
     CONSTRAINT `fk_video_status_vid` FOREIGN KEY (`vid`) REFERENCES `video` (`vid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='视频数据统计表';
@@ -256,3 +257,64 @@ CREATE TABLE `user_follow` (
     CONSTRAINT `ck_user_follow_not_self`
         CHECK (`follower_id` <> `followed_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户关系表';
+
+CREATE TABLE video_stats_sequence (
+    vid INT NOT NULL,
+    last_sequence BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (vid),
+    CONSTRAINT fk_video_stats_sequence_vid
+        FOREIGN KEY (vid) REFERENCES video (vid)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    COMMENT='视频统计聚合序号';
+
+CREATE TABLE video_stats_outbox (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    event_id VARCHAR(64) NOT NULL,
+    aggregate_id INT NOT NULL COMMENT '视频ID',
+    aggregate_sequence BIGINT UNSIGNED NOT NULL,
+    event_type VARCHAR(32) NOT NULL,
+    payload JSON NOT NULL,
+    status TINYINT NOT NULL DEFAULT 0 COMMENT '0=PENDING,1=SENDING,2=SENT,3=FAILED',
+    retry_count INT NOT NULL DEFAULT 0,
+    next_retry_at DATETIME(3) NULL,
+    sending_at DATETIME(3) NULL,
+    lease_token VARCHAR(64) NULL,
+    last_error VARCHAR(1000) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    sent_at DATETIME(3) NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_video_stats_outbox_event_id (event_id),
+    UNIQUE KEY uk_video_stats_outbox_sequence (aggregate_id, aggregate_sequence),
+    KEY idx_video_stats_outbox_poll (status, next_retry_at, sending_at, id),
+    CONSTRAINT fk_video_stats_outbox_vid
+        FOREIGN KEY (aggregate_id) REFERENCES video (vid)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    COMMENT='视频统计Outbox';
+
+CREATE TABLE video_stats_consumed_event (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    event_id VARCHAR(64) NOT NULL,
+    vid INT NOT NULL,
+    aggregate_sequence BIGINT UNSIGNED NOT NULL,
+    event_type VARCHAR(32) NOT NULL,
+    delta BIGINT NOT NULL,
+    payload_hash CHAR(64) NOT NULL,
+    process_status TINYINT NOT NULL DEFAULT 0
+        COMMENT '0=RECEIVED,1=MYSQL_COMMITTED,2=REPAIR_REQUIRED',
+    last_error VARCHAR(1000) NULL,
+    consumed_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    committed_at DATETIME(3) NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_video_stats_consumed_event_id (event_id),
+    UNIQUE KEY uk_video_stats_consumed_sequence (vid, aggregate_sequence),
+    KEY idx_video_stats_consumed_repair (process_status, id),
+    CONSTRAINT fk_video_stats_consumed_vid
+        FOREIGN KEY (vid) REFERENCES video (vid)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    COMMENT='视频统计消费幂等记录';
+
+INSERT INTO video_stats_sequence (vid, last_sequence)
+SELECT vid, applied_sequence
+FROM video_status
+ON DUPLICATE KEY UPDATE
+    last_sequence = GREATEST(last_sequence, VALUES(last_sequence));

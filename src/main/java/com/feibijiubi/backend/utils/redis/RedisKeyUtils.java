@@ -2,15 +2,6 @@ package com.feibijiubi.backend.utils.redis;
 
 public class RedisKeyUtils {
     private RedisKeyUtils() {}
-
-    public static String loginCode(String phone) {
-        return RedisConstants.LOGIN_CODE_PREFIX + phone;
-    }
-
-    public static String videoDetail(Integer videoId) {
-        return RedisConstants.VIDEO_DETAIL_PREFIX + videoId;
-    }
-
     public static String jwtToken(String jti) {
         return RedisConstants.JWT_TOKEN_PREFIX + jti;
     }
@@ -25,5 +16,17 @@ public class RedisKeyUtils {
 
     public static String categoryTree() {
         return RedisConstants.CATEGORY_PREFIX;
+    }
+
+    public static String videoStatus(Integer vid) {
+        return RedisConstants.VIDEO_STATUS_PREFIX + vid;
+    }
+
+    public static String feedHotVideos() {
+        return RedisConstants.FEED_HOT_VIDEOS_PREFIX;
+    }
+
+    public static String processedKey(String eventId) {
+        return RedisConstants.PROCESSED_PREFIX + eventId;
     }
 }

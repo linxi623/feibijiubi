@@ -17,4 +17,5 @@ public class VideoStatus {
     private Integer shareTimes;
     private Integer collectTimes;
     private Integer danmuTimes;
+    private Integer appliedSequence;
 }
