@@ -18,6 +18,13 @@ public class VideoStatusEventPublisher {
     private final RabbitTemplate rabbitTemplate;
     private final VideoStatusProperties properties;
 
+    /**
+     * 将视频状态事件发送到RabbitMQ，并同步等待RabbitMQ的发送确认。
+     * 若交换机拒绝消息、确认超时或消息无法路由到队列，就抛出异常
+     * @param event
+     * @param attemptId 处理该消息的线程唯一标识
+     * @throws Exception
+     */
     public void publish(VideoStatusChangedEvent event, String attemptId)
             throws Exception {
         CorrelationData correlationData = new CorrelationData(
@@ -39,7 +46,6 @@ public class VideoStatusEventPublisher {
                 },
                 correlationData
         );
-
         CorrelationData.Confirm confirm = correlationData.getFuture().get(
                 properties.getPublishConfirmTimeoutSeconds(),
                 TimeUnit.SECONDS

@@ -5,14 +5,18 @@ import com.feibijiubi.backend.common.BusinessException;
 import java.time.LocalDateTime;
 
 public record VideoStatusChangedEvent(
+        // 用于幂等操作
         String eventId,
         Integer vid,
+        // 防止乱序
         Long aggregateSequence,
         VideoStatusEventType type,
         Long delta,
         Double hotScoreDelta,
         LocalDateTime occurredAt,
+        // 版本控制用的，方便后续添加新字段
         Integer schemaVersion,
+        // 追踪用的Id，当消息进入死信队列可以定位到对应的用户和请求
         String traceId
 ) {
     public void validate() {

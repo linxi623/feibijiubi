@@ -19,6 +19,11 @@ public class VideoStatusOutboxClaimService {
     private final VideoStatusOutboxMapper outboxMapper;
     private final VideoStatusProperties properties;
 
+    /**
+     * 从消息表中领取任务
+     * 加上线程的唯一标识，同时将消息状态改为SENDING，标记消息发送的时间
+     * @return
+     */
     @Transactional(rollbackFor = Exception.class)
     public List<VideoStatusOutbox> claimBatch() {
         LocalDateTime now = LocalDateTime.now();

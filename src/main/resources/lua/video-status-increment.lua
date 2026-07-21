@@ -1,12 +1,13 @@
--- KEYS[1] video:status:v1:{vid}
--- KEYS[2] feed:hot:videos:v2
--- KEYS[3] video:status:processed:v1:{eventId}
--- ARGV[1] field
--- ARGV[2] delta
--- ARGV[3] vid member
--- ARGV[4] hot score delta
--- ARGV[5] event ttl seconds
--- ARGV[6] aggregate sequence
+-- KEYS[1] video:status:v1:{vid}          -- 视频统计的 Hash（点赞数、播放数等）
+-- KEYS[2] feed:hot:videos:v1             -- 热点榜的 ZSet（按热度分排序）
+-- KEYS[3] video:status:processed:v1:{eventId}  -- 幂等 Key（防止重复消费）
+
+-- ARGV[1] field                           -- 要更新的字段名（如 "likeTimes"）
+-- ARGV[2] delta                           -- 变化量（+1 或 -1）
+-- ARGV[3] vid member                      -- 视频 ID（作为 ZSet 的 member）
+-- ARGV[4] hot score delta                 -- 热点分变化量（如 +5.0）
+-- ARGV[5] event ttl seconds               -- 幂等 Key 的过期时间（秒）
+-- ARGV[6] aggregate sequence              -- 当前事件的序列号（用于顺序校验）
 
 if redis.call('EXISTS', KEYS[3]) == 1 then
     return 'DUPLICATE'

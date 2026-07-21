@@ -258,16 +258,16 @@ CREATE TABLE `user_follow` (
         CHECK (`follower_id` <> `followed_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户关系表';
 
-CREATE TABLE video_stats_sequence (
+CREATE TABLE video_status_sequence (
     vid INT NOT NULL,
     last_sequence BIGINT UNSIGNED NOT NULL DEFAULT 0,
     PRIMARY KEY (vid),
-    CONSTRAINT fk_video_stats_sequence_vid
+    CONSTRAINT fk_video_status_sequence_vid
         FOREIGN KEY (vid) REFERENCES video (vid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     COMMENT='视频统计聚合序号';
 
-CREATE TABLE video_stats_outbox (
+CREATE TABLE video_status_outbox (
     id BIGINT NOT NULL AUTO_INCREMENT,
     event_id VARCHAR(64) NOT NULL,
     aggregate_id INT NOT NULL COMMENT '视频ID',
@@ -283,15 +283,15 @@ CREATE TABLE video_stats_outbox (
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     sent_at DATETIME(3) NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_video_stats_outbox_event_id (event_id),
-    UNIQUE KEY uk_video_stats_outbox_sequence (aggregate_id, aggregate_sequence),
-    KEY idx_video_stats_outbox_poll (status, next_retry_at, sending_at, id),
-    CONSTRAINT fk_video_stats_outbox_vid
+    UNIQUE KEY uk_video_status_outbox_event_id (event_id),
+    UNIQUE KEY uk_video_status_outbox_sequence (aggregate_id, aggregate_sequence),
+    KEY idx_video_status_outbox_poll (status, next_retry_at, sending_at, id),
+    CONSTRAINT fk_video_status_outbox_vid
         FOREIGN KEY (aggregate_id) REFERENCES video (vid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     COMMENT='视频统计Outbox';
 
-CREATE TABLE video_stats_consumed_event (
+CREATE TABLE video_status_consumed_event (
     id BIGINT NOT NULL AUTO_INCREMENT,
     event_id VARCHAR(64) NOT NULL,
     vid INT NOT NULL,
@@ -305,15 +305,15 @@ CREATE TABLE video_stats_consumed_event (
     consumed_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     committed_at DATETIME(3) NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_video_stats_consumed_event_id (event_id),
-    UNIQUE KEY uk_video_stats_consumed_sequence (vid, aggregate_sequence),
-    KEY idx_video_stats_consumed_repair (process_status, id),
-    CONSTRAINT fk_video_stats_consumed_vid
+    UNIQUE KEY uk_video_status_consumed_event_id (event_id),
+    UNIQUE KEY uk_video_status_consumed_sequence (vid, aggregate_sequence),
+    KEY idx_video_status_consumed_repair (process_status, id),
+    CONSTRAINT fk_video_status_consumed_vid
         FOREIGN KEY (vid) REFERENCES video (vid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     COMMENT='视频统计消费幂等记录';
 
-INSERT INTO video_stats_sequence (vid, last_sequence)
+INSERT INTO video_status_sequence (vid, last_sequence)
 SELECT vid, applied_sequence
 FROM video_status
 ON DUPLICATE KEY UPDATE

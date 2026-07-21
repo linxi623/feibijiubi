@@ -93,6 +93,13 @@ public class VideoStatusServiceImpl implements VideoStatusService {
         }
     }
 
+    /**
+     * 给某个视频的事件创建一条严格递增的记录，并插入Outbox表格中
+     * @param vid 视频id
+     * @param type 事件类型，点赞、投币、收藏等
+     * @param delta 表示增量，有正负
+     * @return
+     */
     @Override
     @Transactional(
             propagation = Propagation.MANDATORY,
@@ -143,6 +150,10 @@ public class VideoStatusServiceImpl implements VideoStatusService {
         return event;
     }
 
+    /**
+     * 如果从redis里取不到数据，就从mysql里存到redis里
+     * @param vid
+     */
     @Override
     public void rebuild(Integer vid) {
         VideoStatus status = videoStatusMapper.selectByVid(vid);
@@ -171,6 +182,11 @@ public class VideoStatusServiceImpl implements VideoStatusService {
         );
     }
 
+    /**
+     * 将数据最终保存到数据库中，持久化，并标记已经被消费的事件
+     * @param event
+     * @param payloadHash
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void persist(
@@ -210,16 +226,17 @@ public class VideoStatusServiceImpl implements VideoStatusService {
         }
     }
 
+    /**
+     * 优先从redis里面取出视频对应的状态
+     * @param vid
+     * @return
+     */
     @Override
     public VideoStatus getByVid(Integer vid) {
         String key = RedisKeyUtils.videoStatus(vid);
         Map<String, String> values =
                 redisHashOperations.entries(key);
 
-        if (values.isEmpty()) {
-            rebuild(vid);
-            values = redisHashOperations.entries(key);
-        }
         if (values.isEmpty()) {
             return videoStatusMapper.selectByVid(vid);
         }
@@ -238,6 +255,12 @@ public class VideoStatusServiceImpl implements VideoStatusService {
         return status;
     }
 
+    /**
+     * 将String转为int类型
+     * @param map
+     * @param key
+     * @return
+     */
     private Integer parseInt(Map<String, String> map, String key) {
         String val = map.get(key);
         if (val == null || val.trim().isEmpty() || "null".equalsIgnoreCase(val)) {
@@ -251,6 +274,11 @@ public class VideoStatusServiceImpl implements VideoStatusService {
         }
     }
 
+    /**
+     * 检查事件是否已被重复消费
+     * @param event
+     * @param payloadHash
+     */
     private void handleDuplicate(
             VideoStatusChangedEvent event,
             String payloadHash
@@ -283,6 +311,11 @@ public class VideoStatusServiceImpl implements VideoStatusService {
         );
     }
 
+    /**
+     * 计算视频的热门分数
+     * @param status
+     * @return
+     */
     private double calculateBaseScore(VideoStatus status) {
         return status.getPlayTimes()
                 + status.getLikeTimes() * 1.5

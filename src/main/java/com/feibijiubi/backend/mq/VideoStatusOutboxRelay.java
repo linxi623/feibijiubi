@@ -26,6 +26,9 @@ public class VideoStatusOutboxRelay {
     private final VideoStatusProperties properties;
     private final JsonUtils jsonUtils;
 
+    /**
+     * 从消息表中定期扫描待发送的消息并发布
+     */
     @Scheduled(
             fixedDelayString =
                     "${app.video-Status.outbox-fixed-delay-ms:1000}"
@@ -42,6 +45,10 @@ public class VideoStatusOutboxRelay {
         }
     }
 
+    /**
+     * 发布消息，并标记消息发布的状态
+     * @param outbox
+     */
     private void publishOne(VideoStatusOutbox outbox) {
         try {
             VideoStatusChangedEvent event = jsonUtils.fromJson(
@@ -82,6 +89,7 @@ public class VideoStatusOutboxRelay {
         }
     }
 
+    // 恢复已经超时的Outbox消息租约，避免消息一直卡在“发送中”的状态
     private void recoverExpiredLease() {
         LocalDateTime expiredBefore = LocalDateTime.now()
                 .minusSeconds(properties.getOutboxLeaseSeconds());

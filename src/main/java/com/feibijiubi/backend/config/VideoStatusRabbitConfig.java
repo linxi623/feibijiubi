@@ -1,4 +1,4 @@
-package com.feibijiubi.backend.config.rabbitmq;
+package com.feibijiubi.backend.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feibijiubi.backend.utils.rabbitmq.RabbitConstants;
