@@ -14,6 +14,7 @@ import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.amqp.core.AcknowledgeMode;
+import org.springframework.beans.factory.annotation.Value;
 
 @Configuration
 public class VideoStatusRabbitConfig {
@@ -154,7 +155,9 @@ public class VideoStatusRabbitConfig {
     public SimpleRabbitListenerContainerFactory
     videoStatusListenerContainerFactory(
             ConnectionFactory connectionFactory,
-            MessageConverter rabbitMessageConverter
+            MessageConverter rabbitMessageConverter,
+            @Value("${spring.rabbitmq.listener.simple.auto-startup:false}")
+            boolean autoStartup
     ) {
         SimpleRabbitListenerContainerFactory factory =
                 new SimpleRabbitListenerContainerFactory();
@@ -165,6 +168,7 @@ public class VideoStatusRabbitConfig {
         factory.setConcurrentConsumers(1);
         factory.setMaxConcurrentConsumers(1);
         factory.setDefaultRequeueRejected(false);
+        factory.setAutoStartup(autoStartup);
         return factory;
     }
 }

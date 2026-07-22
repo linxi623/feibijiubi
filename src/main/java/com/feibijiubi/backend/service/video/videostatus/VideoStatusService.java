@@ -1,4 +1,4 @@
-package com.feibijiubi.backend.service.video;
+package com.feibijiubi.backend.service.video.videostatus;
 
 import com.feibijiubi.backend.entity.VideoStatus;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
@@ -9,19 +9,30 @@ public interface VideoStatusService {
 
     VideoStatusChangedEvent createEvent(Integer vid, VideoStatusEventType type, long delta);
 
-    void rebuild(Integer vid);
-
-    void persist(VideoStatusChangedEvent event, String payloadHash);
-
     VideoStatus getByVid(Integer vid);
 
     enum ApplyResult {
         APPLIED,
         DUPLICATE,
         NEEDS_REBUILD,
-        OLD_SEQUENCE,
-        SEQUENCE_GAP,
         NEGATIVE_RESULT,
-        INVALID_FIELD
+        INVALID_FIELD,
+        INVALID_REDIS_TYPE
+    }
+
+     enum InitializeResult {
+        INITIALIZED,
+        ALREADY_INITIALIZED,
+        INVALID_ARGUMENT,
+        INVALID_REDIS_TYPE
+     }
+
+    enum DeltaCleanupResult {
+        EMPTY,
+        REMAINING,
+        DUPLICATE_CLEANUP,
+        GENERATION_CHANGED,
+        NEEDS_REBUILD,
+        INVALID_ARGUMENT
     }
 }

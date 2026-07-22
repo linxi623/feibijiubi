@@ -1,6 +1,7 @@
 package com.feibijiubi.backend.config;
 
 
+import jakarta.annotation.PostConstruct;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -19,4 +20,29 @@ public class VideoStatusProperties {
     // 消费者返回确认消息的最长时间，超时定义为发送失败
     private int publishConfirmTimeoutSeconds = 5;
     private int consumerMaxRetries = 5;
+    private int consumerRecoveryAutoReplayMaxAgeSeconds = 604_800;
+    private int cleanupMaxAttempts = 10;
+    private long flushFixedDelayMs = 500;
+    private int flushDirtyBatchSize = 100;
+    private int flushEventBatchSize = 1000;
+    private long flushRecoveryFixedDelayMs = 5000;
+    private long cleanupFixedDelayMs = 1000;
+    private int cleanupBatchSize = 100;
+    private boolean schedulingEnabled;
+
+    @PostConstruct
+    public void validate() {
+        long redisEventTtlSeconds = Math.multiplyExact(
+                (long) redisEventTtlDays,
+                86_400L
+        );
+        if (consumerRecoveryAutoReplayMaxAgeSeconds <= 0
+                || consumerRecoveryAutoReplayMaxAgeSeconds
+                >= redisEventTtlSeconds) {
+            throw new IllegalStateException(
+                    "consumerRecoveryAutoReplayMaxAgeSeconds 必须大于 0，"
+                            + "且小于 Redis 事件幂等 Key 的 TTL"
+            );
+        }
+    }
 }

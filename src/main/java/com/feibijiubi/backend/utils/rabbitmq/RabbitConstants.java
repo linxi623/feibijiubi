@@ -14,6 +14,12 @@ public final class RabbitConstants {
     public static final String DEAD_EXCHANGE = "video.status.dlx.v1";
     public static final String DEAD_ROUTING_KEY = "video.status.dead.v1";
     public static final String DEAD_QUEUE = "video.status.dlq.v1";
+
+    public static final String ATTEMPT_HEADER = "x-video-status-attempt";
+    public static final String RECOVERY_HEADER = "x-video-status-recovery";
+    public static final String EVENT_ID_HEADER = "x-video-status-event-id";
+    public static final String FAILURE_REASON_HEADER =
+            "x-video-status-failure-reason";
     //-----------------------------------------video-status----------------------------------------
 
 

@@ -11,7 +11,7 @@ import com.feibijiubi.backend.mapper.UserVideoMapper;
 import com.feibijiubi.backend.mapper.VideoMapper;
 import com.feibijiubi.backend.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.service.video.UserVideoService;
-import com.feibijiubi.backend.service.video.VideoStatusService;
+import com.feibijiubi.backend.service.video.videostatus.VideoStatusService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

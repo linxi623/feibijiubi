@@ -9,7 +9,6 @@ public class VideoStatusOutbox {
     private Long id;
     private String eventId; // 全局标识事件，保证消息幂等
     private Integer aggregateId; // 视频id
-    private Long aggregateSequence; // 表示同一个视频的第几个事件，保证顺序
     private String eventType; // 描述事件类型，点赞、收藏、投币等
     private String payload; // 消息体，包含发送消息的所有内容
     private Integer status; // 消息的发送状态，0=PENDING 待发送、1=SENDING 发送中、2=SENT 已发送、3=FAILED 发送失败

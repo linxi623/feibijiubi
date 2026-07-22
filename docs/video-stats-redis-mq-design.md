@@ -1,5 +1,6 @@
-# 菲比啾比视频统计：Redis 实时计数与 RabbitMQ 异步落库设计
+﻿# 菲比啾比视频统计：Redis 实时计数与 RabbitMQ 异步落库设计
 
+> **状态：已被 V2 方案取代。** 当前实现请以 `docs/video-status-batch-aggregation-implementation.md` 和 `database/feibijiubi.sql` 为准。本文件只用于理解旧版严格 sequence + 逐事件落库设计，不要继续复制其中的建表 SQL 和 sequence 实现。
 > 文档类型：技术设计与实施手册  
 > 适用项目：菲比啾比后端  
 > 技术栈：Java 17、Spring Boot 3.5、MyBatis、MySQL、Redis、RabbitMQ  
@@ -36,8 +37,8 @@ RabbitMQ 异步传递统计事件
 | 实时视频聚合统计 | Redis Hash | 客户端主要读取来源，使用 Lua 原子计数 |
 | 热门视频顺序 | Redis ZSet | 根据互动增量实时调整热门分数 |
 | 持久化视频聚合统计 | MySQL `video_status` | 最终持久化结果、Redis 重建基线 |
-| 待投递统计事件 | MySQL `video_stats_outbox` | 解决 MySQL 事务与 RabbitMQ 之间的双写问题 |
-| 已消费事件 | MySQL `video_stats_consumed_event` | 保证 RabbitMQ 重复投递时不会重复落库 |
+| 待投递统计事件 | MySQL `video_status_outbox` | 解决 MySQL 事务与 RabbitMQ 之间的双写问题 |
+| 已消费事件 | MySQL `video_status_consumed_event` | 保证 RabbitMQ 重复投递时不会重复落库 |
 | 统计消息 | RabbitMQ | 异步解耦、削峰、失败重试和死信 |
 
 核心原则：
@@ -124,7 +125,7 @@ MySQL Outbox + RabbitMQ Publisher Confirm + 手动 ACK + 双端 eventId 幂等
     ↓
 MySQL 本地事务
     ├── 更新 user_video、用户余额等业务事实
-    └── INSERT video_stats_outbox（稳定 eventId + aggregateSequence）
+    └── INSERT video_status_outbox（稳定 eventId + aggregateSequence）
     ↓ 提交成功
 事务提交后唤醒 Outbox Relay（只做调度提示，不直接更新 Redis）
     ↓
@@ -491,7 +492,7 @@ public record VideoStatsChangedEvent(
 ### 8.1 Outbox 表
 
 ```sql
-CREATE TABLE video_stats_outbox (
+CREATE TABLE video_status_outbox (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     event_id VARCHAR(64) NOT NULL,
     aggregate_id INT NOT NULL COMMENT 'vid',
@@ -507,8 +508,8 @@ CREATE TABLE video_stats_outbox (
     last_error VARCHAR(1000) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     sent_at DATETIME(3) NULL,
-    UNIQUE KEY uk_video_stats_outbox_event_id (event_id),
-    KEY idx_video_stats_outbox_poll (status, next_retry_at, sending_at, id)
+    UNIQUE KEY uk_video_status_outbox_event_id (event_id),
+    KEY idx_video_status_outbox_poll (status, next_retry_at, sending_at, id)
 ) ENGINE=InnoDB;
 ```
 
@@ -523,7 +524,7 @@ Outbox 与用户业务事实必须在同一个 MySQL 事务中提交。`SENDING`
 ### 8.2 消费幂等表
 
 ```sql
-CREATE TABLE video_stats_consumed_event (
+CREATE TABLE video_status_consumed_event (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     event_id VARCHAR(64) NOT NULL,
     vid INT NOT NULL,
@@ -535,7 +536,7 @@ CREATE TABLE video_stats_consumed_event (
     last_error VARCHAR(1000) NULL,
     consumed_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     committed_at DATETIME(3) NULL,
-    UNIQUE KEY uk_video_stats_consumed_event_id (event_id),
+    UNIQUE KEY uk_video_status_consumed_event_id (event_id),
     KEY idx_video_stats_consumed_vid (vid),
     KEY idx_video_stats_consumed_repair (process_status, id)
 ) ENGINE=InnoDB;
@@ -672,7 +673,7 @@ config/rabbitmq/VideoStatsRabbitConfig.java
 2. 更新 user_video
 3. 不再同步更新 video_status
 4. 生成稳定 eventId
-5. 在同一事务 INSERT video_stats_outbox
+5. 在同一事务 INSERT video_status_outbox
 6. 提交事务
 ```
 
@@ -765,7 +766,7 @@ NACK/Return/超时：按 leaseToken 恢复 PENDING，retry_count +1
 
 ```sql
 SELECT ...
-FROM video_stats_outbox
+FROM video_status_outbox
 WHERE status = 0
   AND (next_retry_at IS NULL OR next_retry_at <= NOW(3))
 ORDER BY id
@@ -837,7 +838,7 @@ deliveryMode = PERSISTENT
     ↓
 开启 MySQL 事务
     ↓
-插入或读取 video_stats_consumed_event
+插入或读取 video_status_consumed_event
     ├── 相同 eventId、相同 payload 且 MYSQL_COMMITTED：重复成功
     ├── 相同 eventId、不同 payload：严重冲突，进入 DLQ
     └── 首次事件：固定八项 delta 更新 video_status
@@ -1013,7 +1014,7 @@ DLQ 消息必须可以查看：
 
 人工重放前先查询：
 
-1. `video_stats_consumed_event` 是否已有 eventId；
+1. `video_status_consumed_event` 是否已有 eventId；
 2. MySQL `video_status` 当前值；
 3. Redis 幂等 Key 是否仍存在；
 4. 消息是否超过 Redis 幂等 TTL。
@@ -1239,7 +1240,7 @@ src/main/resources/
 
 ### 阶段 3：实现 Outbox
 
-- [ ] 创建 `video_stats_outbox` 并增加按 vid 原子递增的 `aggregateSequence`；
+- [ ] 创建 `video_status_outbox` 并增加按 vid 原子递增的 `aggregateSequence`；
 - [ ] 事务内插入稳定事件；
 - [ ] 实现 `afterCommit` 唤醒 Relay；
 - [ ] 实现带租约、超时回收和 leaseToken 的 Outbox Relay；
@@ -1249,7 +1250,7 @@ src/main/resources/
 
 ### 阶段 4：实现幂等消费者
 
-- [ ] 创建 `video_stats_consumed_event`；
+- [ ] 创建 `video_status_consumed_event`；
 - [ ] 实现固定字段增量 SQL；
 - [ ] Redis 和 MySQL 分别幂等；
 - [ ] 同 vid 的 sequence 缺口会延迟重试；
@@ -1380,9 +1381,9 @@ videoStatusMapper.increaseShareTimes(...)
 至少监控：
 
 ```text
-video_stats_outbox_pending_total
-video_stats_outbox_failed_total
-video_stats_outbox_oldest_pending_seconds
+video_status_outbox_pending_total
+video_status_outbox_failed_total
+video_status_outbox_oldest_pending_seconds
 video_stats_publish_confirm_nack_total
 video_stats_publish_return_total
 video_stats_queue_ready
@@ -1479,7 +1480,7 @@ MySQL video_status
 本章代码采用以下明确约束：
 
 1. 消费者第一版固定 `concurrency = 1`，保证同一队列内的事件按顺序处理；
-2. 每个视频使用数据库 `video_stats_sequence` 生成连续序号；
+2. 每个视频使用数据库 `video_status_sequence` 生成连续序号；
 3. `video_status` 增加 `applied_sequence`，作为 Redis 丢失后的重建基线；
 4. Redis Hash 使用 `video:stats:v2:{vid}`，不再使用短 TTL；
 5. Lua 同时更新 Hash、热门 ZSet、最后序号和 eventId 幂等 Key；
@@ -1492,7 +1493,7 @@ MySQL video_status
 建议新建迁移文件：
 
 ```text
-database/migration/V20260718__video_stats_outbox.sql
+database/migration/V20260718__video_status_outbox.sql
 ```
 
 完整 SQL：
@@ -1510,16 +1511,16 @@ ALTER TABLE video_status
     ADD COLUMN applied_sequence BIGINT UNSIGNED NOT NULL DEFAULT 0
         COMMENT '已经持久化的最后统计事件序号';
 
-CREATE TABLE video_stats_sequence (
+CREATE TABLE video_status_sequence (
     vid INT NOT NULL,
     last_sequence BIGINT UNSIGNED NOT NULL DEFAULT 0,
     PRIMARY KEY (vid),
-    CONSTRAINT fk_video_stats_sequence_vid
+    CONSTRAINT fk_video_status_sequence_vid
         FOREIGN KEY (vid) REFERENCES video (vid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='视频统计聚合序号';
 
-CREATE TABLE video_stats_outbox (
+CREATE TABLE video_status_outbox (
     id BIGINT NOT NULL AUTO_INCREMENT,
     event_id VARCHAR(64) NOT NULL,
     aggregate_id INT NOT NULL COMMENT '视频ID',
@@ -1535,15 +1536,15 @@ CREATE TABLE video_stats_outbox (
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     sent_at DATETIME(3) NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_video_stats_outbox_event_id (event_id),
-    UNIQUE KEY uk_video_stats_outbox_sequence (aggregate_id, aggregate_sequence),
-    KEY idx_video_stats_outbox_poll (status, next_retry_at, sending_at, id),
-    CONSTRAINT fk_video_stats_outbox_vid
+    UNIQUE KEY uk_video_status_outbox_event_id (event_id),
+    UNIQUE KEY uk_video_status_outbox_sequence (aggregate_id, aggregate_sequence),
+    KEY idx_video_status_outbox_poll (status, next_retry_at, sending_at, id),
+    CONSTRAINT fk_video_status_outbox_vid
         FOREIGN KEY (aggregate_id) REFERENCES video (vid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='视频统计Outbox';
 
-CREATE TABLE video_stats_consumed_event (
+CREATE TABLE video_status_consumed_event (
     id BIGINT NOT NULL AUTO_INCREMENT,
     event_id VARCHAR(64) NOT NULL,
     vid INT NOT NULL,
@@ -1557,7 +1558,7 @@ CREATE TABLE video_stats_consumed_event (
     consumed_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     committed_at DATETIME(3) NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_video_stats_consumed_event_id (event_id),
+    UNIQUE KEY uk_video_status_consumed_event_id (event_id),
     UNIQUE KEY uk_video_stats_consumed_sequence (vid, aggregate_sequence),
     KEY idx_video_stats_consumed_repair (process_status, id),
     CONSTRAINT fk_video_stats_consumed_vid
@@ -1565,7 +1566,7 @@ CREATE TABLE video_stats_consumed_event (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   COMMENT='视频统计消费幂等记录';
 
-INSERT INTO video_stats_sequence (vid, last_sequence)
+INSERT INTO video_status_sequence (vid, last_sequence)
 SELECT vid, applied_sequence
 FROM video_status
 ON DUPLICATE KEY UPDATE
@@ -2049,20 +2050,20 @@ public interface VideoStatsOutboxMapper {
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.feibijiubi.backend.mapper.VideoStatsSequenceMapper">
     <insert id="ensureExists">
-        INSERT INTO video_stats_sequence(vid, last_sequence)
+        INSERT INTO video_status_sequence(vid, last_sequence)
         VALUES (#{vid}, 0)
         ON DUPLICATE KEY UPDATE vid = VALUES(vid)
     </insert>
 
     <update id="increase">
-        UPDATE video_stats_sequence
+        UPDATE video_status_sequence
         SET last_sequence = last_sequence + 1
         WHERE vid = #{vid}
     </update>
 
     <select id="selectCurrent" resultType="java.lang.Long">
         SELECT last_sequence
-        FROM video_stats_sequence
+        FROM video_status_sequence
         WHERE vid = #{vid}
     </select>
 </mapper>
@@ -2077,7 +2078,7 @@ public interface VideoStatsOutboxMapper {
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.feibijiubi.backend.mapper.VideoStatsOutboxMapper">
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO video_stats_outbox(
+        INSERT INTO video_status_outbox(
             event_id,
             aggregate_id,
             aggregate_sequence,
@@ -2114,7 +2115,7 @@ public interface VideoStatsOutboxMapper {
                last_error,
                created_at,
                sent_at
-        FROM video_stats_outbox
+        FROM video_status_outbox
         WHERE status = 0
           AND (next_retry_at IS NULL OR next_retry_at &lt;= #{now})
         ORDER BY id
@@ -2123,7 +2124,7 @@ public interface VideoStatsOutboxMapper {
     </select>
 
     <update id="markSending">
-        UPDATE video_stats_outbox
+        UPDATE video_status_outbox
         SET status = 1,
             sending_at = #{sendingAt},
             lease_token = #{leaseToken}
@@ -2132,7 +2133,7 @@ public interface VideoStatsOutboxMapper {
     </update>
 
     <update id="markSent">
-        UPDATE video_stats_outbox
+        UPDATE video_status_outbox
         SET status = 2,
             sent_at = #{sentAt},
             sending_at = NULL,
@@ -2144,7 +2145,7 @@ public interface VideoStatsOutboxMapper {
     </update>
 
     <update id="markPending">
-        UPDATE video_stats_outbox
+        UPDATE video_status_outbox
         SET status = 0,
             retry_count = retry_count + 1,
             next_retry_at = #{nextRetryAt},
@@ -2157,7 +2158,7 @@ public interface VideoStatsOutboxMapper {
     </update>
 
     <update id="markFailed">
-        UPDATE video_stats_outbox
+        UPDATE video_status_outbox
         SET status = 3,
             retry_count = retry_count + 1,
             sending_at = NULL,
@@ -2169,7 +2170,7 @@ public interface VideoStatsOutboxMapper {
     </update>
 
     <update id="recoverExpiredSending">
-        UPDATE video_stats_outbox
+        UPDATE video_status_outbox
         SET status = 0,
             retry_count = retry_count + 1,
             next_retry_at = NOW(3),
@@ -2648,7 +2649,7 @@ int applyDelta(
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.feibijiubi.backend.mapper.VideoStatsConsumedEventMapper">
     <insert id="insertReceived">
-        INSERT INTO video_stats_consumed_event(
+        INSERT INTO video_status_consumed_event(
             event_id,
             vid,
             aggregate_sequence,
@@ -2682,12 +2683,12 @@ int applyDelta(
                last_error,
                consumed_at,
                committed_at
-        FROM video_stats_consumed_event
+        FROM video_status_consumed_event
         WHERE event_id = #{eventId}
     </select>
 
     <update id="markCommitted">
-        UPDATE video_stats_consumed_event
+        UPDATE video_status_consumed_event
         SET process_status = 1,
             committed_at = NOW(3),
             last_error = NULL
@@ -2696,7 +2697,7 @@ int applyDelta(
     </update>
 
     <update id="markRepairRequired">
-        UPDATE video_stats_consumed_event
+        UPDATE video_status_consumed_event
         SET process_status = 2,
             last_error = #{lastError}
         WHERE event_id = #{eventId}

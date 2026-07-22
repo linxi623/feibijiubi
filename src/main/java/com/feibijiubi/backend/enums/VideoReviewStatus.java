@@ -1,8 +1,13 @@
 package com.feibijiubi.backend.enums;
 
 import com.feibijiubi.backend.common.BusinessException;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.apache.coyote.BadRequestException;
 
+
+@Getter
+@AllArgsConstructor
 public enum VideoReviewStatus {
     PENDING(0, "待审核"),
     APPROVED(1, "审核通过"),
@@ -12,18 +17,6 @@ public enum VideoReviewStatus {
     private final int code;
     private final String desc;
 
-    VideoReviewStatus(int code, String desc) {
-        this.code = code;
-        this.desc = desc;
-    }
-
-    public int getCode() {
-        return code;
-    }
-
-    public String getDesc() {
-        return desc;
-    }
 
     /**
      * 根绝数据库中的状态码获取对应枚举

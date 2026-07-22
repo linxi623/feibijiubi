@@ -1,23 +1,44 @@
--- KEYS[1] video:status:v1:{vid}          -- 视频统计的 Hash（点赞数、播放数等）
--- KEYS[2] feed:hot:videos:v1             -- 热点榜的 ZSet（按热度分排序）
--- KEYS[3] video:status:processed:v1:{eventId}  -- 幂等 Key（防止重复消费）
+-- KEYS[1] current stats hash
+-- KEYS[2] pending delta hash
+-- KEYS[3] dirty set
+-- KEYS[4] processed event key
+-- KEYS[5] hot videos zset
+-- ARGV[1] current field
+-- ARGV[2] delta field
+-- ARGV[3] delta
+-- ARGV[4] vid
+-- ARGV[5] hot score delta
+-- ARGV[6] processed ttl seconds
 
--- ARGV[1] field                           -- 要更新的字段名（如 "likeTimes"）
--- ARGV[2] delta                           -- 变化量（+1 或 -1）
--- ARGV[3] vid member                      -- 视频 ID（作为 ZSet 的 member）
--- ARGV[4] hot score delta                 -- 热点分变化量（如 +5.0）
--- ARGV[5] event ttl seconds               -- 幂等 Key 的过期时间（秒）
--- ARGV[6] aggregate sequence              -- 当前事件的序列号（用于顺序校验）
-
-if redis.call('EXISTS', KEYS[3]) == 1 then
-    return 'DUPLICATE'
+local function redisType(key)
+    local result = redis.call('TYPE', key)
+    if type(result) == 'table' then
+        return result['ok']
+    end
+    return result
 end
 
-if redis.call('EXISTS', KEYS[1]) == 0 then
+if redis.call('EXISTS', KEYS[1]) == 0
+        or redis.call('EXISTS', KEYS[2]) == 0 then
     return 'NEEDS_REBUILD'
 end
 
-local allowed = {
+local currentType = redisType(KEYS[1])
+local deltaType = redisType(KEYS[2])
+local dirtyType = redisType(KEYS[3])
+local hotType = redisType(KEYS[5])
+
+if currentType ~= 'hash' or deltaType ~= 'hash' then
+    return 'INVALID_REDIS_TYPE'
+end
+if dirtyType ~= 'none' and dirtyType ~= 'set' then
+    return 'INVALID_REDIS_TYPE'
+end
+if hotType ~= 'none' and hotType ~= 'zset' then
+    return 'INVALID_REDIS_TYPE'
+end
+
+local allowedCurrent = {
     playTimes = true,
     likeTimes = true,
     unlikeTimes = true,
@@ -28,35 +49,55 @@ local allowed = {
     danmuTimes = true
 }
 
-local field = ARGV[1]
-if allowed[field] ~= true then
+local allowedDelta = {
+    playDelta = true,
+    likeDelta = true,
+    unlikeDelta = true,
+    commentDelta = true,
+    coinDelta = true,
+    shareDelta = true,
+    collectDelta = true,
+    danmuDelta = true
+}
+
+local currentField = ARGV[1]
+local deltaField = ARGV[2]
+if allowedCurrent[currentField] ~= true
+        or allowedDelta[deltaField] ~= true then
     return 'INVALID_FIELD'
 end
 
-local current = tonumber(redis.call('HGET', KEYS[1], field))
-local delta = tonumber(ARGV[2])
-local incomingSequence = tonumber(ARGV[6])
-local lastSequence = tonumber(redis.call('HGET', KEYS[1], 'lastSequence'))
+local current = tonumber(redis.call('HGET', KEYS[1], currentField))
+local pending = tonumber(redis.call('HGET', KEYS[2], deltaField))
+local delta = tonumber(ARGV[3])
+local hotScoreDelta = tonumber(ARGV[5])
+local processedTtl = tonumber(ARGV[6])
 
-if current == nil or delta == nil
-        or incomingSequence == nil or lastSequence == nil then
+if current == nil
+        or pending == nil
+        or delta == nil
+        or hotScoreDelta == nil
+        or processedTtl == nil
+        or processedTtl <= 0
+        or ARGV[4] == nil
+        or ARGV[4] == '' then
     return 'NEEDS_REBUILD'
 end
 
-if incomingSequence <= lastSequence then
-    return 'OLD_SEQUENCE'
-end
-
-if incomingSequence ~= lastSequence + 1 then
-    return 'SEQUENCE_GAP'
+-- 先确认承载统计的 Hash 完整，再判断事件幂等。
+-- 否则 current/delta 丢失但 processed Key 仍在时会错误返回 DUPLICATE。
+if redis.call('EXISTS', KEYS[4]) == 1 then
+    return 'DUPLICATE'
 end
 
 if current + delta < 0 then
     return 'NEGATIVE_RESULT'
 end
 
-redis.call('HINCRBY', KEYS[1], field, delta)
-redis.call('HSET', KEYS[1], 'lastSequence', incomingSequence)
-redis.call('ZINCRBY', KEYS[2], ARGV[4], ARGV[3])
-redis.call('SET', KEYS[3], '1', 'EX', ARGV[5])
+-- 所有校验必须位于第一次写命令之前。
+redis.call('HINCRBY', KEYS[1], currentField, delta)
+redis.call('HINCRBY', KEYS[2], deltaField, delta)
+redis.call('SADD', KEYS[3], ARGV[4])
+redis.call('ZINCRBY', KEYS[5], hotScoreDelta, ARGV[4])
+redis.call('SET', KEYS[4], '1', 'EX', processedTtl)
 return 'APPLIED'

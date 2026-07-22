@@ -31,9 +31,8 @@ public interface VideoStatusMapper {
 
     int countLikeByUid(Integer uid);
 
-    int applyDelta(
+    int applyBatchDelta(
             @Param("vid") Integer vid,
-            @Param("sequence") Long sequence,
             @Param("delta") VideoStatusDelta delta
     );
 

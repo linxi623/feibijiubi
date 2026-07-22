@@ -3,11 +3,15 @@ package com.feibijiubi.backend.mq;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feibijiubi.backend.common.NonRetryableMessageException;
 import com.feibijiubi.backend.common.RedisOperationException;
+import com.feibijiubi.backend.common.RepairRequiredMessageException;
 import com.feibijiubi.backend.common.RetryableMessageException;
 import com.feibijiubi.backend.config.VideoStatusProperties;
-
+import com.feibijiubi.backend.enums.RegistrationResult;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
-import com.feibijiubi.backend.service.video.VideoStatusService;
+import com.feibijiubi.backend.service.video.videostatus.VideoStatusConsumptionService;
+import com.feibijiubi.backend.service.video.videostatus.VideoStatusEventFingerprintService;
+import com.feibijiubi.backend.service.video.videostatus.VideoStatusService;
+import com.feibijiubi.backend.service.video.videostatus.VideoStatusVidMutex;
 import com.feibijiubi.backend.utils.rabbitmq.RabbitConstants;
 import com.rabbitmq.client.Channel;
 import lombok.RequiredArgsConstructor;
@@ -18,9 +22,6 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.security.MessageDigest;
-import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Component
@@ -28,9 +29,12 @@ import java.util.Map;
 public class VideoStatusEventConsumer {
 
     private final ObjectMapper objectMapper;
+    private final VideoStatusEventFingerprintService fingerprintService;
+    private final VideoStatusConsumptionService consumptionService;
     private final VideoStatusService videoStatusService;
     private final VideoStatusMessageForwarder forwarder;
     private final VideoStatusProperties properties;
+    private final VideoStatusVidMutex vidMutex;
 
     @RabbitListener(
             queues = RabbitConstants.MAIN_QUEUE,
@@ -38,16 +42,27 @@ public class VideoStatusEventConsumer {
     )
     public void consume(Message message, Channel channel) throws IOException {
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
+        VideoStatusChangedEvent event = null;
 
         try {
-            process(message);
+            event = parseAndValidate(message);
+            process(event);
+        } catch (RepairRequiredMessageException e) {
+            forwardDeadThenAck(message, channel, deliveryTag, e);
+            return;
         } catch (NonRetryableMessageException e) {
             forwardDeadThenAck(message, channel, deliveryTag, e);
             return;
         } catch (RetryableMessageException
                  | RedisOperationException
                  | DataAccessException e) {
-            forwardRetryOrDeadThenAck(message, channel, deliveryTag, e);
+            forwardRetryOrDeadThenAck(
+                    message,
+                    channel,
+                    deliveryTag,
+                    event,
+                    e
+            );
             return;
         } catch (Exception e) {
             forwardDeadThenAck(
@@ -67,31 +82,43 @@ public class VideoStatusEventConsumer {
         channel.basicAck(deliveryTag, false);
     }
 
-    private void process(Message message) {
-        VideoStatusChangedEvent event = parse(message);
-        String payloadHash = sha256(message.getBody());
+    private void process(VideoStatusChangedEvent event) {
+        vidMutex.withLock(event.vid(), () -> processLocked(event));
+    }
+
+    private void processLocked(VideoStatusChangedEvent event) {
+        String payloadHash = fingerprintService.hash(event);
+        RegistrationResult registration = consumptionService.register(
+                event,
+                payloadHash
+        );
+
+        if (registration == RegistrationResult.REDIS_ALREADY_APPLIED
+                || registration == RegistrationResult.ALREADY_FLUSHED) {
+            return;
+        }
 
         VideoStatusService.ApplyResult redisResult =
                 videoStatusService.apply(event);
         switch (redisResult) {
             case APPLIED, DUPLICATE ->
-                    videoStatusService.persist(event, payloadHash);
-            case SEQUENCE_GAP, NEEDS_REBUILD ->
+                    consumptionService.markRedisApplied(event.eventId());
+            case NEEDS_REBUILD ->
                     throw new RetryableMessageException(
-                            "统计事件存在序号缺口或需要重建"
+                            "Redis 初始化后仍无法应用视频统计事件"
                     );
-            case OLD_SEQUENCE ->
-                    throw new NonRetryableMessageException(
-                            "旧序号事件没有对应的 eventId 幂等标记"
+            case NEGATIVE_RESULT ->
+                    throw new RetryableMessageException(
+                            "负增量暂时无法应用"
                     );
-            case NEGATIVE_RESULT, INVALID_FIELD ->
+            case INVALID_FIELD, INVALID_REDIS_TYPE ->
                     throw new NonRetryableMessageException(
-                            "统计事件会产生非法计数"
+                            "Redis 视频统计数据结构非法"
                     );
         }
     }
 
-    private VideoStatusChangedEvent parse(Message message) {
+    private VideoStatusChangedEvent parseAndValidate(Message message) {
         try {
             VideoStatusChangedEvent event = objectMapper.readValue(
                     message.getBody(),
@@ -108,13 +135,19 @@ public class VideoStatusEventConsumer {
             Message message,
             Channel channel,
             long deliveryTag,
+            VideoStatusChangedEvent event,
             Exception cause
     ) throws IOException {
+        int nextAttempt = headerAttempt(message) + 1;
+        if (event != null) {
+            recordFailureBestEffort(event.eventId(), nextAttempt, cause);
+        }
+
         try {
-            if (retryCount(message) >= properties.getConsumerMaxRetries()) {
-                forwarder.toDead(message, cause.getMessage());
+            if (nextAttempt <= properties.getConsumerMaxRetries()) {
+                forwarder.toRetry(message, nextAttempt);
             } else {
-                forwarder.toRetry(message);
+                forwarder.toDead(message, safeMessage(cause));
             }
             channel.basicAck(deliveryTag, false);
         } catch (Exception forwardError) {
@@ -130,7 +163,7 @@ public class VideoStatusEventConsumer {
             Exception cause
     ) throws IOException {
         try {
-            forwarder.toDead(message, cause.getMessage());
+            forwarder.toDead(message, safeMessage(cause));
             channel.basicAck(deliveryTag, false);
         } catch (Exception forwardError) {
             log.error("统计消息死信转发失败，保留原消息未确认", forwardError);
@@ -138,38 +171,52 @@ public class VideoStatusEventConsumer {
         }
     }
 
-    private long retryCount(Message message) {
-        Object header = message.getMessageProperties()
-                .getHeaders()
-                .get("x-death");
-        if (!(header instanceof List<?> deaths)) {
-            return 0;
+    private int headerAttempt(Message message) {
+        Object header = message.getMessageProperties().getHeaders()
+                .get(RabbitConstants.ATTEMPT_HEADER);
+        if (header instanceof Number number) {
+            return Math.max(0, number.intValue());
         }
-
-        return deaths.stream()
-                .filter(Map.class::isInstance)
-                .map(Map.class::cast)
-                .filter(death -> RabbitConstants.RETRY_QUEUE
-                        .equals(String.valueOf(death.get("queue"))))
-                .mapToLong(death -> {
-                    Object count = death.get("count");
-                    return count instanceof Number number
-                            ? number.longValue()
-                            : 0L;
-                })
-                .sum();
+        if (header instanceof String text) {
+            try {
+                return Math.max(0, Integer.parseInt(text));
+            } catch (NumberFormatException ignored) {
+                log.warn("非法的视频统计重试次数 Header: {}", text);
+            }
+        }
+        return 0;
     }
 
-    private String sha256(byte[] body) {
+    private void recordFailureBestEffort(
+            String eventId,
+            int attempt,
+            Exception originalError
+    ) {
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(body);
-            return java.util.HexFormat.of().formatHex(digest);
-        } catch (Exception e) {
-            throw new NonRetryableMessageException(
-                    "统计消息摘要计算失败",
-                    e
+            consumptionService.recordConsumerFailure(
+                    eventId,
+                    attempt,
+                    safeMessage(originalError)
+            );
+        } catch (Exception recordError) {
+            log.error(
+                    "记录视频统计消费失败信息失败，不覆盖原始异常: eventId={}, attempt={}",
+                    eventId,
+                    attempt,
+                    recordError
             );
         }
     }
+
+    private String safeMessage(Exception error) {
+        String message = error.getMessage();
+        if (message == null || message.isBlank()) {
+            message = error.getClass().getSimpleName();
+        }
+        if (message.length() <= 1000) {
+            return message;
+        }
+        return message.substring(0, 1000);
+    }
+
 }

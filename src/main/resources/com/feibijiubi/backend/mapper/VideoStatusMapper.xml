@@ -83,7 +83,7 @@
         SET   share_times = share_times + 1
         WHERE vid = #{vid}
     </update>
-    <update id="applyDelta">
+    <update id="applyBatchDelta">
         UPDATE video_status
         SET play_times = play_times + #{delta.playDelta},
             like_times = like_times + #{delta.likeDelta},
@@ -92,10 +92,8 @@
             coin_times = coin_times + #{delta.coinDelta},
             share_times = share_times + #{delta.shareDelta},
             collect_times = collect_times + #{delta.collectDelta},
-            danmu_times = danmu_times + #{delta.danmuDelta},
-            applied_sequence = #{sequence}
+            danmu_times = danmu_times + #{delta.danmuDelta}
         WHERE vid = #{vid}
-          AND applied_sequence + 1 = #{sequence}
           AND play_times + #{delta.playDelta} >= 0
           AND like_times + #{delta.likeDelta} >= 0
           AND unlike_times + #{delta.unlikeDelta} >= 0

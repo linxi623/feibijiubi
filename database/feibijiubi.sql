@@ -193,15 +193,14 @@ CREATE TABLE `video` (
 
 CREATE TABLE `video_status` (
     `vid` INT NOT NULL COMMENT '视频ID',
-    `play_times` INT NOT NULL DEFAULT 0 COMMENT '播放次数',
-    `like_times` INT NOT NULL DEFAULT 0 COMMENT '点赞次数',
-    `unlike_times` INT NOT NULL DEFAULT 0 COMMENT '点踩次数',
-    `comment_times` INT NOT NULL DEFAULT 0 COMMENT '评论次数',
-    `coin_times` INT NOT NULL DEFAULT 0 COMMENT '投币次数',
-    `share_times` INT NOT NULL DEFAULT 0 COMMENT '分享次数',
-    `collect_times` INT NOT NULL DEFAULT 0 COMMENT '收藏次数',
-    `danmu_times` INT NOT NULL DEFAULT 0 COMMENT '弹幕次数',
-    `applied_sequence` INT NOT NULL DEFAULT 0 COMMENT '已经持久化的最后统计事件序号',
+    `play_times` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '播放次数',
+    `like_times` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '点赞次数',
+    `unlike_times` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '点踩次数',
+    `comment_times` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '评论次数',
+    `coin_times` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '投币次数',
+    `share_times` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '分享次数',
+    `collect_times` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '收藏次数',
+    `danmu_times` BIGINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '弹幕次数',
     PRIMARY KEY (`vid`),
     CONSTRAINT `fk_video_status_vid` FOREIGN KEY (`vid`) REFERENCES `video` (`vid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='视频数据统计表';
@@ -258,20 +257,11 @@ CREATE TABLE `user_follow` (
         CHECK (`follower_id` <> `followed_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户关系表';
 
-CREATE TABLE video_status_sequence (
-    vid INT NOT NULL,
-    last_sequence BIGINT UNSIGNED NOT NULL DEFAULT 0,
-    PRIMARY KEY (vid),
-    CONSTRAINT fk_video_status_sequence_vid
-        FOREIGN KEY (vid) REFERENCES video (vid)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    COMMENT='视频统计聚合序号';
 
 CREATE TABLE video_status_outbox (
     id BIGINT NOT NULL AUTO_INCREMENT,
     event_id VARCHAR(64) NOT NULL,
     aggregate_id INT NOT NULL COMMENT '视频ID',
-    aggregate_sequence BIGINT UNSIGNED NOT NULL,
     event_type VARCHAR(32) NOT NULL,
     payload JSON NOT NULL,
     status TINYINT NOT NULL DEFAULT 0 COMMENT '0=PENDING,1=SENDING,2=SENT,3=FAILED',
@@ -284,7 +274,6 @@ CREATE TABLE video_status_outbox (
     sent_at DATETIME(3) NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uk_video_status_outbox_event_id (event_id),
-    UNIQUE KEY uk_video_status_outbox_sequence (aggregate_id, aggregate_sequence),
     KEY idx_video_status_outbox_poll (status, next_retry_at, sending_at, id),
     CONSTRAINT fk_video_status_outbox_vid
         FOREIGN KEY (aggregate_id) REFERENCES video (vid)
@@ -295,26 +284,74 @@ CREATE TABLE video_status_consumed_event (
     id BIGINT NOT NULL AUTO_INCREMENT,
     event_id VARCHAR(64) NOT NULL,
     vid INT NOT NULL,
-    aggregate_sequence BIGINT UNSIGNED NOT NULL,
     event_type VARCHAR(32) NOT NULL,
     delta BIGINT NOT NULL,
+    payload JSON NOT NULL,
     payload_hash CHAR(64) NOT NULL,
     process_status TINYINT NOT NULL DEFAULT 0
-        COMMENT '0=RECEIVED,1=MYSQL_COMMITTED,2=REPAIR_REQUIRED',
+        COMMENT '0=RECEIVED,1=REDIS_APPLIED_PENDING_FLUSH,2=FLUSHED,3=REPAIR_REQUIRED',
+    consumer_retry_count INT NOT NULL DEFAULT 0,
+    last_attempt_at DATETIME(3) NULL,
     last_error VARCHAR(1000) NULL,
     consumed_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    committed_at DATETIME(3) NULL,
+    redis_applied_at DATETIME(3) NULL,
+    flushed_at DATETIME(3) NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uk_video_status_consumed_event_id (event_id),
-    UNIQUE KEY uk_video_status_consumed_sequence (vid, aggregate_sequence),
-    KEY idx_video_status_consumed_repair (process_status, id),
+    KEY idx_video_status_consumed_pending (process_status, vid, id),
+    KEY idx_video_status_consumed_recovery (process_status, last_attempt_at, id),
     CONSTRAINT fk_video_status_consumed_vid
         FOREIGN KEY (vid) REFERENCES video (vid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    COMMENT='视频统计消费幂等记录';
+    COMMENT='视频统计消费事件与待批量落库日志';
 
-INSERT INTO video_status_sequence (vid, last_sequence)
-SELECT vid, applied_sequence
-FROM video_status
-ON DUPLICATE KEY UPDATE
-    last_sequence = GREATEST(last_sequence, VALUES(last_sequence));
+CREATE TABLE video_status_flush_batch (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    batch_id VARCHAR(64) NOT NULL,
+    vid INT NOT NULL,
+    redis_generation VARCHAR(64) NOT NULL,
+    play_delta BIGINT NOT NULL DEFAULT 0,
+    like_delta BIGINT NOT NULL DEFAULT 0,
+    unlike_delta BIGINT NOT NULL DEFAULT 0,
+    comment_delta BIGINT NOT NULL DEFAULT 0,
+    coin_delta BIGINT NOT NULL DEFAULT 0,
+    share_delta BIGINT NOT NULL DEFAULT 0,
+    collect_delta BIGINT NOT NULL DEFAULT 0,
+    danmu_delta BIGINT NOT NULL DEFAULT 0,
+    cleanup_status TINYINT NOT NULL DEFAULT 0
+        COMMENT '0=PENDING,1=CLEANED,2=SKIPPED_GENERATION_CHANGED,3=REPAIR_REQUIRED',
+    last_error VARCHAR(1000) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    cleaned_at DATETIME(3) NULL,
+    cleanup_retry_count INT NOT NULL DEFAULT 0,
+    last_attempt_at DATETIME(3) NULL ,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_video_status_flush_batch_id (batch_id),
+    KEY idx_video_status_flush_cleanup (cleanup_status, id),
+    CONSTRAINT fk_video_status_flush_batch_vid
+        FOREIGN KEY (vid) REFERENCES video (vid)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    COMMENT='视频统计批量落库后的Redis清理任务';
+
+CREATE TABLE video_status_consumption_repair_log (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    operation_id VARCHAR(64) NOT NULL,
+    event_id VARCHAR(64) NOT NULL,
+    action VARCHAR(32) NOT NULL,
+    operation_status TINYINT NOT NULL DEFAULT 0
+        COMMENT '0=STARTED,1=COMPLETED,2=FAILED',
+    reason VARCHAR(1000) NOT NULL,
+    operator VARCHAR(64) NOT NULL,
+    last_error VARCHAR(1000) NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    completed_at DATETIME(3) NULL,
+    active_event_id VARCHAR(64)
+    GENERATED ALWAYS AS (
+        CASE WHEN operation_status = 0 THEN event_id ELSE NULL END
+    ) STORED,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_video_status_repair_operation (operation_id),
+    UNIQUE KEY uk_video_status_repair_active_event (active_event_id),
+    KEY idx_video_status_repair_event (event_id, id),
+    KEY idx_video_status_repair_pending (operation_status, id)
+);

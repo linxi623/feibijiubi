@@ -4,10 +4,9 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.feibijiubi.backend.mapper.VideoStatusOutboxMapper">
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO video_stats_outbox(
+        INSERT INTO video_status_outbox(
             event_id,
             aggregate_id,
-            aggregate_sequence,
             event_type,
             payload,
             status,
@@ -16,7 +15,6 @@
         ) VALUES (
                      #{eventId},
                      #{aggregateId},
-                     #{aggregateSequence},
                      #{eventType},
                      #{payload},
                      0,
@@ -30,7 +28,6 @@
         SELECT id,
                event_id,
                aggregate_id,
-               aggregate_sequence,
                event_type,
                payload,
                status,
@@ -41,7 +38,7 @@
                last_error,
                created_at,
                sent_at
-        FROM video_stats_outbox
+        FROM video_status_outbox
         WHERE status = 0
           AND (next_retry_at IS NULL OR next_retry_at &lt;= #{now})
         ORDER BY id
@@ -50,7 +47,7 @@
     </select>
 
     <update id="markSending">
-        UPDATE video_stats_outbox
+        UPDATE video_status_outbox
         SET status = 1,
             sending_at = #{sendingAt},
             lease_token = #{leaseToken}
@@ -59,7 +56,7 @@
     </update>
 
     <update id="markSent">
-        UPDATE video_stats_outbox
+        UPDATE video_status_outbox
         SET status = 2,
             sent_at = #{sentAt},
             sending_at = NULL,
@@ -71,7 +68,7 @@
     </update>
 
     <update id="markPending">
-        UPDATE video_stats_outbox
+        UPDATE video_status_outbox
         SET status = 0,
             retry_count = retry_count + 1,
             next_retry_at = #{nextRetryAt},
@@ -84,7 +81,7 @@
     </update>
 
     <update id="markFailed">
-        UPDATE video_stats_outbox
+        UPDATE video_status_outbox
         SET status = 3,
             retry_count = retry_count + 1,
             sending_at = NULL,
@@ -96,7 +93,7 @@
     </update>
 
     <update id="recoverExpiredSending">
-        UPDATE video_stats_outbox
+        UPDATE video_status_outbox
         SET status = 0,
             retry_count = retry_count + 1,
             next_retry_at = NOW(3),

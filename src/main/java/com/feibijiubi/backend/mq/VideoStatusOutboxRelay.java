@@ -31,7 +31,7 @@ public class VideoStatusOutboxRelay {
      */
     @Scheduled(
             fixedDelayString =
-                    "${app.video-Status.outbox-fixed-delay-ms:1000}"
+                    "${app.video-status.outbox-fixed-delay-ms:1000}"
     )
     public void relay() {
         if (!properties.isAsyncEnabled()) {
