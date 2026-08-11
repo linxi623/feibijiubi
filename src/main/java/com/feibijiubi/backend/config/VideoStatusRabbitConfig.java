@@ -9,12 +9,15 @@ import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.support.converter.DefaultJackson2JavaTypeMapper;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.cglib.core.Converter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.messaging.converter.JsonbMessageConverter;
 
 @Configuration
 public class VideoStatusRabbitConfig {
@@ -141,7 +144,12 @@ public class VideoStatusRabbitConfig {
      */
     @Bean
     public MessageConverter rabbitMessageConverter(ObjectMapper objectMapper) {
-        return new Jackson2JsonMessageConverter(objectMapper);
+        DefaultJackson2JavaTypeMapper typeMapper = new DefaultJackson2JavaTypeMapper();
+        typeMapper.setTrustedPackages("*");
+
+        Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter(objectMapper);
+        converter.setJavaTypeMapper(typeMapper);
+        return converter;
     }
 
 
@@ -155,9 +163,7 @@ public class VideoStatusRabbitConfig {
     public SimpleRabbitListenerContainerFactory
     videoStatusListenerContainerFactory(
             ConnectionFactory connectionFactory,
-            MessageConverter rabbitMessageConverter,
-            @Value("${spring.rabbitmq.listener.simple.auto-startup:false}")
-            boolean autoStartup
+            MessageConverter rabbitMessageConverter
     ) {
         SimpleRabbitListenerContainerFactory factory =
                 new SimpleRabbitListenerContainerFactory();
@@ -168,7 +174,6 @@ public class VideoStatusRabbitConfig {
         factory.setConcurrentConsumers(1);
         factory.setMaxConcurrentConsumers(1);
         factory.setDefaultRequeueRejected(false);
-        factory.setAutoStartup(autoStartup);
         return factory;
     }
 }

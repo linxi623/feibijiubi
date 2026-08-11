@@ -29,8 +29,9 @@ public class UserController {
 
     @OptionalLogin
     @GetMapping("/{uid}")
-    public ApiResponse<UserVO> getUser(@PathVariable Integer uid) {
-        UserVO vo = userService.getCurrentUser(uid);
+    public ApiResponse<UserVO> getUser(HttpServletRequest request, @PathVariable Integer uid) {
+        Integer currentUserId = (Integer) request.getAttribute("currentUserId");
+        UserVO vo = userService.getUser(currentUserId, uid);
         return ApiResponse.success("查询成功", vo);
     }
 
@@ -58,6 +59,14 @@ public class UserController {
         return ApiResponse.success("修改成功", avatarUrl);
     }
 
+    @PostMapping("/me/background")
+    public ApiResponse<String> updateBackground(HttpServletRequest request,
+                                                @RequestParam("file") MultipartFile file) {
+        Integer currentUserId = (Integer) request.getAttribute("currentUserId");
+        String backgroundUrl = userService.updateBackground(currentUserId, file);
+        return ApiResponse.success("修改成功", backgroundUrl);
+    }
+
     @PostMapping("/{uid}/subscribe")
     public ApiResponse<Void> subscribe(HttpServletRequest request,
                                        @PathVariable Integer uid,
@@ -66,5 +75,4 @@ public class UserController {
         userService.subscribe(currentUserId, uid, isSet);
         return ApiResponse.success(null);
     }
-
 }

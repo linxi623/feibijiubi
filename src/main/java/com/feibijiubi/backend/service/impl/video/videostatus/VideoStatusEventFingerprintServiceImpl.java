@@ -13,6 +13,11 @@ import java.util.HexFormat;
 public class VideoStatusEventFingerprintServiceImpl
         implements VideoStatusEventFingerprintService {
 
+    /**
+     * 计算消息的语义哈希值（Semantic Hash），主要用于幂等性去重和消息唯一性校验
+     * @param event
+     * @return
+     */
     @Override
     public String hash(VideoStatusChangedEvent event) {
         event.validate();

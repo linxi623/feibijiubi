@@ -10,6 +10,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class VideoStatusProperties {
     // 总开关，是否启用异步统计
     private boolean asyncEnabled;
+    private boolean schedulingEnabled;
     private int redisEventTtlDays = 30;
     // 每次从数据库中抓取多少条待发布消息
     private int outboxBatchSize = 100;
@@ -19,7 +20,9 @@ public class VideoStatusProperties {
     private int outboxLeaseSeconds = 60;
     // 消费者返回确认消息的最长时间，超时定义为发送失败
     private int publishConfirmTimeoutSeconds = 5;
+
     private int consumerMaxRetries = 5;
+    // 7天
     private int consumerRecoveryAutoReplayMaxAgeSeconds = 604_800;
     private int cleanupMaxAttempts = 10;
     private long flushFixedDelayMs = 500;
@@ -28,7 +31,7 @@ public class VideoStatusProperties {
     private long flushRecoveryFixedDelayMs = 5000;
     private long cleanupFixedDelayMs = 1000;
     private int cleanupBatchSize = 100;
-    private boolean schedulingEnabled;
+
 
     @PostConstruct
     public void validate() {

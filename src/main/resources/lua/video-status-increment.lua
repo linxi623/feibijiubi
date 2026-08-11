@@ -12,6 +12,10 @@
 
 local function redisType(key)
     local result = redis.call('TYPE', key)
+    -- 此时 result 可能是：
+        --   - 字符串: "hash"
+        --   - Table:  { ok = "hash" }
+
     if type(result) == 'table' then
         return result['ok']
     end
@@ -23,6 +27,7 @@ if redis.call('EXISTS', KEYS[1]) == 0
     return 'NEEDS_REBUILD'
 end
 
+-- 检验key的类型是否正确
 local currentType = redisType(KEYS[1])
 local deltaType = redisType(KEYS[2])
 local dirtyType = redisType(KEYS[3])
@@ -59,7 +64,7 @@ local allowedDelta = {
     collectDelta = true,
     danmuDelta = true
 }
-
+-- 判断在hash中字段是否存在
 local currentField = ARGV[1]
 local deltaField = ARGV[2]
 if allowedCurrent[currentField] ~= true

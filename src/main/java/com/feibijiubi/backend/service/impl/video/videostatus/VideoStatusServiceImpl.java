@@ -50,7 +50,7 @@ public class VideoStatusServiceImpl implements VideoStatusService {
     private final RedisUtils redisUtils;
 
     @Resource(name = "videoStatusIncrementScript")
-    private DefaultRedisScript<String> videoStatusInitScript;
+    private DefaultRedisScript<String> videoStatusIncrementScript;
 
     private final VideoStatusProperties properties;
     private final VideoStatusVidMutex vidMutex;
@@ -92,7 +92,7 @@ public class VideoStatusServiceImpl implements VideoStatusService {
         );
 
         String result = redisUtils.executeScript(
-                videoStatusInitScript,
+                videoStatusIncrementScript,
                 keys,
                 event.type().redisField(),
                 event.type().deltaField(),

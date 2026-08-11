@@ -121,6 +121,14 @@
             AND deleted_at IS NULL
     </update>
 
+    <update id="updateBackground">
+        UPDATE users
+        SET background_url = #{backgroundUrl},
+            updated_at = NOW()
+        WHERE id = #{currentUserId}
+          AND deleted_at IS NULL
+    </update>
+
     <update id="decreaseCoin">
         UPDATE users
         SET coin = coin - #{coin}

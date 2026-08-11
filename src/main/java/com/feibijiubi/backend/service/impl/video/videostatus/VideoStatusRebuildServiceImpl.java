@@ -11,16 +11,12 @@ import com.feibijiubi.backend.utils.redis.RedisUtils;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.locks.LockSupport;
 
 @Slf4j
 @Service
@@ -28,14 +24,8 @@ import java.util.concurrent.locks.LockSupport;
 public class VideoStatusRebuildServiceImpl
         implements VideoStatusRebuildService {
 
-    private static final Duration INIT_LOCK_TTL = Duration.ofSeconds(10);
-    private static final Duration LOCK_CONTENTION_RECHECK_DELAY =
-            Duration.ofMillis(50);
-
     @Resource(name = "videoStatusInitScript")
     private DefaultRedisScript<String> videoStatusInitScript;
-    @Resource(name = "compareAndDeleteScript")
-    private DefaultRedisScript<Long> compareAndDeleteScript;
 
     private final VideoStatusRebuildSnapshotService snapshotService;
     private final VideoStatusVidMutex vidMutex;
@@ -48,49 +38,24 @@ public class VideoStatusRebuildServiceImpl
     }
 
     private void ensureInitializedUnderVidLock(Integer vid) {
-        Presence initialPresence = readPresence(vid);
-        if (initialPresence.complete()) {
-            return;
-        }
-        failIfInconsistent(vid, initialPresence);
-
-        String lockKey = RedisKeyUtils.videoStatusInitLock(vid);
-        String token = UUID.randomUUID().toString();
-        Boolean locked = redisUtils.setIfAbsent(lockKey, token, INIT_LOCK_TTL);
-
-        if (!Boolean.TRUE.equals(locked)) {
-            recheckAfterLockContention(vid);
-            return;
-        }
-
-        try {
-            Presence lockedPresence = readPresence(vid);
-            if (lockedPresence.complete()) {
-                return;
-            }
-            failIfInconsistent(vid, lockedPresence);
-
-            // load() 位于独立 Spring Bean；方法返回时只读事务已经结束。
-            VideoStatusRebuildSnapshot snapshot = snapshotService.load(vid);
-            InitialValues values = classifyConfirmedPending(snapshot);
-            initializeRedis(snapshot, values);
-        } finally {
-            releaseLock(lockKey, token);
-        }
-    }
-
-    private void recheckAfterLockContention(Integer vid) {
-        LockSupport.parkNanos(LOCK_CONTENTION_RECHECK_DELAY.toNanos());
         Presence presence = readPresence(vid);
         if (presence.complete()) {
             return;
         }
         failIfInconsistent(vid, presence);
-        throw new RetryableMessageException(
-                "Redis 视频统计初始化锁正被占用，vid=" + vid
-        );
+
+        // load() 位于独立 Spring Bean；方法返回时只读事务已经结束。
+        VideoStatusRebuildSnapshot snapshot = snapshotService.load(vid);
+        InitialValues values = classifyConfirmedPending(snapshot);
+        initializeRedis(snapshot, values);
     }
 
+    /**
+     * 保证current_hash保存的是实时的数据，从消息表中取出还没有刷入的mysql的数据，从mysql中取出已经持久化保存的数据
+     * 两者合并得到current_hash
+     * @param snapshot
+     * @return
+     */
     private InitialValues classifyConfirmedPending(
             VideoStatusRebuildSnapshot snapshot
     ) {
@@ -100,6 +65,9 @@ public class VideoStatusRebuildServiceImpl
         try {
             for (VideoStatusRebuildSnapshot.Candidate candidate
                     : snapshot.candidates()) {
+                // 判断是否已确认：
+                // 方式1: processStatus == FLUSHED (状态码=1)
+                // 方式2: processStatus == RECEIVED 但在 Redis 中有 processedKey
                 boolean confirmed = candidate.processStatus() == 1
                         || (candidate.processStatus() == 0
                         && Boolean.TRUE.equals(redisUtils.hasKey(
@@ -108,6 +76,7 @@ public class VideoStatusRebuildServiceImpl
                 if (!confirmed) {
                     continue;
                 }
+                // 已确认但还没有刷入mysql的消息
                 pending.add(candidate.delta());
                 pendingHotScore += candidate.hotScoreDelta();
             }
@@ -171,6 +140,11 @@ public class VideoStatusRebuildServiceImpl
         );
     }
 
+    /**
+     * 检查视频key和增量key是否存在
+     * @param vid
+     * @return
+     */
     private Presence readPresence(Integer vid) {
         return new Presence(
                 Boolean.TRUE.equals(redisUtils.hasKey(
@@ -182,6 +156,11 @@ public class VideoStatusRebuildServiceImpl
         );
     }
 
+    /**
+     * delta和current只有一个key存在，有问题
+     * @param vid
+     * @param presence
+     */
     private void failIfInconsistent(Integer vid, Presence presence) {
         if (presence.currentExists() == presence.deltaExists()) {
             return;
@@ -195,18 +174,6 @@ public class VideoStatusRebuildServiceImpl
         throw new RetryableMessageException(
                 "Redis 视频统计 current/delta 结构不一致，vid=" + vid
         );
-    }
-
-    private void releaseLock(String lockKey, String token) {
-        try {
-            redisUtils.executeScript(
-                    compareAndDeleteScript,
-                    List.of(lockKey),
-                    token
-            );
-        } catch (RuntimeException e) {
-            log.error("Redis 视频统计初始化锁释放失败，lockKey={}", lockKey, e);
-        }
     }
 
     private void validateVid(Integer vid) {

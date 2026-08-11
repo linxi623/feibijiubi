@@ -115,7 +115,7 @@ cleanup 状态速查：
 ## 3. 总体架构
 
 ```mermaid
-flowchart LR
+flowchart TB
     A[HTTP 业务请求] --> B[业务 Service 事务]
     B --> C[业务事实表]
     B --> D[video_status_outbox]

@@ -16,7 +16,8 @@ public final class RedisConstants {
     public static final String VIDEO_STATUS_DELTA_PREFIX = "video:status:delta:v1:";
     public static final String DIRTY_VIDEO_PREFIX = "dirty:video:v1";
     public static final String VIDEO_FLUSH_CLEAN_PREFIX = "video:status:flush-cleaned:v1:";
-    public static final String VIDEO_STATUS_INIT_LOCK_PREFIX = "video:status:init-lock:v1:";
+    // 分布式锁
+    public static final String LOCK_KEY = "lock:video-status:vid:";
     // redis的幂等Key
     public static final String PROCESSED_PREFIX = "video:status:process:v1:";
     public static final String FEED_HOT_VIDEOS_PREFIX = "feed:hot:videos:v1";

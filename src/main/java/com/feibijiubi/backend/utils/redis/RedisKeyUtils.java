@@ -42,12 +42,11 @@ public class RedisKeyUtils {
         return RedisConstants.DIRTY_VIDEO_PREFIX;
     }
 
-
     public static String flushVideo(String batchId) {
         return RedisConstants.VIDEO_FLUSH_CLEAN_PREFIX + batchId;
     }
 
-    public static String videoStatusInitLock(Integer vid) {
-        return RedisConstants.VIDEO_STATUS_INIT_LOCK_PREFIX + vid;
+    public static String lockKey(Integer vid) {
+        return RedisConstants.LOCK_KEY + vid;
     }
 }

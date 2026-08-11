@@ -34,7 +34,6 @@ public class VideoStatusEventConsumer {
     private final VideoStatusService videoStatusService;
     private final VideoStatusMessageForwarder forwarder;
     private final VideoStatusProperties properties;
-    private final VideoStatusVidMutex vidMutex;
 
     @RabbitListener(
             queues = RabbitConstants.MAIN_QUEUE,
@@ -83,10 +82,6 @@ public class VideoStatusEventConsumer {
     }
 
     private void process(VideoStatusChangedEvent event) {
-        vidMutex.withLock(event.vid(), () -> processLocked(event));
-    }
-
-    private void processLocked(VideoStatusChangedEvent event) {
         String payloadHash = fingerprintService.hash(event);
         RegistrationResult registration = consumptionService.register(
                 event,
@@ -118,6 +113,11 @@ public class VideoStatusEventConsumer {
         }
     }
 
+    /**
+     * 将消息转为对象，同时验证该对象的准确性
+     * @param message
+     * @return
+     */
     private VideoStatusChangedEvent parseAndValidate(Message message) {
         try {
             VideoStatusChangedEvent event = objectMapper.readValue(

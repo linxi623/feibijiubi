@@ -36,7 +36,7 @@ public class VideoStatusConsumptionServiceImpl
 
     @Override
     @Transactional(
-            propagation = Propagation.REQUIRES_NEW,
+            propagation = Propagation.REQUIRES_NEW, // 不管外层是否有事务，这个方法都独立开启新事务，插入记录后立即提交（或回滚）
             rollbackFor = Exception.class,
             noRollbackFor = RepairRequiredMessageException.class
     )
@@ -146,6 +146,12 @@ public class VideoStatusConsumptionServiceImpl
         }
     }
 
+    /**
+     * 产生唯一键冲突后，去对应列查找
+     * @param event
+     * @param semanticPayloadHash
+     * @return
+     */
     private RegistrationResult handleDuplicate(
             VideoStatusChangedEvent event,
             String semanticPayloadHash
@@ -157,7 +163,7 @@ public class VideoStatusConsumptionServiceImpl
                     "唯一键冲突后未查询到消费事件，eventId=" + event.eventId()
             );
         }
-
+        // 查看内容是否相同，不同的话说明有bug，一个唯一键对应了两个不同的事件
         boolean sameContent = Objects.equals(existing.getVid(), event.vid())
                 && Objects.equals(existing.getEventType(), event.type().name())
                 && Objects.equals(existing.getDelta(), event.delta())
@@ -202,11 +208,13 @@ public class VideoStatusConsumptionServiceImpl
     private RegistrationResult handleReceived(
             VideoStatusConsumedEvent existing
     ) {
+        // 现在减去最长允许期限得到的时间，在该时间到现在处理的事件都没有过期
         LocalDateTime replayCutoff = LocalDateTime.now().minusSeconds(
                 properties.getConsumerRecoveryAutoReplayMaxAgeSeconds()
         );
         boolean expired = existing.getConsumedAt() == null
                 || !existing.getConsumedAt().isAfter(replayCutoff);
+        // 超过时限后就不再重新投递，直接记录为失败
         if (expired) {
             String error = truncate(
                     "RECEIVED 事件超过自动重放安全年龄，禁止继续应用 Redis，eventId="
@@ -224,7 +232,7 @@ public class VideoStatusConsumptionServiceImpl
             }
             throw new RepairRequiredMessageException(error, true);
         }
-
+        // 没有过期，继续尝试更新redis
         if (consumedEventMapper.touchReceivedAttempt(
                 existing.getEventId()
         ) != 1) {

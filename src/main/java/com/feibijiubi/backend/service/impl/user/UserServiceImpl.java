@@ -40,9 +40,21 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserVO getCurrentUser(Integer currentUserId) {
-        User user = userMapper.selectById(currentUserId);
+        return buildUserVO(currentUserId, false);
+    }
+
+    @Override
+    public UserVO getUser(Integer currentUserId, Integer uid) {
+        boolean subscribed = currentUserId != null
+                && !Objects.equals(currentUserId, uid)
+                && Boolean.TRUE.equals(userFollowMapper.checkExist(currentUserId, uid));
+        return buildUserVO(uid, subscribed);
+    }
+
+    private UserVO buildUserVO(Integer uid, boolean subscribed) {
+        User user = userMapper.selectById(uid);
         if (user == null) {
-            throw new BusinessException(401, "查询用户异常");
+            throw new BusinessException(404, "用户不存在");
         }
 
         if (user.getStatus() != null && user.getStatus() != 0) {
@@ -50,12 +62,12 @@ public class UserServiceImpl implements UserService {
         }
 
         UserCountVO userCount = UserConverter.toUserCountVO(
-                userFollowMapper.countFans(currentUserId),
-                userFollowMapper.countStar(currentUserId),
-                videoStatusMapper.countLikeByUid(currentUserId),
-                videoMapper.countVideoByUid(currentUserId)
+                userFollowMapper.countFans(uid),
+                userFollowMapper.countStar(uid),
+                videoStatusMapper.countLikeByUid(uid),
+                videoMapper.countVideoByUid(uid)
         );
-        return UserConverter.toUserVO(user, userCount, false);
+        return UserConverter.toUserVO(user, userCount, subscribed);
     }
 
     @Override
@@ -106,11 +118,23 @@ public class UserServiceImpl implements UserService {
     public String updateAvatar(Integer currentUserId, MultipartFile file) {
         loginValidation(currentUserId);
 
-        String avatarUrl = fileStorageService.uploadImage(currentUserId, file, "avatar/" + currentUserId);
+        String avatarUrl = fileStorageService.uploadImage(currentUserId, file, "avatar/");
 
         userMapper.updateAvatar(currentUserId, avatarUrl);
 
         return avatarUrl;
+    }
+
+    @Override
+    public String updateBackground(Integer currentUserId, MultipartFile file) {
+        loginValidation(currentUserId);
+
+        String backgroundUrl = fileStorageService.uploadImage(currentUserId, file, "background/");
+        int updatedRows = userMapper.updateBackground(currentUserId, backgroundUrl);
+        if (updatedRows != 1) {
+            throw new BusinessException(500, "修改主页背景图失败");
+        }
+        return backgroundUrl;
     }
 
     @Override

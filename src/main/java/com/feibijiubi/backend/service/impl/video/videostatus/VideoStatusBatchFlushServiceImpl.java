@@ -29,6 +29,13 @@ public class VideoStatusBatchFlushServiceImpl
     private final VideoStatusMapper videoStatusMapper;
     private final VideoStatusFlushBatchMapper flushBatchMapper;
 
+    /**
+     * 取一个视频的一批数据进行刷库，返回的是刷库结果，如果没有刷库，就返回空，刷库了就返回对应内容
+     * @param vid
+     * @param limit
+     * @param redisGeneration
+     * @return
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public FlushResult flushOneVideo(

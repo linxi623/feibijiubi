@@ -18,7 +18,12 @@ http://localhost:8080
 
 如果修改了 Spring Boot 端口，以实际配置为准。
 
-### 1.2 Content-Type
+### 1.2 HTTP 方法约定
+
+当前代码统一采用：**`GET` 用于读取，`POST` 用于一切写操作**（新增、修改、删除、互动动作）。
+目前没有使用 `PUT` / `DELETE`。因此像“修改资料”“删除视频”“审核视频”这类接口也都是 `POST`。
+
+### 1.3 Content-Type
 
 | 请求类型 | Content-Type |
 |---|---|
@@ -26,7 +31,7 @@ http://localhost:8080
 | 文件上传 | `multipart/form-data` |
 | Query / Path 参数 | 通常不需要设置 Content-Type |
 
-### 1.3 通用响应结构
+### 1.4 通用响应结构
 
 所有 Controller 使用 `ApiResponse<T>`：
 
@@ -46,7 +51,7 @@ http://localhost:8080
 
 > 当前全局异常处理器没有显式设置 HTTP Status，因此已处理的业务异常通常仍返回 HTTP 200；调用方应主要根据响应 JSON 中的 `code` 判断结果。
 
-### 1.4 常见业务状态码
+### 1.5 常见业务状态码
 
 | code | 说明 |
 |---:|---|
@@ -56,11 +61,13 @@ http://localhost:8080
 | `403` | 没有权限或账号状态异常 |
 | `404` | 资源不存在 |
 | `409` | 资源状态冲突或并发操作冲突 |
+| `429` | 触发限流（登录失败过多、上传凭证请求过于频繁等） |
 | `500` | 服务端内部错误或数据异常 |
 
-### 1.5 登录认证
+### 1.6 登录认证
 
-除注册、登录以及标记为“可选登录”的接口外，`/api/**` 默认都经过登录拦截器。
+除注册、登录以及标记为“可选登录”的接口外，`/api/**` 默认都经过登录拦截器。当前拦截器只对
+`/api/auth/register` 和 `/api/auth/login` 放行，其余路径（包括 `/api/category`）都需要有效 Token。
 
 需要登录时，请携带：
 
@@ -78,7 +85,10 @@ Authorization: Bearer <token>
 }
 ```
 
-### 1.6 权限等级
+修改密码会提升服务端 `token_version`，退出登录会把该 Token 的 `jti` 写入 Redis 黑名单，因此旧 Token
+在这两种情况下会立即失效。
+
+### 1.7 权限等级
 
 | 权限 | 说明 |
 |---|---|
@@ -89,7 +99,7 @@ Authorization: Bearer <token>
 
 管理员路径 `/api/admin/**` 会经过管理员拦截器。
 
-### 1.7 参数位置说明
+### 1.8 参数位置说明
 
 | 名称 | 说明 |
 |---|---|
@@ -114,7 +124,7 @@ Authorization: Bearer <token>
 
 ## 2. 接口总览
 
-当前 Controller 共提供 24 个接口。
+当前 Controller 共提供 25 个接口。
 
 ### 2.1 账号与用户
 
@@ -125,33 +135,40 @@ Authorization: Bearer <token>
 | 账号 | POST | `/api/auth/logout` | 登录 |
 | 用户 | GET | `/api/users/me` | 登录 |
 | 用户 | GET | `/api/users/{uid}` | 可选登录 |
-| 用户 | PUT | `/api/users/me` | 登录 |
-| 用户 | PUT | `/api/users/me/password` | 登录 |
-| 用户 | PUT | `/api/users/me/avatar` | 登录 |
+| 用户 | POST | `/api/users/me` | 登录 |
+| 用户 | POST | `/api/users/me/password` | 登录 |
+| 用户 | POST | `/api/users/me/avatar` | 登录 |
+| 用户 | POST | `/api/users/me/background` | 登录 |
 | 关注 | POST | `/api/users/{uid}/subscribe` | 登录 |
 
-### 2.2 视频与互动
+### 2.2 分类
+
+| 模块 | 方法 | 路径 | 权限 |
+|---|---|---|---|
+| 分类 | GET | `/api/category` | 登录 |
+
+### 2.3 视频与互动
 
 | 模块 | 方法 | 路径 | 权限 |
 |---|---|---|---|
 | 视频 | POST | `/api/videos/upload-url` | 登录 |
 | 视频 | POST | `/api/videos/cover` | 登录 |
 | 视频 | POST | `/api/videos` | 登录 |
-| 视频 | DELETE | `/api/videos/{vid}/delete` | 登录且为作者 |
+| 视频 | POST | `/api/videos/{vid}/delete` | 登录且为作者 |
 | 视频 | GET | `/api/videos/{vid}` | 可选登录 |
 | 视频 | GET | `/api/videos/feed` | 可选登录 |
 | 互动 | POST | `/api/videos/{vid}/play-count` | 可选登录 |
-| 互动 | PUT | `/api/videos/{vid}/progress` | 登录 |
-| 互动 | PUT | `/api/videos/{vid}/islike` | 登录 |
-| 互动 | PUT | `/api/videos/{vid}/coin` | 登录 |
-| 互动 | PUT | `/api/videos/{vid}/share` | 可选登录 |
+| 互动 | POST | `/api/videos/{vid}/progress` | 登录 |
+| 互动 | POST | `/api/videos/{vid}/islike` | 登录 |
+| 互动 | POST | `/api/videos/{vid}/coin` | 登录 |
+| 互动 | POST | `/api/videos/{vid}/share` | 可选登录 |
 | 互动 | POST | `/api/videos/{vid}/collect` | 登录 |
 
-### 2.3 管理员视频审核
+### 2.4 管理员视频审核
 
 | 模块 | 方法 | 路径 | 权限 |
 |---|---|---|---|
-| 审核 | PUT | `/api/admin/videos/{vid}/review` | 管理员 |
+| 审核 | POST | `/api/admin/videos/{vid}/review` | 管理员 |
 | 审核 | GET | `/api/admin/videos/{vid}` | 管理员 |
 | 审核 | GET | `/api/admin/videos/page` | 管理员 |
 
@@ -249,12 +266,18 @@ Content-Type: application/json
 }
 ```
 
+### 登录失败限流
+
+登录接口带有基于 Redis 的固定窗口失败限流：连续登录失败达到上限后，在冷却时间内会直接拒绝登录并返回
+`429`；登录成功后会清空该用户名的失败计数。
+
 ### 常见错误
 
 | code | message | 触发条件 |
 |---:|---|---|
 | 400 | `用户名或密码错误` | 用户不存在或密码错误 |
 | 403 | `账号状态异常，无法登录` | 账号不是正常状态 |
+| 429 | `尝试次数过多，请稍后再试` | 登录失败次数达到上限 |
 
 ### curl
 
@@ -277,7 +300,7 @@ Authorization: Bearer <token>
 
 ### 请求参数
 
-无请求体。当前用户身份由登录拦截器写入请求上下文。
+无请求体。当前用户身份和 Token 上下文由登录拦截器写入请求。
 
 ### 成功响应
 
@@ -291,7 +314,18 @@ Authorization: Bearer <token>
 
 ### 当前实现说明
 
-当前 `logout` Service 仍为空实现，接口只返回成功，尚未通过 Redis 黑名单等机制使 JWT 在服务端立即失效。客户端退出后应删除本地 Token。
+- 退出登录会把当前 Token 的 `jti` 写入 Redis 黑名单，剩余 TTL 与 Token 过期时间对齐，之后该 Token 无法
+  再通过登录拦截器（服务端立即失效）。
+- 该接口标记为“允许已撤销 Token 访问”（`@AllowRevokedToken`），因此已在黑名单中的 Token 再次调用退出会
+  幂等地直接返回成功。
+- 客户端退出后仍应删除本地 Token。
+
+### 常见错误
+
+| code | message |
+|---:|---|
+| 401 | `登录状态失效` |
+| 401 | `登录状态已失效` |
 
 ### curl
 
@@ -383,7 +417,7 @@ GET /api/users/{uid}
 
 ### 当前实现说明
 
-当前 Service 复用了查询用户信息的方法，`subscribed` 暂时固定为 `false`，尚未根据当前访问者计算是否关注目标用户。`GET /api/users/me` 当前也固定返回 `subscribed: false`。该可选登录接口会校验所携带 Token，但业务逻辑暂不使用当前访问者身份。
+携带有效 Token 时，`subscribed` 表示当前访问者是否已关注目标用户；未登录或查询本人时返回 `false`。`GET /api/users/me` 的 `subscribed` 固定为 `false`。
 
 ### curl
 
@@ -403,7 +437,7 @@ curl "http://localhost:8080/api/users/2" \
 ## 4.3 修改当前用户资料
 
 ```http
-PUT /api/users/me
+POST /api/users/me
 Authorization: Bearer <token>
 Content-Type: application/json
 ```
@@ -426,7 +460,7 @@ Content-Type: application/json
 | `gender` | number | 否 | `0` 女，`1` 男，`2` 未知 |
 | `description` | string | 否 | 个人简介 |
 
-> 当前 DTO 没有字段级 Bean Validation 限制，具体可接受范围以 Service 和数据库约束为准。
+> 具体可接受范围以 DTO 校验、Service 逻辑和数据库约束为准。
 
 ### 成功响应
 
@@ -441,7 +475,7 @@ Content-Type: application/json
 ### curl
 
 ```bash
-curl -X PUT "http://localhost:8080/api/users/me" \
+curl -X POST "http://localhost:8080/api/users/me" \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"nickname":"新的昵称","gender":1,"description":"这是我的个人简介"}'
@@ -452,7 +486,7 @@ curl -X PUT "http://localhost:8080/api/users/me" \
 ## 4.4 修改当前用户密码
 
 ```http
-PUT /api/users/me/password
+POST /api/users/me/password
 Authorization: Bearer <token>
 Content-Type: application/json
 ```
@@ -485,6 +519,8 @@ Content-Type: application/json
 }
 ```
 
+修改成功后会提升 `token_version`，此前签发的所有 Token 立即失效，需要重新登录。
+
 ### 常见错误
 
 | code | message |
@@ -497,7 +533,7 @@ Content-Type: application/json
 ### curl
 
 ```bash
-curl -X PUT "http://localhost:8080/api/users/me/password" \
+curl -X POST "http://localhost:8080/api/users/me/password" \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"oldPassword":"123456","newPassword":"654321","confirmedPassword":"654321"}'
@@ -508,7 +544,7 @@ curl -X PUT "http://localhost:8080/api/users/me/password" \
 ## 4.5 修改当前用户头像
 
 ```http
-PUT /api/users/me/avatar
+POST /api/users/me/avatar
 Authorization: Bearer <token>
 Content-Type: multipart/form-data
 ```
@@ -554,14 +590,34 @@ Content-Type: multipart/form-data
 ### curl
 
 ```bash
-curl -X PUT "http://localhost:8080/api/users/me/avatar" \
+curl -X POST "http://localhost:8080/api/users/me/avatar" \
   -H "Authorization: Bearer <token>" \
   -F "file=@/path/to/avatar.png"
 ```
 
 ---
 
-## 4.6 关注或取消关注用户
+## 4.6 修改当前用户主页背景图
+
+```http
+POST /api/users/me/background
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+```
+
+权限：**登录**
+
+表单字段：`file`，支持 JPG/PNG，最大 2 MB。成功响应的 `data` 为背景图存储地址，并同步写入用户的 `backgroundUrl`。
+
+```bash
+curl -X POST "http://localhost:8080/api/users/me/background" \
+  -H "Authorization: Bearer <token>" \
+  -F "file=@/path/to/background.jpg"
+```
+
+---
+
+## 4.7 关注或取消关注用户
 
 ```http
 POST /api/users/{uid}/subscribe?isSet={boolean}
@@ -615,9 +671,64 @@ curl -X POST "http://localhost:8080/api/users/2/subscribe?isSet=false" \
 
 ---
 
-# 5. 视频接口
+# 5. 分类接口
 
-## 5.1 获取视频直传临时凭证
+## 5.1 获取分类树
+
+```http
+GET /api/category
+Authorization: Bearer <token>
+```
+
+权限：**登录**
+
+返回全部主分区及其子分区（两级结构），结果使用 Redis Cache-Aside 缓存。
+
+### 成功响应
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "mcId": "douga",
+      "mcName": "动画",
+      "children": [
+        {
+          "scId": "mad",
+          "scName": "MAD·AMV",
+          "description": "具有一定制作程度的动画或静画的二次创作视频",
+          "rcmTags": ["MAD", "AMV"]
+        }
+      ]
+    }
+  ]
+}
+```
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `mcId` | string | 主分区 ID |
+| `mcName` | string | 主分区名称 |
+| `children` | array | 子分区列表 |
+| `children[].scId` | string | 子分区 ID |
+| `children[].scName` | string | 子分区名称 |
+| `children[].description` | string | 子分区描述 |
+| `children[].rcmTags` | array\<string> | 推荐标签 |
+
+### curl
+
+```bash
+curl "http://localhost:8080/api/category" \
+  -H "Authorization: Bearer <token>"
+```
+
+---
+
+# 6. 视频接口
+
+## 6.1 获取视频直传临时凭证
 
 ```http
 POST /api/videos/upload-url
@@ -627,7 +738,8 @@ Content-Type: application/json
 
 权限：**登录**
 
-该接口生成视频临时 Object Key 和腾讯云 COS 临时凭证，前端随后直接上传视频到 COS。
+该接口生成视频临时 Object Key 和腾讯云 COS 临时凭证，前端随后直接上传视频到 COS。接口带有基于 Redis 的
+上传凭证请求限流，短时间内请求过多会返回 `429`。
 
 ### 请求体
 
@@ -683,6 +795,7 @@ Content-Type: application/json
 | 400 | `文件大小不合法` |
 | 400 | `该文件超出限制` |
 | 400 | `文件后缀不能为空` |
+| 429 | `请求过于频繁，请稍后再试` |
 
 ### curl
 
@@ -695,7 +808,7 @@ curl -X POST "http://localhost:8080/api/videos/upload-url" \
 
 ---
 
-## 5.2 上传视频封面
+## 6.2 上传视频封面
 
 ```http
 POST /api/videos/cover
@@ -741,7 +854,7 @@ curl -X POST "http://localhost:8080/api/videos/cover" \
 
 ---
 
-## 5.3 投稿视频
+## 6.3 投稿视频
 
 ```http
 POST /api/videos
@@ -838,7 +951,7 @@ curl -X POST "http://localhost:8080/api/videos" \
 
 ---
 
-## 5.4 投稿者删除自己的视频
+## 6.4 投稿者删除自己的视频
 
 ```http
 POST /api/videos/{vid}/delete
@@ -884,13 +997,13 @@ Authorization: Bearer <token>
 ### curl
 
 ```bash
-curl -X DELETE "http://localhost:8080/api/videos/1/delete" \
+curl -X POST "http://localhost:8080/api/videos/1/delete" \
   -H "Authorization: Bearer <token>"
 ```
 
 ---
 
-## 5.5 获取视频详情
+## 6.5 获取视频详情
 
 ```http
 GET /api/videos/{vid}
@@ -981,10 +1094,10 @@ curl "http://localhost:8080/api/videos/1" \
 
 ---
 
-## 5.6 获取视频 Feed
+## 6.6 获取视频 Feed
 
 ```http
-GET /api/videos/feed?cursor={cursor}&size={size}
+GET /api/videos/feed?cursor={cursor}&size={size}&mcId={mcId}&scId={scId}
 ```
 
 权限：**可选登录**
@@ -994,7 +1107,11 @@ GET /api/videos/feed?cursor={cursor}&size={size}
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
 |---|---|---|---|---|
 | `cursor` | string | 否 | 无 | 下一页游标，首次请求不传 |
-| `size` | integer | 否 | `15` | 每页数量 |
+| `size` | integer | 否 | `15` | 每页数量，取值范围 `1`～`25` |
+| `mcId` | string | 否 | 无 | 主分区 ID，按主分区过滤 |
+| `scId` | string | 否 | 无 | 子分区 ID，按子分区过滤 |
+
+`size` 由 Bean Validation 约束在 `1`～`25`，越界会返回 `400`（如 `每页数量不能小于1`、`每页数量不能多余25`）。
 
 内部游标格式为：
 
@@ -1032,7 +1149,6 @@ GET /api/videos/feed?cursor={cursor}&size={size}
 
 ### 当前实现注意
 
-- `size` 暂未进行正数和最大值限制；显式传入 `size <= 0` 可能导致数据库或分页处理异常并返回 `500`。
 - 游标格式错误当前可能被包装为 `500`，而不是更合理的 `400`。
 - 该接口可携带 Token，但当前 Feed 业务逻辑不使用当前登录用户。
 
@@ -1044,17 +1160,17 @@ GET /api/videos/feed?cursor={cursor}&size={size}
 curl "http://localhost:8080/api/videos/feed?size=15"
 ```
 
-下一页：
+按分区过滤 + 下一页：
 
 ```bash
-curl "http://localhost:8080/api/videos/feed?cursor=<nextCursor>&size=15"
+curl "http://localhost:8080/api/videos/feed?cursor=<nextCursor>&size=15&mcId=douga&scId=mad"
 ```
 
 ---
 
-# 6. 用户视频互动接口
+# 7. 用户视频互动接口
 
-## 6.1 增加播放量
+## 7.1 增加播放量
 
 ```http
 POST /api/videos/{vid}/play-count
@@ -1092,10 +1208,10 @@ curl -X POST "http://localhost:8080/api/videos/1/play-count"
 
 ---
 
-## 6.2 保存播放进度
+## 7.2 保存播放进度
 
 ```http
-PUT /api/videos/{vid}/progress?playTime={seconds}
+POST /api/videos/{vid}/progress?playTime={seconds}
 Authorization: Bearer <token>
 ```
 
@@ -1131,16 +1247,16 @@ Authorization: Bearer <token>
 ### curl
 
 ```bash
-curl -X PUT "http://localhost:8080/api/videos/1/progress?playTime=35.5" \
+curl -X POST "http://localhost:8080/api/videos/1/progress?playTime=35.5" \
   -H "Authorization: Bearer <token>"
 ```
 
 ---
 
-## 6.3 点赞、取消点赞、点踩或取消点踩
+## 7.3 点赞、取消点赞、点踩或取消点踩
 
 ```http
-PUT /api/videos/{vid}/islike?islike={boolean}&isSet={boolean}
+POST /api/videos/{vid}/islike?islike={boolean}&isSet={boolean}
 Authorization: Bearer <token>
 ```
 
@@ -1178,16 +1294,16 @@ Authorization: Bearer <token>
 ### curl
 
 ```bash
-curl -X PUT "http://localhost:8080/api/videos/1/islike?islike=true&isSet=true" \
+curl -X POST "http://localhost:8080/api/videos/1/islike?islike=true&isSet=true" \
   -H "Authorization: Bearer <token>"
 ```
 
 ---
 
-## 6.4 视频投币
+## 7.4 视频投币
 
 ```http
-PUT /api/videos/{vid}/coin?coin={number}
+POST /api/videos/{vid}/coin?coin={number}
 Authorization: Bearer <token>
 ```
 
@@ -1225,16 +1341,16 @@ Authorization: Bearer <token>
 ### curl
 
 ```bash
-curl -X PUT "http://localhost:8080/api/videos/1/coin?coin=1" \
+curl -X POST "http://localhost:8080/api/videos/1/coin?coin=1" \
   -H "Authorization: Bearer <token>"
 ```
 
 ---
 
-## 6.5 增加分享量
+## 7.5 增加分享量
 
 ```http
-PUT /api/videos/{vid}/share
+POST /api/videos/{vid}/share
 ```
 
 权限：**可选登录**
@@ -1254,12 +1370,12 @@ PUT /api/videos/{vid}/share
 ### curl
 
 ```bash
-curl -X PUT "http://localhost:8080/api/videos/1/share"
+curl -X POST "http://localhost:8080/api/videos/1/share"
 ```
 
 ---
 
-## 6.6 收藏或取消收藏
+## 7.6 收藏或取消收藏
 
 ```http
 POST /api/videos/{vid}/collect?isCollect={boolean}
@@ -1303,9 +1419,12 @@ curl -X POST "http://localhost:8080/api/videos/1/collect?isCollect=false" \
   -H "Authorization: Bearer <token>"
 ```
 
+> 互动计数（播放/点赞/投币/收藏/分享）不会直接落库，而是先更新 Redis 计数，再经 RabbitMQ 事件与批量
+> 聚合任务异步写入 `video_status`。相关设计见 `docs/video-status-full-flow-design.md`。
+
 ---
 
-# 7. 管理员视频审核接口
+# 8. 管理员视频审核接口
 
 以下接口均要求：
 
@@ -1313,10 +1432,10 @@ curl -X POST "http://localhost:8080/api/videos/1/collect?isCollect=false" \
 Authorization: Bearer <管理员或超级管理员 token>
 ```
 
-## 7.1 审核视频
+## 8.1 审核视频
 
 ```http
-PUT /api/admin/videos/{vid}/review
+POST /api/admin/videos/{vid}/review
 Content-Type: application/json
 ```
 
@@ -1378,7 +1497,7 @@ Content-Type: application/json
 ### curl
 
 ```bash
-curl -X PUT "http://localhost:8080/api/admin/videos/1/review" \
+curl -X POST "http://localhost:8080/api/admin/videos/1/review" \
   -H "Authorization: Bearer <管理员token>" \
   -H "Content-Type: application/json" \
   -d '{"result":"APPROVED","reason":null}'
@@ -1386,7 +1505,7 @@ curl -X PUT "http://localhost:8080/api/admin/videos/1/review" \
 
 ---
 
-## 7.2 查询管理员视频详情
+## 8.2 查询管理员视频详情
 
 ```http
 GET /api/admin/videos/{vid}
@@ -1452,7 +1571,7 @@ curl "http://localhost:8080/api/admin/videos/1" \
 
 ---
 
-## 7.3 分页查询指定状态的视频
+## 8.3 分页查询指定状态的视频
 
 ```http
 GET /api/admin/videos/page?page={page}&status={status}&quantity={quantity}
@@ -1468,9 +1587,9 @@ GET /api/admin/videos/page?page={page}&status={status}&quantity={quantity}
 | `status` | byte | 否 | `1` | 视频审核状态 |
 | `quantity` | integer | 否 | `10` | 每页数量 |
 
-> 虽然 Service 对空 `page` 有默认处理，但 Controller 当前将 `page` 声明为必填参数，因此 HTTP 请求不能省略。
+> Controller 当前将 `page` 声明为必填参数，因此 HTTP 请求不能省略。
 >
-> HTTP 请求省略 `status` 时，Controller 会传入默认值 `1`；Service 内部的 `status == null` 默认值 `0` 通过当前 Controller 路径通常不可达。
+> HTTP 请求省略 `status` 时，Controller 会传入默认值 `1`。
 >
 > 当前未校验 `page`、`quantity` 必须为正数，也未限制最大 `quantity`。`status` 约定为 `0`～`3`，但当前没有范围校验。查询结果按 `created_at` 升序排列。
 
@@ -1511,46 +1630,49 @@ curl "http://localhost:8080/api/admin/videos/page?page=1&status=0&quantity=10" \
 
 ---
 
-# 8. 推荐联调顺序
+# 9. 推荐联调顺序
 
-## 8.1 用户功能
+## 9.1 用户功能
 
 1. `POST /api/auth/register` 注册。
 2. `POST /api/auth/login` 登录。
 3. 保存响应中的 `data.token`。
 4. `GET /api/users/me` 验证 Token。
-5. `PUT /api/users/me` 修改资料。
-6. `PUT /api/users/me/avatar` 修改头像。
-7. `PUT /api/users/me/password` 修改密码。
-8. 使用新密码重新登录。
-9. `GET /api/users/{uid}` 查询其他用户。
-10. `POST /api/users/{uid}/subscribe` 测试关注和取消关注。
+5. `POST /api/users/me` 修改资料。
+6. `POST /api/users/me/avatar` 修改头像。
+7. `POST /api/users/me/background` 修改主页背景图。
+8. `POST /api/users/me/password` 修改密码（旧 Token 随之失效）。
+9. 使用新密码重新登录。
+10. `GET /api/users/{uid}` 查询其他用户。
+11. `POST /api/users/{uid}/subscribe` 测试关注和取消关注。
+12. `POST /api/auth/logout` 退出，确认旧 Token 立即失效。
 
-## 8.2 视频投稿
+## 9.2 视频投稿
 
 1. 登录并取得 Token。
-2. 调用 `POST /api/videos/upload-url` 获取临时上传凭证和 `tempKey`。
-3. 使用临时凭证将视频上传到 COS 的 `tempKey`。
-4. 调用 `POST /api/videos/cover` 上传封面并取得临时封面 Key。
-5. 调用 `POST /api/videos` 完成投稿。
-6. 使用管理员接口查询待审核视频。
-7. 使用管理员接口审核通过。
-8. 调用 `GET /api/videos/{vid}` 查询公开视频。
-9. 调用 `GET /api/videos/feed` 验证 Feed。
+2. `GET /api/category` 获取可用分区，选择 `mcId` / `scId`。
+3. 调用 `POST /api/videos/upload-url` 获取临时上传凭证和 `tempKey`。
+4. 使用临时凭证将视频上传到 COS 的 `tempKey`。
+5. 调用 `POST /api/videos/cover` 上传封面并取得临时封面 Key。
+6. 调用 `POST /api/videos` 完成投稿。
+7. 使用管理员接口查询待审核视频。
+8. 使用管理员接口审核通过。
+9. 调用 `GET /api/videos/{vid}` 查询公开视频。
+10. 调用 `GET /api/videos/feed` 验证 Feed（可带 `mcId` / `scId`）。
 
-## 8.3 视频互动
+## 9.3 视频互动
 
 1. `POST /api/videos/{vid}/play-count` 增加播放量。
-2. `PUT /api/videos/{vid}/progress` 保存登录用户播放进度。
-3. `PUT /api/videos/{vid}/islike` 测试点赞、取消点赞、点踩和取消点踩。
-4. `PUT /api/videos/{vid}/coin` 测试投币。
-5. `PUT /api/videos/{vid}/share` 增加分享量。
+2. `POST /api/videos/{vid}/progress` 保存登录用户播放进度。
+3. `POST /api/videos/{vid}/islike` 测试点赞、取消点赞、点踩和取消点踩。
+4. `POST /api/videos/{vid}/coin` 测试投币。
+5. `POST /api/videos/{vid}/share` 增加分享量。
 6. `POST /api/videos/{vid}/collect` 测试收藏和取消收藏。
-7. 再次查询视频详情，核对统计和当前用户互动状态。
+7. 等待聚合任务落库后，再次查询视频详情，核对统计和当前用户互动状态。
 
-## 8.4 视频删除
+## 9.4 视频删除
 
-1. 使用视频作者 Token 调用 `DELETE /api/videos/{vid}/delete`。
+1. 使用视频作者 Token 调用 `POST /api/videos/{vid}/delete`。
 2. 确认公开详情和 Feed 不再返回该视频。
 3. 确认数据库 `video.deleted_at` 已写入。
 4. 确认 COS 视频和封面在事务提交后被清理。
@@ -1559,16 +1681,17 @@ curl "http://localhost:8080/api/admin/videos/page?page=1&status=0&quantity=10" \
 
 ---
 
-# 9. 当前实现注意事项
+# 10. 当前实现注意事项
 
 1. 当前密码仍以明文形式保存和比对，仅适合学习阶段；正式环境应使用 BCrypt 等密码哈希算法。
 2. 用户角色：`0` 普通用户、`1` 管理员、`2` 超级管理员。
 3. 用户状态：`0` 正常、`1` 封禁、`2` 注销。
-4. 退出登录接口目前没有服务端 Token 撤销能力，调用成功后主要依赖客户端清除 Token。
+4. 退出登录已支持服务端 Token 撤销：`jti` 写入 Redis 黑名单后旧 Token 立即失效；修改密码会提升
+   `token_version`，同样使此前所有 Token 失效。
 5. 视频投稿依赖腾讯云 COS，临时文件数据库记录和 COS 对象都必须真实存在。
-6. 视频详情和互动接口只处理审核通过且未逻辑删除的视频。
+6. 视频详情和公开 Feed 只处理审核通过且未逻辑删除的视频。
 7. 播放量和分享量暂未实现用户、IP 或时间窗口去重。
-8. Feed 的 `size` 暂未限制范围，非法游标当前可能返回 `500`。
-9. 指定用户详情接口暂未根据当前访问者计算 `subscribed`。
-10. 管理员分页接口的 `page` 当前为必填参数，`status` 的 Controller 默认值为 `1`。
-11. 全局异常处理器会把未单独处理的异常包装为 `code = 500`，具体提示以当前实现为准。
+8. 互动统计经 Redis + RabbitMQ 异步聚合后才落库，读取到的统计值可能有短暂延迟。
+9. 管理员分页接口的 `page` 当前为必填参数，`status` 的 Controller 默认值为 `1`。
+10. 全局异常处理器会把未单独处理的异常包装为 `code = 500`，具体提示以当前实现为准。
+11. 登录失败限流与上传凭证限流基于 Redis 固定窗口实现，触发时返回 `429`。

@@ -13,7 +13,6 @@
         <result property="delta" column="delta"/>
         <result property="payloadHash" column="payload_hash"/>
         <result property="payload" column="payload"/>
-        <result property="payloadHash" column="payload_hash"/>
         <result property="processStatus" column="process_status"/>
         <result property="consumerRetryCount" column="consumer_retry_count"/>
         <result property="lastAttemptAt" column="last_attempt_at"/>
@@ -31,7 +30,6 @@
         delta,
         payload_hash,
         payload,
-        payload_hash,
         process_status,
         consumer_retry_count,
         last_attempt_at,
@@ -49,7 +47,6 @@
             delta,
             payload_hash,
             payload,
-            payload_hash,
             process_status,
             consumer_retry_count,
             last_attempt_at,
@@ -62,7 +59,6 @@
             #{delta},
             #{payloadHash},
             #{payload},
-            #{payloadHash},
             0,
             0,
             NOW(3),

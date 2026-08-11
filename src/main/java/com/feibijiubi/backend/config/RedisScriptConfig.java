@@ -51,13 +51,4 @@ public class RedisScriptConfig {
         return redisScript;
     }
 
-    @Bean
-    DefaultRedisScript<Long> compareAndDeleteScript() {
-        DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>();
-        redisScript.setLocation(
-                new ClassPathResource("lua/compare-and-delete.lua")
-        );
-        redisScript.setResultType(Long.class);
-        return redisScript;
-    }
 }

@@ -20,13 +20,6 @@ public interface VideoStatusService {
         INVALID_REDIS_TYPE
     }
 
-     enum InitializeResult {
-        INITIALIZED,
-        ALREADY_INITIALIZED,
-        INVALID_ARGUMENT,
-        INVALID_REDIS_TYPE
-     }
-
     enum DeltaCleanupResult {
         EMPTY,
         REMAINING,

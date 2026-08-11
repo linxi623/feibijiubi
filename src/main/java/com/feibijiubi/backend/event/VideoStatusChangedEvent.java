@@ -1,7 +1,5 @@
 package com.feibijiubi.backend.event;
 
-import com.feibijiubi.backend.common.BusinessException;
-
 import java.time.LocalDateTime;
 
 public record VideoStatusChangedEvent(
