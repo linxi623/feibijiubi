@@ -1,0 +1,212 @@
+<!--定义Mapper映射文件的约束和基本结构-->
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.feibijiubi.backend.mapper.VideoMapper">
+    <insert id="insert"
+            parameterType="com.feibijiubi.backend.entity.Video"
+            useGeneratedKeys="true"
+            keyProperty="vid">
+        INSERT INTO video (
+            uid,
+            title,
+            source_type,
+            visibility,
+            duration,
+            mc_id,
+            sc_id,
+            tags,
+            description,
+            cover_url,
+            cover_key,
+            video_url,
+            video_key,
+            status,
+            created_at
+        ) VALUES (
+            #{uid},
+            #{title},
+            #{sourceType},
+            #{visibility},
+            #{duration},
+            #{mcId},
+            #{scId},
+            #{tags},
+            #{description},
+            #{coverUrl},
+            #{coverKey},
+            #{videoUrl},
+            #{videoKey},
+            #{status},
+            #{createdAt}
+        )
+    </insert>
+    <update id="updateReviewStatus">
+        UPDATE video
+        SET status = #{newStatus}
+        WHERE vid = #{vid}
+            AND status = #{oldStatus}
+            AND deleted_at IS NULL
+    </update>
+    <update id="updateVideo">
+        UPDATE video
+        <set>
+            <if test="title != null and title != ''">title = #{title},</if>
+            <if test="sourceType != null">source_type = #{sourceType},</if>
+            <if test="visibility != null">visibility = #{visibility},</if>
+            <if test="duration != null">duration = #{duration},</if>
+            <if test="mcId != null and mcId != ''">mc_id = #{mcId},</if>
+            <if test="scId != null and scId != ''">sc_id = #{scId},</if>
+            <if test="tags != null">tags = #{tags},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="coverUrl != null and coverUrl != ''">cover_url = #{coverUrl},</if>
+            <if test="coverKey != null and coverKey != ''">cover_key = #{coverKey},</if>
+            <if test="videoUrl != null and videoUrl != ''">video_url = #{videoUrl},</if>
+            <if test="videoKey != null and videoKey != ''">video_key = #{videoKey},</if>
+            <if test="deletedAt != null">deleted_at = #{deletedAt},</if>
+        </set>
+        WHERE vid = #{vid}
+          AND uid = #{uid}
+          AND deleted_at IS NULL
+    </update>
+
+    <update id="softDeleteByOwner">
+        UPDATE video
+        SET deleted_at = #{deletedAt}
+        WHERE vid = #{vid}
+          AND uid = #{uid}
+          AND deleted_at IS NULL
+    </update>
+
+    <select id="selectPublishedByVid"
+            resultType="com.feibijiubi.backend.entity.Video">
+        SELECT
+            vid,
+            uid,
+            title,
+            source_type,
+            visibility,
+            duration,
+            mc_id,
+            sc_id,
+            tags,
+            description,
+            cover_url,
+            video_url,
+            status,
+            created_at
+        FROM video
+        WHERE vid = #{vid}
+        AND status = 1
+        AND deleted_at IS NULL
+    </select>
+
+    <select id="selectPublishedList"
+            resultType="com.feibijiubi.backend.entity.Video">
+        SELECT
+            vid,
+            uid,
+            title,
+            source_type,
+            visibility,
+            duration,
+            mc_id,
+            sc_id,
+            tags,
+            description,
+            cover_url,
+            video_url,
+            status,
+            created_at,
+            deleted_at
+        FROM video
+        WHERE status = 1
+        AND visibility = 0
+        AND deleted_at IS NULL
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectFeed"
+            resultType="com.feibijiubi.backend.vo.VideoListItemVO">
+        SELECT
+            v.vid AS vid,
+            v.uid AS uid,
+            v.title AS title,
+            v.cover_url AS coverUrl,
+            v.duration AS duration,
+            vs.play_times AS playTimes,
+            vs.comment_times AS commentTimes,
+            v.created_at AS createdAt,
+            u.nickname AS nickname
+        FROM video v
+        INNER JOIN video_status vs ON vs.vid = v.vid
+        INNER JOIN users u ON u.id = v.uid
+        WHERE v.status = 1
+        AND v.visibility = 0
+        <set>
+            <if test="mcId != null">mc_id = #{mcId},</if>
+            <if test="scId != null">sc_id = #{scId},</if>
+        </set>
+        AND v.deleted_at IS NULL
+
+        <if test="cursorCreatedAt != null and cursorVid != null">
+            AND (
+                v.created_at &lt; #{cursorCreatedAt}
+                OR (
+                    v.created_at = #{cursorCreatedAt}
+                    AND v.vid &lt; #{cursorVid}
+                )
+            )
+        </if>
+
+        ORDER BY v.created_at DESC, v.vid DESC
+        LIMIT #{size}
+    </select>
+    <select id="selectByVid" resultType="com.feibijiubi.backend.entity.Video">
+        SELECT
+            vid,
+            uid,
+            title,
+            source_type,
+            visibility,
+            duration,
+            mc_id,
+            sc_id,
+            tags,
+            description,
+            cover_url,
+            cover_key,
+            video_url,
+            video_key,
+            status,
+            created_at,
+            deleted_at
+        FROM video
+        WHERE vid = #{vid}
+    </select>
+
+    <select id="selectByStatus" resultType="com.feibijiubi.backend.vo.AdminVideoListItemVO">
+        SELECT
+            vid AS vid,
+            uid AS uid,
+            title AS title,
+            cover_url AS coverUrl,
+            duration AS duration,
+            created_at AS createdAt
+        FROM video
+        WHERE status = #{status}
+        AND deleted_at IS NULL
+        ORDER BY created_at
+    </select>
+
+    <select id="countVideoByUid" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM video
+        WHERE uid = #{uid}
+        AND status = 1
+        AND visibility = 0
+        AND deleted_at IS NULL
+    </select>
+
+</mapper>

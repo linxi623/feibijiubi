@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper">
+
+    <resultMap id="VideoStatusConsumedEventResultMap"
+               type="com.feibijiubi.backend.entity.VideoStatusConsumedEvent">
+        <id property="id" column="id"/>
+        <result property="eventId" column="event_id"/>
+        <result property="vid" column="vid"/>
+        <result property="eventType" column="event_type"/>
+        <result property="delta" column="delta"/>
+        <result property="payloadHash" column="payload_hash"/>
+        <result property="payload" column="payload"/>
+        <result property="processStatus" column="process_status"/>
+        <result property="consumerRetryCount" column="consumer_retry_count"/>
+        <result property="lastAttemptAt" column="last_attempt_at"/>
+        <result property="lastError" column="last_error"/>
+        <result property="consumedAt" column="consumed_at"/>
+        <result property="redisAppliedAt" column="redis_applied_at"/>
+        <result property="flushedAt" column="flushed_at"/>
+    </resultMap>
+
+    <sql id="ConsumedEventColumns">
+        id,
+        event_id,
+        vid,
+        event_type,
+        delta,
+        payload_hash,
+        payload,
+        process_status,
+        consumer_retry_count,
+        last_attempt_at,
+        last_error,
+        consumed_at,
+        redis_applied_at,
+        flushed_at
+    </sql>
+
+    <insert id="insertReceived">
+        INSERT INTO video_status_consumed_event (
+            event_id,
+            vid,
+            event_type,
+            delta,
+            payload_hash,
+            payload,
+            process_status,
+            consumer_retry_count,
+            last_attempt_at,
+            last_error,
+            consumed_at
+        ) VALUES (
+            #{eventId},
+            #{vid},
+            #{eventType},
+            #{delta},
+            #{payloadHash},
+            #{payload},
+            0,
+            0,
+            NOW(3),
+            NULL,
+            NOW(3)
+        )
+    </insert>
+
+    <select id="selectByEventId"
+            resultMap="VideoStatusConsumedEventResultMap">
+        SELECT
+        <include refid="ConsumedEventColumns"/>
+        FROM video_status_consumed_event
+        WHERE event_id = #{eventId}
+    </select>
+
+    <select id="selectByEventIdForUpdate"
+            resultMap="VideoStatusConsumedEventResultMap">
+        SELECT
+        <include refid="ConsumedEventColumns"/>
+        FROM video_status_consumed_event
+        WHERE event_id = #{eventId}
+        FOR UPDATE
+    </select>
+
+    <update id="touchReceivedAttempt">
+        UPDATE video_status_consumed_event
+        SET last_attempt_at = NOW(3)
+        WHERE event_id = #{eventId}
+          AND process_status = 0
+    </update>
+
+    <update id="markRedisApplied">
+        UPDATE video_status_consumed_event
+        SET process_status = 1,
+            redis_applied_at = NOW(3),
+            last_error = NULL
+        WHERE event_id = #{eventId}
+          AND process_status = 0
+    </update>
+
+    <update id="markCommitted">
+        UPDATE video_status_consumed_event
+        SET process_status = 2,
+            flushed_at = NOW(3),
+            last_error = NULL
+        WHERE event_id = #{eventId}
+          AND process_status = 0
+    </update>
+
+    <update id="recordConsumerFailure">
+        UPDATE video_status_consumed_event
+        SET consumer_retry_count = GREATEST(
+                consumer_retry_count,
+                #{attempt}
+            ),
+            last_attempt_at = NOW(3),
+            last_error = #{lastError}
+        WHERE event_id = #{eventId}
+          AND process_status = 0
+    </update>
+
+    <select id="selectExpiredReceivedForUpdate"
+            resultMap="VideoStatusConsumedEventResultMap">
+        SELECT
+        <include refid="ConsumedEventColumns"/>
+        FROM video_status_consumed_event
+        WHERE process_status = 0
+          AND last_attempt_at &lt; #{expiredBefore}
+        ORDER BY id
+        LIMIT #{limit}
+        FOR UPDATE SKIP LOCKED
+    </select>
+
+    <update id="markRecoveryRepublished">
+        UPDATE video_status_consumed_event
+        SET consumer_retry_count = consumer_retry_count + 1,
+            last_attempt_at = NOW(3),
+            last_error = NULL
+        WHERE event_id = #{eventId}
+          AND process_status = 0
+    </update>
+
+    <update id="markRepairRequired">
+        UPDATE video_status_consumed_event
+        SET process_status = 3,
+            last_attempt_at = NOW(3),
+            last_error = #{lastError}
+        WHERE event_id = #{eventId}
+          AND process_status = #{expectedStatus}
+    </update>
+
+    <update id="resetRepairToReceived">
+        UPDATE video_status_consumed_event
+        SET process_status = 0,
+            consumer_retry_count = 0,
+            last_attempt_at = NOW(3),
+            last_error = NULL,
+            redis_applied_at = NULL,
+            flushed_at = NULL
+        WHERE event_id = #{eventId}
+          AND process_status = 3
+    </update>
+
+    <update id="keepRepairIgnored">
+        UPDATE video_status_consumed_event
+        SET last_attempt_at = NOW(3),
+            last_error = #{resolution}
+        WHERE event_id = #{eventId}
+          AND process_status = 3
+    </update>
+
+    <select id="selectRepairRequired"
+            resultMap="VideoStatusConsumedEventResultMap">
+        SELECT
+        <include refid="ConsumedEventColumns"/>
+        FROM video_status_consumed_event
+        WHERE process_status = 3
+        <if test="afterId != null">
+            AND id &gt; #{afterId}
+        </if>
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectRebuildCandidates"
+            resultMap="VideoStatusConsumedEventResultMap">
+        SELECT id,
+               event_id,
+               vid,
+               event_type,
+               delta,
+               payload,
+               process_status
+        FROM video_status_consumed_event
+        WHERE vid = #{vid}
+          AND process_status IN (0, 1)
+        ORDER BY id
+    </select>
+
+    <select id="selectPendingForUpdate"
+            resultMap="VideoStatusConsumedEventResultMap">
+        SELECT id,
+               event_id,
+               vid,
+               event_type,
+               delta,
+               process_status,
+               redis_applied_at
+        FROM video_status_consumed_event
+        WHERE vid = #{vid}
+          AND process_status = 1
+        ORDER BY CASE WHEN delta &gt; 0 THEN 0 ELSE 1 END,
+                 id
+        LIMIT #{limit}
+        FOR UPDATE SKIP LOCKED
+    </select>
+
+    <update id="markFlushed">
+        UPDATE video_status_consumed_event
+        SET process_status = 2,
+            flushed_at = NOW(3),
+            last_error = NULL
+        WHERE process_status = 1
+          AND id IN
+        <foreach collection="ids" item="id"
+                 open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <update id="markFlushRepairRequired">
+        UPDATE video_status_consumed_event
+        SET process_status = 3,
+            last_attempt_at = NOW(3),
+            last_error = #{lastError}
+        WHERE process_status = 1
+          AND id IN
+        <foreach collection="ids" item="id"
+                 open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <select id="countPendingByVid" resultType="int">
+        SELECT COUNT(*)
+        FROM video_status_consumed_event
+        WHERE vid = #{vid}
+          AND process_status = 1
+    </select>
+
+    <select id="selectPendingVids" resultType="int">
+        SELECT DISTINCT vid
+        FROM video_status_consumed_event
+        WHERE process_status = 1
+        ORDER BY vid
+        LIMIT #{limit}
+    </select>
+
+</mapper>

@@ -1,39 +1,16 @@
-HELP.md
-target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
-
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### VS Code ###
-.vscode/
-
-
-### 个人配置 ###
+# Monorepo tooling and generated output
+**/node_modules/
+**/dist/
+**/*.log
+**/.idea/
+**/target/
 .claude/
-src/main/resources/application.yml
+.agents/
+*.iml
 
+# Retired upstream visual assets kept only in the migration backup
+client/src/assets/img/bilibili/
+client/src/assets/img/teriteri-pink.png
+client/src/assets/img/teriteri-white.png
+admin/src/assets/img/teriteri-pink.png
+admin/src/assets/img/teriteri-white.png
