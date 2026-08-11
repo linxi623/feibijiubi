@@ -163,7 +163,9 @@ public class VideoStatusRabbitConfig {
     public SimpleRabbitListenerContainerFactory
     videoStatusListenerContainerFactory(
             ConnectionFactory connectionFactory,
-            MessageConverter rabbitMessageConverter
+            MessageConverter rabbitMessageConverter,
+            @Value("${spring.rabbitmq.listener.simple.auto-startup:true}")
+            boolean autoStartup
     ) {
         SimpleRabbitListenerContainerFactory factory =
                 new SimpleRabbitListenerContainerFactory();
@@ -174,6 +176,7 @@ public class VideoStatusRabbitConfig {
         factory.setConcurrentConsumers(1);
         factory.setMaxConcurrentConsumers(1);
         factory.setDefaultRequeueRejected(false);
+        factory.setAutoStartup(autoStartup);
         return factory;
     }
 }

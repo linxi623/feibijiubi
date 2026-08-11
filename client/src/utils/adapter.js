@@ -1,9 +1,9 @@
 import { DEFAULT_AVATAR, resolveMediaUrl } from '@/utils/media';
 
 /**
- * 菲比啾比后端 VO -> 旧版 teriteri 前端模板期望形状 的适配层。
+ * 菲比啾比后端 VO -> 旧版前端模板期望形状的适配层。
  *
- * 旧版前端大量模板依赖 teriteri 后端的字段命名（user.uid / user.avatar_url /
+ * 旧版前端大量模板依赖历史字段命名（user.uid / user.avatar_url /
  * video.descr / 嵌套的 {video, user, stats} 包装对象等）。
  * 为了避免大面积改动模板，统一在数据获取边界做一次形状转换。
  */

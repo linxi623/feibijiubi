@@ -13,13 +13,11 @@
                 </div>
             </div> -->
             <header>
-                <!-- 动画效果头图，文件资源版权归bilibili官方所有，本项目仅用作学习，无商业用途！ -->
+                <!-- 菲比啾比主题头图：根据指针位置切换同主题图层 -->
                 <div class="view">
                     <img src="~assets/img/feibijiubi/hero-banner.jpg" class="morning" alt="菲比啾比">
                     <img src="~assets/img/feibijiubi/hero-banner.jpg" class="afternoon" alt="菲比啾比">
-                    <video autoplay loop muted class="evening">
-                        <source src="~assets/img/feibijiubi/hero-source.png" type="image/png" />
-                    </video>
+                    <img src="~assets/img/feibijiubi/hero-banner.jpg" class="evening" alt="菲比啾比">
                     <img src="~assets/img/feibijiubi/hero-banner.jpg" class="window-cover" alt="">
                 </div>
                 <div class="tree">
