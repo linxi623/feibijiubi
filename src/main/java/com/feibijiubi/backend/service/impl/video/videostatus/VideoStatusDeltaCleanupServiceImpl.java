@@ -101,7 +101,7 @@ public class VideoStatusDeltaCleanupServiceImpl
             case EMPTY, REMAINING, DUPLICATE_CLEANUP -> {
                 requireSingleUpdate(
                         flushBatchMapper.markCleaned(batchId),
-                        "标记 Redis delta 清理完成失败"
+                        "标记此批次 Redis delta 清理完成"
                 );
                 deleteCleanupMarkerAfterCommit(cleanupKey, batchId);
             }

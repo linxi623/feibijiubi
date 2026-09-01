@@ -1,6 +1,7 @@
 package com.feibijiubi.backend.service.impl.video.videostatus;
 
 import com.feibijiubi.backend.common.RetryableMessageException;
+import com.feibijiubi.backend.enums.VideoStatusConsumeProcessStatus;
 import com.feibijiubi.backend.event.VideoStatusDelta;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusRebuildService;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusRebuildSnapshot;
@@ -66,11 +67,14 @@ public class VideoStatusRebuildServiceImpl
             for (VideoStatusRebuildSnapshot.Candidate candidate
                     : snapshot.candidates()) {
                 // 判断是否已确认：
-                // 方式1: processStatus == FLUSHED (状态码=1)
+                // 方式1: processStatus == REDIS_APPLIED_PENDING_FLUSH (状态码=1)
                 // 方式2: processStatus == RECEIVED 但在 Redis 中有 processedKey
-                boolean confirmed = candidate.processStatus() == 1
-                        || (candidate.processStatus() == 0
-                        && Boolean.TRUE.equals(redisUtils.hasKey(
+                boolean confirmed =
+                        candidate.processStatus()
+                                == VideoStatusConsumeProcessStatus.REDIS_APPLIED_PENDING_FLUSH.getCode()
+                                || (candidate.processStatus()
+                                == VideoStatusConsumeProcessStatus.RECEIVED.getCode()
+                                && Boolean.TRUE.equals(redisUtils.hasKey(
                                 RedisKeyUtils.processedKey(candidate.eventId())
                         )));
                 if (!confirmed) {
