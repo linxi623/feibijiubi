@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.controller;
 
+import com.feibijiubi.backend.annotation.OptionalLogin;
 import com.feibijiubi.backend.common.ApiResponse;
-import com.feibijiubi.backend.entity.Category;
 import com.feibijiubi.backend.service.category.CategoryService;
 import com.feibijiubi.backend.vo.CategoryParentVO;
 import lombok.RequiredArgsConstructor;
@@ -18,9 +18,10 @@ import java.util.List;
 public class CategoryController {
     private final CategoryService categoryService;
 
-    @GetMapping()
+    @GetMapping
+    @OptionalLogin
     public ApiResponse<List<CategoryParentVO>> getAll() {
-        List<CategoryParentVO> list= categoryService.getCategories();
+        List<CategoryParentVO> list = categoryService.getCategories();
         return ApiResponse.success(list);
     }
 

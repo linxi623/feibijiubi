@@ -1,21 +1,66 @@
 spring:
   application:
-    name:
+    name: backend
 
   datasource:
     url:
     username:
     password:
-    driver-class-name:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      database: 0
+      connect-timeout: 3s
+      timeout: 3s
+
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: guest
+    password: guest
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        acknowledge-mode: manual
+        prefetch: 20
+        default-requeue-rejected: false
+        auto-startup: false
+
+app:
+  video-status:
+    async-enabled: false
+    outbox-relay-enabled: false
+    scheduling-enabled: true
+    redis-event-ttl-days: 30
+    outbox-batch-size: 100
+    outbox-fixed-delay-ms: 1000
+    outbox-lease-seconds: 60
+    publish-confirm-timeout-seconds: 5
+    consumer-max-retries: 5
+    consumer-recovery-auto-replay-max-age-seconds: 604800
+    cleanup-max-attempts: 10
+    flush-fixed-delay-ms: 500
+    flush-dirty-batch-size: 100
+    flush-event-batch-size: 1000
+    flush-recovery-fixed-delay-ms: 5000
+    cleanup-fixed-delay-ms: 1000
+    cleanup-batch-size: 100
+
 
 mybatis:
-  mapper-locations:
+  mapper-locations: classpath:com/feibijiubi/backend/mapper/*.xml
   configuration:
-    map-underscore-to-camel-case:
+    map-underscore-to-camel-case: true
 
 jwt:
-  secret:
-  expire-minutes:
+  secret: feibijiubi-user-login-secret-key-please-change-in-production
+  expire-minutes: 1440
 
 tencent:
   cos:
@@ -24,3 +69,4 @@ tencent:
     region:
     bucket:
     base-url:
+    app-id:
