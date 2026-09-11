@@ -36,4 +36,5 @@ build/
 ### 个人配置 ###
 .claude/
 src/main/resources/application.yml
+backup-*.sql
 

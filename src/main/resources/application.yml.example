@@ -3,24 +3,26 @@ spring:
     name: backend
 
   datasource:
-    url:
-    username:
-    password:
+    # Local development defaults. Docker Compose overrides these with SPRING_DATASOURCE_*.
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:feibijiubi}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:change-me}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   data:
     redis:
-      host: 127.0.0.1
-      port: 6379
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
       database: 0
       connect-timeout: 3s
       timeout: 3s
 
   rabbitmq:
-    host: 127.0.0.1
-    port: 5672
-    username: guest
-    password: guest
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    # Use 25672 when connecting from the host to the Docker Compose RabbitMQ instance.
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
     publisher-confirm-type: correlated
     publisher-returns: true
     template:
@@ -59,14 +61,14 @@ mybatis:
     map-underscore-to-camel-case: true
 
 jwt:
-  secret: feibijiubi-user-login-secret-key-please-change-in-production
+  secret: ${JWT_SECRET:replace-with-a-long-random-secret}
   expire-minutes: 1440
 
 tencent:
   cos:
-    secret-id:
-    secret-key:
-    region:
-    bucket:
-    base-url:
-    app-id:
+    secret-id: ${TENCENT_COS_SECRET_ID:}
+    secret-key: ${TENCENT_COS_SECRET_KEY:}
+    region: ${TENCENT_COS_REGION:}
+    bucket: ${TENCENT_COS_BUCKET:}
+    base-url: ${TENCENT_COS_BASE_URL:}
+    app-id: ${TENCENT_COS_APP_ID:}

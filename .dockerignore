@@ -1,0 +1,6 @@
+.git
+.idea
+target
+README.assets
+*.iml
+*.log

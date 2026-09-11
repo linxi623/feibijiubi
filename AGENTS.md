@@ -153,3 +153,12 @@ user-account service, and Redis utils under `src/test/java/...`.
 - Passwords are still stored/compared in plaintext (learning stage; a `TODO` marks where hashing goes).
 - Business errors return HTTP 200 with a business `code` in the `ApiResponse` body; the global handler
   wraps unhandled errors as `code = 500`.
+
+## Docker Compose deployment
+
+`compose.yaml` starts MySQL, Redis, RabbitMQ, and the Spring Boot backend together. The backend is
+built by the multi-stage `Dockerfile`; MySQL runs `database/feibijiubi.sql` automatically when its
+named volume is initialized for the first time. Use `docker compose up -d --build` and access the API
+at `http://localhost:8080`. Set `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `RABBITMQ_DEFAULT_USER`,
+`RABBITMQ_DEFAULT_PASS`, or `BACKEND_PORT` in a `.env` file to override defaults. To recreate the
+database from the SQL script, remove the named volume with `docker compose down -v`.

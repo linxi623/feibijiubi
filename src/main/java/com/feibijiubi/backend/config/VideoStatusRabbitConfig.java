@@ -171,8 +171,8 @@ public class VideoStatusRabbitConfig {
         factory.setMessageConverter(rabbitMessageConverter);
         factory.setAcknowledgeMode(AcknowledgeMode.MANUAL);
         factory.setPrefetchCount(20);
-        factory.setConcurrentConsumers(1);
-        factory.setMaxConcurrentConsumers(1);
+        factory.setConcurrentConsumers(5);
+        factory.setMaxConcurrentConsumers(5);
         factory.setDefaultRequeueRejected(false);
         return factory;
     }

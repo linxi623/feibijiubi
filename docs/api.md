@@ -4,6 +4,16 @@
 >
 > 文档只描述当前已经存在的接口；代码发生变化后，应同步更新本文档。
 
+## 0. Docker Compose 启动
+
+在项目根目录执行以下命令，可一次启动 MySQL、Redis、RabbitMQ 和 Spring Boot 后端：
+
+```bash
+docker compose up -d --build
+```
+
+后端默认监听 `http://localhost:8080`。MySQL 初始化脚本会在 `mysql-data` 为空时自动执行；已有数据卷不会重复执行。可通过根目录 `.env` 文件覆盖 `MYSQL_ROOT_PASSWORD`、`MYSQL_DATABASE`、`BACKEND_PORT` 等 Compose 变量。
+
 ---
 
 ## 1. 通用约定

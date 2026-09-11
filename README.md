@@ -39,14 +39,6 @@
 
 **菲比啾比（feibijiubi）** 是一个类 B 站视频社区的 Spring Boot 后端项目。面向用户端与管理端提供 HTTP API，并以规范化、可维护的后端工程实践为主要学习目标。
 
-项目覆盖从用户注册到视频发布、审核和互动统计的主要链路：
-
-```text
-注册 / 登录
-    -> 获取视频 Feed -> 查看详情 -> 点赞 / 投币 / 收藏 / 分享
-    -> 获取 COS 临时凭证 -> 上传视频与封面 -> 提交稿件
-    -> 管理员审核 -> 视频发布 -> 互动数据异步汇总
-```
 
 ## 当前状态
 
@@ -76,48 +68,33 @@
 
 ### 环境要求
 
-- JDK 17
-- MySQL
 - Docker 与 Docker Compose
 - 腾讯云 COS 存储桶及访问配置
 
-项目已提供 Maven Wrapper，无需单独安装 Maven。
+### 使用通用配置模板
 
-### 初始化数据库
-
-在 MySQL 中创建 `feibijiubi` 数据库，并执行：
-
-```text
-database/feibijiubi.sql
-```
-
-### 准备配置
-
-以 `src/main/resources/application.yml.example` 为模板创建本地 `application.yml`，填写 MySQL、Redis、RabbitMQ、JWT 和腾讯云 COS 配置。
-
-请勿将密码、密钥等敏感信息提交到仓库。
+复制 `src/main/resources/application.yml.example` 为 `application.yml`，再通过环境变量填写数据库、Redis、RabbitMQ、JWT 和腾讯云 COS 配置。`application.yml` 已被 Git 忽略，不要把真实密码、密钥或 COS 凭证提交到仓库。
 
 ### 启动依赖服务
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-### 启动后端
+Docker Compose 会一次启动 MySQL、Redis、RabbitMQ 和 Spring Boot 后端。默认访问地址：
 
-Windows PowerShell 或 CMD：
+- API：`http://localhost:8080`
+- MySQL：`127.0.0.1:3307`（容器内部为 `mysql:3306`）
+- Redis：`127.0.0.1:6379`
+- RabbitMQ AMQP：`127.0.0.1:25672`
+- RabbitMQ 管理台：`http://localhost:25673`，默认账号密码为 `guest/guest`
 
-```powershell
-.\mvnw.cmd spring-boot:run
-```
+#### 注意事项
+- 可在项目根目录创建 `.env` 覆盖 `MYSQL_ROOT_PASSWORD`、`MYSQL_DATABASE` 和 `BACKEND_PORT` 等变量。
+- 需要重新初始化数据库时，使用 `docker compose down -v`，该命令会删除 Docker 数据卷，请先确认已完成备份。
+- 启动时docker映射的本地端口可能会被占有，可在`compose.yaml`或者`.env`中修改
 
-Git Bash、Linux 或 macOS：
 
-```bash
-./mvnw spring-boot:run
-```
-
-服务默认运行在 `http://localhost:8080`，接口统一使用 `/api` 前缀。
 
 ## 项目结构
 
