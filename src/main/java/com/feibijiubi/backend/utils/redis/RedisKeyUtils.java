@@ -30,20 +30,8 @@ public class RedisKeyUtils {
         return RedisConstants.PROCESSED_PREFIX + eventId;
     }
 
-    public static String videoDelta(Integer vid) {
-        return RedisConstants.VIDEO_STATUS_DELTA_PREFIX + vid;
-    }
-
-    public static String videoStatusDelta(Integer vid) {
-        return RedisConstants.VIDEO_STATUS_DELTA_PREFIX + vid;
-    }
-
     public static String dirtyVideo() {
         return RedisConstants.DIRTY_VIDEO_PREFIX;
-    }
-
-    public static String flushVideo(String batchId) {
-        return RedisConstants.VIDEO_FLUSH_CLEAN_PREFIX + batchId;
     }
 
     public static String lockKey(Integer vid) {

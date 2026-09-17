@@ -46,13 +46,10 @@ app:
     publish-confirm-timeout-seconds: 5
     consumer-max-retries: 5
     consumer-recovery-auto-replay-max-age-seconds: 604800
-    cleanup-max-attempts: 10
     flush-fixed-delay-ms: 500
     flush-dirty-batch-size: 100
     flush-event-batch-size: 1000
     flush-recovery-fixed-delay-ms: 5000
-    cleanup-fixed-delay-ms: 1000
-    cleanup-batch-size: 100
 
 
 mybatis:

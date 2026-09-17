@@ -3,12 +3,9 @@ package com.feibijiubi.backend.service.impl.video.videostatus;
 import com.feibijiubi.backend.common.RetryableMessageException;
 import com.feibijiubi.backend.common.VideoStatusFlushDataException;
 import com.feibijiubi.backend.entity.VideoStatusConsumedEvent;
-import com.feibijiubi.backend.entity.VideoStatusFlushBatch;
 import com.feibijiubi.backend.event.VideoStatusDelta;
 import com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper;
-import com.feibijiubi.backend.mapper.VideoStatusFlushBatchMapper;
 import com.feibijiubi.backend.mapper.VideoStatusMapper;
-import com.feibijiubi.backend.service.video.videostatus.FlushResult;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusBatchFlushService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,7 +13,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -27,33 +23,23 @@ public class VideoStatusBatchFlushServiceImpl
 
     private final VideoStatusConsumedEventMapper consumedEventMapper;
     private final VideoStatusMapper videoStatusMapper;
-    private final VideoStatusFlushBatchMapper flushBatchMapper;
 
     /**
-     * 取一个视频的一批数据进行刷库，返回的是刷库结果，如果没有刷库，就返回空，刷库了就返回对应内容
+     * 取一个视频的一批数据进行刷库，如果没有刷库，就直接返回。
      * @param vid
      * @param limit
-     * @param redisGeneration
-     * @return
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public FlushResult flushOneVideo(
-            Integer vid,
-            int limit,
-            String redisGeneration
-    ) {
+    public void flushOneVideo(Integer vid, int limit) {
         if (vid == null || vid <= 0 || limit <= 0) {
             throw new IllegalArgumentException("刷库 vid 和 limit 不合法");
-        }
-        if (redisGeneration == null || redisGeneration.isBlank()) {
-            throw new IllegalArgumentException("Redis generation 不能为空");
         }
 
         List<VideoStatusConsumedEvent> events =
                 consumedEventMapper.selectPendingForUpdate(vid, limit);
         if (events.isEmpty()) {
-            return FlushResult.empty(vid, redisGeneration);
+            return;
         }
 
         List<Long> ids = events.stream()
@@ -87,19 +73,6 @@ public class VideoStatusBatchFlushServiceImpl
             );
         }
 
-        VideoStatusFlushBatch batch = VideoStatusFlushBatch.create(
-                UUID.randomUUID().toString(),
-                vid,
-                redisGeneration,
-                delta
-        );
-        if (flushBatchMapper.insert(batch) != 1) {
-            throw new RetryableMessageException(
-                    "视频统计刷库批次写入失败，vid=" + vid
-            );
-        }
-
-        return FlushResult.completed(batch, ids, delta);
     }
 
     @Override

@@ -41,14 +41,4 @@ public class RedisScriptConfig {
         return redisScript;
     }
 
-    @Bean
-    DefaultRedisScript<String> videoStatusDeltaSubtractScript() {
-        DefaultRedisScript<String> redisScript = new DefaultRedisScript<>();
-        redisScript.setLocation(
-                new ClassPathResource("lua/video-status-delta-subtract.lua")
-        );
-        redisScript.setResultType(String.class);
-        return redisScript;
-    }
-
 }

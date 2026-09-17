@@ -305,34 +305,6 @@ CREATE TABLE video_status_consumed_event (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     COMMENT='视频统计消费事件与待批量落库日志';
 
-CREATE TABLE video_status_flush_batch (
-    id BIGINT NOT NULL AUTO_INCREMENT,
-    batch_id VARCHAR(64) NOT NULL,
-    vid INT NOT NULL,
-    redis_generation VARCHAR(64) NOT NULL,
-    play_delta BIGINT NOT NULL DEFAULT 0,
-    like_delta BIGINT NOT NULL DEFAULT 0,
-    unlike_delta BIGINT NOT NULL DEFAULT 0,
-    comment_delta BIGINT NOT NULL DEFAULT 0,
-    coin_delta BIGINT NOT NULL DEFAULT 0,
-    share_delta BIGINT NOT NULL DEFAULT 0,
-    collect_delta BIGINT NOT NULL DEFAULT 0,
-    danmu_delta BIGINT NOT NULL DEFAULT 0,
-    cleanup_status TINYINT NOT NULL DEFAULT 0
-        COMMENT '0=PENDING,1=CLEANED,2=SKIPPED_GENERATION_CHANGED,3=REPAIR_REQUIRED',
-    last_error VARCHAR(1000) NULL,
-    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    cleaned_at DATETIME(3) NULL,
-    cleanup_retry_count INT NOT NULL DEFAULT 0,
-    last_attempt_at DATETIME(3) NULL ,
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_video_status_flush_batch_id (batch_id),
-    KEY idx_video_status_flush_cleanup (cleanup_status, id),
-    CONSTRAINT fk_video_status_flush_batch_vid
-        FOREIGN KEY (vid) REFERENCES video (vid)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    COMMENT='视频统计批量落库后的Redis清理任务';
-
 CREATE TABLE video_status_consumption_repair_log (
     id BIGINT NOT NULL AUTO_INCREMENT,
     operation_id VARCHAR(64) NOT NULL,

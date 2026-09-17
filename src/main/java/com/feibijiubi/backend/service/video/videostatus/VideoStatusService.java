@@ -20,12 +20,4 @@ public interface VideoStatusService {
         INVALID_REDIS_TYPE
     }
 
-    enum DeltaCleanupResult {
-        EMPTY,
-        REMAINING,
-        DUPLICATE_CLEANUP,
-        GENERATION_CHANGED,
-        NEEDS_REBUILD,
-        INVALID_ARGUMENT
-    }
 }

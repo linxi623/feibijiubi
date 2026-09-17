@@ -17,7 +17,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -39,23 +38,21 @@ public class VideoStatusRebuildServiceImpl
     }
 
     private void ensureInitializedUnderVidLock(Integer vid) {
-        Presence presence = readPresence(vid);
-        if (presence.complete()) {
+        if (Boolean.TRUE.equals(
+                redisUtils.hasKey(RedisKeyUtils.videoStatus(vid))
+        )) {
             return;
         }
-        failIfInconsistent(vid, presence);
 
-        // load() 位于独立 Spring Bean；方法返回时只读事务已经结束。
+        // load() 位于独立 Spring Bean，返回时只读事务已经结束。
         VideoStatusRebuildSnapshot snapshot = snapshotService.load(vid);
         InitialValues values = classifyConfirmedPending(snapshot);
         initializeRedis(snapshot, values);
     }
 
     /**
-     * 保证current_hash保存的是实时的数据，从消息表中取出还没有刷入的mysql的数据，从mysql中取出已经持久化保存的数据
-     * 两者合并得到current_hash
-     * @param snapshot
-     * @return
+     * current 是 MySQL 已落库基线，加上所有已确认应用到 Redis、
+     * 但仍未批量落库的事件（消费事件状态 0/1）。
      */
     private InitialValues classifyConfirmedPending(
             VideoStatusRebuildSnapshot snapshot
@@ -66,21 +63,21 @@ public class VideoStatusRebuildServiceImpl
         try {
             for (VideoStatusRebuildSnapshot.Candidate candidate
                     : snapshot.candidates()) {
-                // 判断是否已确认：
-                // 方式1: processStatus == REDIS_APPLIED_PENDING_FLUSH (状态码=1)
-                // 方式2: processStatus == RECEIVED 但在 Redis 中有 processedKey
                 boolean confirmed =
                         candidate.processStatus()
-                                == VideoStatusConsumeProcessStatus.REDIS_APPLIED_PENDING_FLUSH.getCode()
+                                == VideoStatusConsumeProcessStatus
+                                .REDIS_APPLIED_PENDING_FLUSH.getCode()
                                 || (candidate.processStatus()
-                                == VideoStatusConsumeProcessStatus.RECEIVED.getCode()
+                                == VideoStatusConsumeProcessStatus.RECEIVED
+                                .getCode()
                                 && Boolean.TRUE.equals(redisUtils.hasKey(
-                                RedisKeyUtils.processedKey(candidate.eventId())
+                                RedisKeyUtils.processedKey(
+                                        candidate.eventId()
+                                )
                         )));
                 if (!confirmed) {
                     continue;
                 }
-                // 已确认但还没有刷入mysql的消息
                 pending.add(candidate.delta());
                 pendingHotScore += candidate.hotScoreDelta();
             }
@@ -108,17 +105,15 @@ public class VideoStatusRebuildServiceImpl
     ) {
         List<String> keys = List.of(
                 RedisKeyUtils.videoStatus(snapshot.vid()),
-                RedisKeyUtils.videoDelta(snapshot.vid()),
                 RedisKeyUtils.dirtyVideo(),
                 RedisKeyUtils.feedHotVideos()
         );
 
-        List<String> args = new ArrayList<>(19);
+        List<String> args = new ArrayList<>(11);
         args.add(String.valueOf(snapshot.vid()));
-        args.add(UUID.randomUUID().toString());
         args.add(String.valueOf(values.hotScore()));
         values.current().appendTo(args);
-        values.pending().appendTo(args);
+        args.add(String.valueOf(values.pending().isNonZero()));
 
         String result = redisUtils.executeScript(
                 videoStatusInitScript,
@@ -129,13 +124,14 @@ public class VideoStatusRebuildServiceImpl
             return;
         }
         if ("ALREADY_INITIALIZED".equals(result)) {
-            Presence presence = readPresence(snapshot.vid());
-            if (presence.complete()) {
+            if (Boolean.TRUE.equals(
+                    redisUtils.hasKey(RedisKeyUtils.videoStatus(snapshot.vid()))
+            )) {
                 return;
             }
             throw new RetryableMessageException(
-                    "Redis 初始化返回 ALREADY_INITIALIZED，但 current/delta 不完整，vid="
-                            + snapshot.vid()
+                    "Redis 初始化返回 ALREADY_INITIALIZED，但 current "
+                            + "不完整，vid=" + snapshot.vid()
             );
         }
         throw new RetryableMessageException(
@@ -144,51 +140,9 @@ public class VideoStatusRebuildServiceImpl
         );
     }
 
-    /**
-     * 检查视频key和增量key是否存在
-     * @param vid
-     * @return
-     */
-    private Presence readPresence(Integer vid) {
-        return new Presence(
-                Boolean.TRUE.equals(redisUtils.hasKey(
-                        RedisKeyUtils.videoStatus(vid)
-                )),
-                Boolean.TRUE.equals(redisUtils.hasKey(
-                        RedisKeyUtils.videoStatusDelta(vid)
-                ))
-        );
-    }
-
-    /**
-     * delta和current只有一个key存在，有问题
-     * @param vid
-     * @param presence
-     */
-    private void failIfInconsistent(Integer vid, Presence presence) {
-        if (presence.currentExists() == presence.deltaExists()) {
-            return;
-        }
-        log.error(
-                "ALERT Redis 视频统计结构不一致: vid={}, currentExists={}, deltaExists={}",
-                vid,
-                presence.currentExists(),
-                presence.deltaExists()
-        );
-        throw new RetryableMessageException(
-                "Redis 视频统计 current/delta 结构不一致，vid=" + vid
-        );
-    }
-
     private void validateVid(Integer vid) {
         if (vid == null || vid <= 0) {
             throw new IllegalArgumentException("vid 必须大于 0");
-        }
-    }
-
-    private record Presence(boolean currentExists, boolean deltaExists) {
-        private boolean complete() {
-            return currentExists && deltaExists;
         }
     }
 
@@ -262,6 +216,17 @@ public class VideoStatusRebuildServiceImpl
                         "negative rebuilt video status, vid=" + vid
                 );
             }
+        }
+
+        private boolean isNonZero() {
+            return play != 0
+                    || like != 0
+                    || unlike != 0
+                    || comment != 0
+                    || coin != 0
+                    || share != 0
+                    || collect != 0
+                    || danmu != 0;
         }
 
         private void appendTo(List<String> target) {

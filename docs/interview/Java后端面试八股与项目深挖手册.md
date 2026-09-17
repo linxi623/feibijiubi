@@ -14,21 +14,20 @@
 2. 同一数据库事务调用 `VideoStatusServiceImpl.createEvent()` 写 `video_status_outbox`。
 3. `VideoStatusOutboxRelay` 定时领取 Outbox，发布 RabbitMQ，确认成功后标记 `SENT`。
 4. `VideoStatusEventConsumer` 收到消息，先向 `video_status_consumed_event` 登记事件。
-5. 消费端调用 `VideoStatusServiceImpl.apply()`，通过 Lua 原子更新 Redis current、delta、dirty set、热度榜和 processed key。
-6. `VideoStatusBatchFlushScheduler` 从消费事件表中选取 `REDIS_APPLIED_PENDING_FLUSH` 事件，按 vid 聚合增量并更新 MySQL。
-7. 写入 `video_status_flush_batch` 后，再由清理任务按批次从 Redis delta 中做幂等减法。
+5. 消费端调用 `VideoStatusServiceImpl.apply()`，通过 Lua 原子更新 Redis current、dirty set、热度榜和 processed key。
+6. `VideoStatusBatchFlushScheduler` 从消费事件表中选取 `REDIS_APPLIED_PENDING_FLUSH` 事件，按 vid 聚合增量，并在同一事务中更新 MySQL 和事件状态。
 
 因此建议把简历改为：
 
-> 设计“事务性 Outbox + RabbitMQ 异步削峰 + Redis/Lua 实时聚合 + 消费事件表批量落库”的最终一致性链路。互动业务状态与 Outbox 在同一 MySQL 事务提交，Relay 可靠投递 MQ；消费端以事件表和语义哈希实现幂等登记，再通过 Lua 原子更新 Redis 实时统计，最终按视频维度聚合已消费事件写回 MySQL，并通过 flush batch、generation、脏数据恢复与缓存重建处理异常窗口。
+> 设计“事务性 Outbox + RabbitMQ 异步削峰 + Redis/Lua 实时聚合 + 消费事件表批量落库”的最终一致性链路。互动业务状态与 Outbox 在同一 MySQL 事务提交，Relay 可靠投递 MQ；消费端以事件表和语义哈希实现幂等登记，再通过 Lua 原子更新 Redis 实时统计，最终按视频维度聚合已消费事件写回 MySQL，并通过 dirty 恢复与 Redis 重建处理异常窗口。
 
-这个版本与代码一致，也更能体现你真正解决的是“双写、重复投递、重复消费、落库与缓存清理”问题。
+这个版本与代码一致，也更能体现你真正解决的是“双写、重复投递、重复消费、批量落库与缓存重建”问题。
 
 ## 1. 项目介绍标准答案
 
 ### 1.1 30 秒版本
 
-菲比啾比是我独立实现的 mini-Bilibili 前后端分离项目，后端使用 Java 17、Spring Boot 3、MyBatis、MySQL、Redis、Redisson、RabbitMQ 和腾讯云 COS。项目覆盖注册登录、JWT 鉴权、视频直传与投稿、审核状态机、视频 Feed、点赞投币收藏以及互动统计。最有挑战的是互动统计链路：我用本地事务 Outbox 保证业务状态和事件同时落库，用 RabbitMQ 削峰，通过消费事件表、语义哈希和 Redis processed key 做幂等，再按视频批量聚合写 MySQL，并设计了租约恢复、重试死信、Redis 重建和增量清理机制。
+菲比啾比是我独立实现的 mini-Bilibili 前后端分离项目，后端使用 Java 17、Spring Boot 3、MyBatis、MySQL、Redis、Redisson、RabbitMQ 和腾讯云 COS。项目覆盖注册登录、JWT 鉴权、视频直传与投稿、审核状态机、视频 Feed、点赞投币收藏以及互动统计。最有挑战的是互动统计链路：我用本地事务 Outbox 保证业务状态和事件同时落库，用 RabbitMQ 削峰，通过消费事件表、语义哈希和 Redis processed key 做幂等，再按视频从状态 1 消费事件批量聚合写 MySQL，并设计了租约恢复、重试死信、dirty 恢复和 Redis 重建机制。
 
 ### 1.2 2 分钟版本
 
@@ -145,16 +144,15 @@ Publisher confirm 只能说明消息到达交换机，不能天然保证一定�
 
 `video-status-increment.lua` 一次完成：
 
-1. 检查 current hash 和 delta hash 是否存在，否则要求 rebuild。
+1. 检查 current hash 是否存在，否则要求 rebuild。
 2. 校验 key 类型以及字段白名单。
-3. 读取当前值、待刷增量和参数，确认数据完整。
+3. 读取当前值和参数，确认数据完整。
 4. 检查 processed event key。
 5. 阻止计数更新后变为负数。
 6. `HINCRBY` 更新实时 current。
-7. `HINCRBY` 更新 pending delta。
-8. `SADD` 把 vid 放入 dirty set。
-9. `ZINCRBY` 更新热门视频分值。
-10. 设置带 TTL 的 processed key。
+7. `SADD` 把 vid 放入 dirty set。
+8. `ZINCRBY` 更新热门视频分值。
+9. 设置带 TTL 的 processed key。
 
 为什么 Lua 优于在 Java 中连续调用命令：
 
@@ -169,7 +167,7 @@ Publisher confirm 只能说明消息到达交换机，不能天然保证一定�
 
 ### 2.7 为什么还要 Redisson 分布式锁
 
-`VideoStatusVidMutex` 按 vid 获取 `RLock`，等待最多 10 秒，不显式传 leaseTime，因此使用 Redisson watchdog 自动续期。它把同一视频的 apply、重建和关键状态操作串行化，防止“某线程正在重建 current/delta，另一线程同时写增量”造成基线覆盖。
+`VideoStatusVidMutex` 按 vid 获取 `RLock`，等待最多 10 秒，不显式传 leaseTime，因此使用 Redisson watchdog 自动续期。它把同一视频的 apply、重建和关键状态操作串行化，防止“某线程正在重建 current，另一线程同时写增量”造成基线覆盖。
 
 需要区分：
 
@@ -193,29 +191,23 @@ Publisher confirm 只能说明消息到达交换机，不能天然保证一定�
 3. 使用一条 `applyBatchDelta` 更新八个统计字段。
 4. SQL 条件保证任一字段更新后不能小于 0。
 5. 把这些消费事件标为 `FLUSHED`。
-6. 同事务插入 `video_status_flush_batch`，记录 batchId、vid、generation 和各项 delta。
 
-这里 MySQL 消费事件表是落库依据，Redis delta 是实时镜像和待清理状态。这样即使 Redis 丢失，也能通过数据库记录判断哪些事件尚未刷库。
+统计更新和事件状态 2 在同一事务提交。这样即使 Redis 丢失，也能通过消费事件记录判断哪些事件尚未刷库。
 
 **为什么 `SKIP LOCKED`**：没有它时，多实例可能等待同一批锁；使用后，被其他事务锁住的记录直接跳过，各实例可以并行处理不同事件。代价是需要持续调度，确保暂时跳过的数据之后仍会被处理。
 
-### 2.9 为什么 Redis 清理用减法而不是 DEL/清零
+### 2.9 为什么刷库后不需要反向修改 Redis
 
-假设刷库线程读到 delta=10，刷 MySQL 期间又来了 3 次互动，此时 Redis delta=13：
+Redis current 表示“MySQL 已落库基线 + 状态 1 事件增量”。刷库完成时，同一 MySQL 事务已经：
 
-- 直接清零会把新增的 3 丢掉。
-- 减去本批的 10，剩余 3，下一批继续处理。
+- 把本批事件累加到 `video_status`。
+- 把本批事件从状态 1 改为状态 2。
 
-`video-status-delta-subtract.lua` 还使用：
+Redis current 不需要做减法，也不存在清理期间又来了新事件导致误删的问题。新事件仍会执行 Lua、加入 dirty Set，并在后续批次落库。
 
-- `flush-cleaned:{batchId}` 防止同一批重复清理。
-- `generation` 检测清理期间是否发生过 Redis 重建。
-- 有剩余增量时保留 dirty vid；全部归零时移出 dirty set。
-- delta hash 不删除，保留八个零字段，避免下一事件误判需要重建。
+**最经典故障题：MySQL 已提交，应用立刻宕机怎么办？**
 
-**最经典故障题：MySQL 已提交，Redis 减法失败怎么办？**
-
-flush batch 已经持久化且标记待清理，清理调度可以重试；batchId 幂等 key 防止重复减。即便应用在 DB 提交后立刻宕机，也能从批次表恢复。
+统计值更新和状态 2 已经在同一个 MySQL 事务中提交，不存在必须继续执行的 Redis 补偿步骤。dirty Set 即使残留，下一次调度读取不到状态 1 后会安全移除该 vid。
 
 ### 2.10 重建与自愈
 
@@ -223,7 +215,6 @@ flush batch 已经持久化且标记待清理，清理调度可以重试；batch
 
 - current hash 丢失：以 MySQL `video_status` 为已落库基线。
 - 尚未落库的事件：从消费事件表中查询 `RECEIVED` / `REDIS_APPLIED_PENDING_FLUSH` 候选并恢复。
-- 重建时生成新的 generation，防止旧 flush batch 清理新一代 Redis 数据。
 - dirty recovery 扫描长期停留状态，尝试自动重放；超过安全年龄的 `RECEIVED` 事件进入人工修复，避免无边界自动重放。
 
 要会解释“为什么超龄事件不能永远自动重放”：processed key 有 TTL。若 TTL 已过，系统无法确认 Redis 当年是否已应用；贸然重放可能重复计数，所以宁可转人工修复，也不制造静默错误。
@@ -628,11 +619,11 @@ InnoDB 通过隐藏事务 ID、回滚指针、undo log 版本链和 Read View �
 18. 为什么 Redis key 丢失时先 rebuild 再重试？
 19. Lua 已经原子，为什么还需要 Redisson 锁？
 20. watchdog 如何工作？业务线程永久卡死怎么办？
-21. 批量刷库为什么不直接读取 Redis delta？
+21. 批量刷库为什么直接读取状态 1 的消费事件？
 22. `FOR UPDATE SKIP LOCKED` 的作用和风险是什么？
-23. 落库期间又有新互动，为什么不会被清掉？
-24. flush batch 表解决哪个宕机窗口？
-25. generation 为什么能阻止旧批次污染新缓存？
+23. 落库期间又有新互动，为什么不会影响本批提交？
+24. 统计更新和事件状态 2 为什么必须同事务提交？
+25. dirty Set 丢失后如何恢复待刷视频？
 26. +1/-1 消息乱序是否一定安全？
 27. 同一用户并发点赞两次，业务状态是否可能竞争？如何改进？
 28. Redis 宕机时接口如何表现？是否有降级策略？
@@ -658,12 +649,11 @@ InnoDB 通过隐藏事务 ID、回滚指针、undo log 版本链和 Read View �
 
 ### 13.1 Redis 和 MySQL 数据不一致怎么排查
 
-1. 确认是 current、delta、dirty set 还是 MySQL 基线异常。
+1. 确认是 current、dirty set 还是 MySQL 基线异常。
 2. 按 eventId 检查 Outbox 状态、RabbitMQ 重试头、消费事件状态。
-3. 检查对应 vid 的 flush batch 和 cleanup 状态。
-4. 比较 Redis generation，判断是否发生过重建。
-5. 不直接手改某一个计数；先冻结该 vid 写入或持有 vid mutex，再基于 MySQL 基线和未刷事件重建。
-6. 记录 repair operation，保证修复本身可审计、可幂等。
+3. 检查对应 vid 是否仍有状态 1 或状态 3 的消费事件。
+4. 不直接手改某一个计数；先冻结该 vid 写入或持有 vid mutex，再基于 MySQL 基线和状态 0/1 中已确认事件重建。
+5. 记录 repair operation，保证修复本身可审计、可幂等。
 
 ### 13.2 RabbitMQ 消息积压怎么处理
 
@@ -750,10 +740,10 @@ JWT、密码哈希、限流、STS、补偿事务、IoC/AOP/MVC/自动配置/MyBa
 ## 17. 最终检查表
 
 - 能准确说出当前链路是 Outbox → MQ → Redis → MySQL，而不是 Redis → Outbox。
-- 能画出 request、outbox、relay、consumer、Redis、flush、cleanup 七个阶段。
+- 能画出 request、outbox、relay、consumer、Redis、flush 六个阶段。
 - 能解释三层幂等和两个最危险宕机窗口。
 - 能说明 Lua 与 Redisson 锁各自负责的原子性范围。
-- 能说明减法清理、batchId 和 generation。
+- 能说明状态 1 事件是刷库依据，以及统计与状态 2 的同事务关系。
 - 能诚实指出密码明文、单点部署、无压测数字、COS 补偿不持久等不足。
 - 每个简历亮点至少能对应到一个类、一个表或一个脚本。
 - 不背名词堆砌，回答中始终包含问题、取舍和边界。

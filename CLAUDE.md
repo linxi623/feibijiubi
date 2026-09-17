@@ -76,7 +76,7 @@ Key `app.video-status.*` flags (see `VideoStatusProperties`):
 
 - `async-enabled` – publish interaction deltas asynchronously.
 - `outbox-relay-enabled` – enable the outbox → RabbitMQ relay scheduler.
-- `scheduling-enabled` – master switch for the batch-flush / cleanup / recovery schedulers.
+- `scheduling-enabled` – master switch for the batch-flush / recovery schedulers.
 - plus batch sizes, fixed delays, lease/timeout seconds, and consumer retry limits.
 
 RabbitMQ listeners default to `auto-startup: false` and manual ack — they are opt-in per environment.
@@ -122,10 +122,11 @@ The flow is:
 3. **Consumer** (`VideoStatusEventConsumer` → `VideoStatusConsumptionServiceImpl`) applies deltas
    idempotently, guarded by `VideoStatusConsumedEvent` + a fingerprint service and a per-vid Redisson
    mutex (`VideoStatusVidMutex`).
-4. **Batch flush** (`VideoStatusBatchFlushScheduler` → `...BatchFlushServiceImpl`) aggregates accumulated
-   deltas from Redis into the `video_status` table in batches.
-5. **Recovery / cleanup / rebuild** schedulers handle dirty records, delta cleanup, and rebuilding Redis
-   state from the DB (`VideoStatusRebuild*`).
+4. **Batch flush** (`VideoStatusBatchFlushScheduler` → `...BatchFlushServiceImpl`) locks and reads a
+   batch of status-1 consumed events for one video, applies their deltas to the `video_status` table,
+   and marks those events status 2 in the same MySQL transaction.
+5. **Recovery / rebuild** schedulers recover dirty video IDs and rebuild Redis current state from the
+   MySQL baseline plus confirmed status-0/1 consumed events (`VideoStatusRebuild*`).
 
 Consumer retry/dead-letter behavior is driven by the typed exceptions in `common/`:
 `RetryableMessageException`, `NonRetryableMessageException`, `RepairRequiredMessageException`.

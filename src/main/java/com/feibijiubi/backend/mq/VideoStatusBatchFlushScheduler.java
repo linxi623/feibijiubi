@@ -5,13 +5,9 @@ import com.feibijiubi.backend.common.RetryableMessageException;
 import com.feibijiubi.backend.common.VideoStatusFlushDataException;
 import com.feibijiubi.backend.config.VideoStatusProperties;
 import com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper;
-import com.feibijiubi.backend.service.video.videostatus.FlushResult;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusBatchFlushService;
-import com.feibijiubi.backend.service.video.videostatus.VideoStatusDeltaCleanupService;
-import com.feibijiubi.backend.service.video.videostatus.VideoStatusRebuildService;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusVidMutex;
 import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
-import com.feibijiubi.backend.utils.redis.operation.RedisHashOperations;
 import com.feibijiubi.backend.utils.redis.operation.RedisSetOperations;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,10 +24,7 @@ public class VideoStatusBatchFlushScheduler {
 
     private final VideoStatusProperties properties;
     private final RedisSetOperations redisSetOperations;
-    private final RedisHashOperations redisHashOperations;
-    private final VideoStatusRebuildService rebuildService;
     private final VideoStatusBatchFlushService batchFlushService;
-    private final VideoStatusDeltaCleanupService cleanupService;
     private final VideoStatusConsumedEventMapper consumedEventMapper;
     private final VideoStatusVidMutex vidMutex;
 
@@ -76,39 +69,10 @@ public class VideoStatusBatchFlushScheduler {
     }
 
     private void flushLocked(Integer vid) {
-        String generation = redisHashOperations.get(
-                RedisKeyUtils.videoStatus(vid),
-                "generation"
-        );
-        if (generation == null || generation.isBlank()) {
-            rebuildService.ensureInitialized(vid);
-            generation = redisHashOperations.get(
-                    RedisKeyUtils.videoStatus(vid),
-                    "generation"
-            );
-        }
-        if (generation == null || generation.isBlank()) {
-            throw new RetryableMessageException(
-                    "Redis generation 缺失，vid=" + vid
-            );
-        }
-
-        FlushResult result = batchFlushService.flushOneVideo(
+        batchFlushService.flushOneVideo(
                 vid,
-                properties.getFlushEventBatchSize(),
-                generation
+                properties.getFlushEventBatchSize()
         );
-        if (!result.empty()) {
-            try {
-                cleanupService.cleanup(result.batchId());
-            } catch (Exception cleanupError) {
-                log.warn(
-                        "MySQL 刷库已提交，但 Redis delta 清理失败，等待 cleanup 恢复: batchId={}",
-                        result.batchId(),
-                        cleanupError
-                );
-            }
-        }
         refreshDirtyMembership(vid);
     }
 

@@ -73,7 +73,7 @@ public class VideoStatusServiceImpl implements VideoStatusService {
         result = execute(event);
         if (result == ApplyResult.NEEDS_REBUILD) {
             throw new RetryableMessageException(
-                    "Redis 视频统计重建后仍缺少 current/delta，vid=" + event.vid()
+                    "Redis 视频统计重建后仍缺少 current，vid=" + event.vid()
             );
         }
         return result;
@@ -85,7 +85,6 @@ public class VideoStatusServiceImpl implements VideoStatusService {
     private ApplyResult execute(VideoStatusChangedEvent event) {
         List<String> keys = List.of(
                 RedisKeyUtils.videoStatus(event.vid()),
-                RedisKeyUtils.videoStatusDelta(event.vid()),
                 RedisKeyUtils.dirtyVideo(),
                 RedisKeyUtils.processedKey(event.eventId()),
                 RedisKeyUtils.feedHotVideos()
@@ -95,7 +94,6 @@ public class VideoStatusServiceImpl implements VideoStatusService {
                 videoStatusIncrementScript,
                 keys,
                 event.type().redisField(),
-                event.type().deltaField(),
                 String.valueOf(event.delta()),
                 String.valueOf(event.vid()),
                 String.valueOf(event.hotScoreDelta()),

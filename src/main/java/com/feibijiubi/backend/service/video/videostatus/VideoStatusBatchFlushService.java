@@ -4,11 +4,7 @@ import java.util.List;
 
 public interface VideoStatusBatchFlushService {
 
-    FlushResult flushOneVideo(
-            Integer vid,
-            int limit,
-            String redisGeneration
-    );
+    void flushOneVideo(Integer vid, int limit);
 
     void markRepairRequired(
             List<Long> consumedEventIds,

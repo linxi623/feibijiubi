@@ -24,13 +24,10 @@ public class VideoStatusProperties {
     private int consumerMaxRetries = 5;
     // 7天
     private int consumerRecoveryAutoReplayMaxAgeSeconds = 604_800;
-    private int cleanupMaxAttempts = 10;
     private long flushFixedDelayMs = 500;
     private int flushDirtyBatchSize = 100;
     private int flushEventBatchSize = 1000;
     private long flushRecoveryFixedDelayMs = 5000;
-    private long cleanupFixedDelayMs = 1000;
-    private int cleanupBatchSize = 100;
 
 
     @PostConstruct
