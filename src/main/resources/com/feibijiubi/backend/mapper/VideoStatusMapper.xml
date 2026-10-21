@@ -4,6 +4,15 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.feibijiubi.backend.mapper.VideoStatusMapper">
+    <!--
+      T02 计数范围：0..9223372036854775807（Long.MAX_VALUE），列仍为 BIGINT UNSIGNED。
+      不使用 CAST(... AS SIGNED)：UNSIGNED 可表示到 2^64-1，先转 SIGNED 会改变语义。
+      统一把列和增量转成 DECIMAL(20,0) 再运算：
+        - 负数不会触发 UNSIGNED 下溢（1690）；
+        - DECIMAL 的精度足够承载 2^64-1 + Long.MAX_VALUE；
+        - WHERE 守卫在写入前同时校验 0 下界与 Long 上界，未满足时返回 0 行，无部分写入。
+      Java 侧仍以 VideoStatusCounterRange 提前拒绝，SQL 只是最后一道防线。
+    -->
     <insert id="insertDefault">
         INSERT INTO video_status(vid)
         VALUES (#{vid})
@@ -28,47 +37,70 @@
 
     <update id="increasePlayTimes">
         UPDATE video_status
-        SET   play_times = play_times + 1
+        SET   play_times = CAST(play_times AS DECIMAL(20,0)) + 1
         WHERE vid = #{vid}
+          AND CAST(play_times AS DECIMAL(20,0)) &lt; 9223372036854775807
     </update>
 
     <update id="increaseLikeTimes">
         UPDATE video_status
         <set>
-            <if test="isLike and isLike != null">like_times = like_times + 1</if>
-            <if test="!isLike and isLike != null">unlike_times = unlike_times + 1</if>
+            <if test="isLike and isLike != null">like_times = CAST(like_times AS DECIMAL(20,0)) + 1</if>
+            <if test="!isLike and isLike != null">unlike_times = CAST(unlike_times AS DECIMAL(20,0)) + 1</if>
         </set>
         WHERE vid = #{vid}
+        <choose>
+            <when test="isLike and isLike != null">
+                AND CAST(like_times AS DECIMAL(20,0)) &lt; 9223372036854775807
+            </when>
+            <otherwise>
+                AND CAST(unlike_times AS DECIMAL(20,0)) &lt; 9223372036854775807
+            </otherwise>
+        </choose>
     </update>
 
+    <!-- 0 时返回 0 行而不是 GREATEST(col - 1, 0)：先算减法会在 UNSIGNED 上抛 1690。 -->
     <update id="decreaseLikeTimes">
         UPDATE video_status
         <set>
-            <if test="isLike and isLike != null">like_times = GREATEST(like_times - 1, 0)</if>
-            <if test="!isLike and isLike != null">unlike_times = GREATEST(unlike_times - 1, 0)</if>
+            <if test="isLike and isLike != null">like_times = CAST(like_times AS DECIMAL(20,0)) - 1</if>
+            <if test="!isLike and isLike != null">unlike_times = CAST(unlike_times AS DECIMAL(20,0)) - 1</if>
         </set>
         WHERE vid = #{vid}
+        <choose>
+            <when test="isLike and isLike != null">
+                AND CAST(like_times AS DECIMAL(20,0)) &gt;= 1
+            </when>
+            <otherwise>
+                AND CAST(unlike_times AS DECIMAL(20,0)) &gt;= 1
+            </otherwise>
+        </choose>
     </update>
 
     <update id="increaseCoinTimes">
         UPDATE video_status
-        SET   coin_times = coin_times + #{coin}
+        SET   coin_times = CAST(coin_times AS DECIMAL(20,0)) + CAST(#{coin} AS DECIMAL(20,0))
         WHERE vid = #{vid}
+          AND CAST(coin_times AS DECIMAL(20,0)) + CAST(#{coin} AS DECIMAL(20,0))
+              BETWEEN 0 AND 9223372036854775807
     </update>
 
     <update id="increaseCollectTimes">
         UPDATE video_status
-        SET   collect_times = collect_times + 1
+        SET   collect_times = CAST(collect_times AS DECIMAL(20,0)) + 1
         WHERE vid = #{vid}
+          AND CAST(collect_times AS DECIMAL(20,0)) &lt; 9223372036854775807
     </update>
 
     <update id="decreaseCollectTimes">
         UPDATE video_status
-        SET   collect_times = GREATEST(collect_times - 1, 0)
+        SET   collect_times = CAST(collect_times AS DECIMAL(20,0)) - 1
         WHERE vid = #{vid}
+          AND CAST(collect_times AS DECIMAL(20,0)) &gt;= 1
     </update>
 
-    <select id="countLikeByUid" resultType="java.lang.Integer">
+    <!-- SUM(BIGINT UNSIGNED) 在 MySQL 里已是 DECIMAL；用 Long 映射，超界时显式报错而不是回绕。 -->
+    <select id="countLikeByUid" resultType="java.lang.Long">
         SELECT COALESCE(SUM(vs.like_times), 0)
         FROM video_status vs
         INNER JOIN video v ON v.vid = vs.vid
@@ -80,27 +112,37 @@
 
     <update id="increaseShareTimes">
         UPDATE video_status
-        SET   share_times = share_times + 1
+        SET   share_times = CAST(share_times AS DECIMAL(20,0)) + 1
         WHERE vid = #{vid}
+          AND CAST(share_times AS DECIMAL(20,0)) &lt; 9223372036854775807
     </update>
+
     <update id="applyBatchDelta">
         UPDATE video_status
-        SET play_times = play_times + #{delta.playDelta},
-            like_times = like_times + #{delta.likeDelta},
-            unlike_times = unlike_times + #{delta.unlikeDelta},
-            comment_times = comment_times + #{delta.commentDelta},
-            coin_times = coin_times + #{delta.coinDelta},
-            share_times = share_times + #{delta.shareDelta},
-            collect_times = collect_times + #{delta.collectDelta},
-            danmu_times = danmu_times + #{delta.danmuDelta}
+        SET play_times = CAST(play_times AS DECIMAL(20,0)) + CAST(#{delta.playDelta} AS DECIMAL(20,0)),
+            like_times = CAST(like_times AS DECIMAL(20,0)) + CAST(#{delta.likeDelta} AS DECIMAL(20,0)),
+            unlike_times = CAST(unlike_times AS DECIMAL(20,0)) + CAST(#{delta.unlikeDelta} AS DECIMAL(20,0)),
+            comment_times = CAST(comment_times AS DECIMAL(20,0)) + CAST(#{delta.commentDelta} AS DECIMAL(20,0)),
+            coin_times = CAST(coin_times AS DECIMAL(20,0)) + CAST(#{delta.coinDelta} AS DECIMAL(20,0)),
+            share_times = CAST(share_times AS DECIMAL(20,0)) + CAST(#{delta.shareDelta} AS DECIMAL(20,0)),
+            collect_times = CAST(collect_times AS DECIMAL(20,0)) + CAST(#{delta.collectDelta} AS DECIMAL(20,0)),
+            danmu_times = CAST(danmu_times AS DECIMAL(20,0)) + CAST(#{delta.danmuDelta} AS DECIMAL(20,0))
         WHERE vid = #{vid}
-          AND play_times + #{delta.playDelta} >= 0
-          AND like_times + #{delta.likeDelta} >= 0
-          AND unlike_times + #{delta.unlikeDelta} >= 0
-          AND comment_times + #{delta.commentDelta} >= 0
-          AND coin_times + #{delta.coinDelta} >= 0
-          AND share_times + #{delta.shareDelta} >= 0
-          AND collect_times + #{delta.collectDelta} >= 0
-          AND danmu_times + #{delta.danmuDelta} >= 0
+          AND CAST(play_times AS DECIMAL(20,0)) + CAST(#{delta.playDelta} AS DECIMAL(20,0))
+              BETWEEN 0 AND 9223372036854775807
+          AND CAST(like_times AS DECIMAL(20,0)) + CAST(#{delta.likeDelta} AS DECIMAL(20,0))
+              BETWEEN 0 AND 9223372036854775807
+          AND CAST(unlike_times AS DECIMAL(20,0)) + CAST(#{delta.unlikeDelta} AS DECIMAL(20,0))
+              BETWEEN 0 AND 9223372036854775807
+          AND CAST(comment_times AS DECIMAL(20,0)) + CAST(#{delta.commentDelta} AS DECIMAL(20,0))
+              BETWEEN 0 AND 9223372036854775807
+          AND CAST(coin_times AS DECIMAL(20,0)) + CAST(#{delta.coinDelta} AS DECIMAL(20,0))
+              BETWEEN 0 AND 9223372036854775807
+          AND CAST(share_times AS DECIMAL(20,0)) + CAST(#{delta.shareDelta} AS DECIMAL(20,0))
+              BETWEEN 0 AND 9223372036854775807
+          AND CAST(collect_times AS DECIMAL(20,0)) + CAST(#{delta.collectDelta} AS DECIMAL(20,0))
+              BETWEEN 0 AND 9223372036854775807
+          AND CAST(danmu_times AS DECIMAL(20,0)) + CAST(#{delta.danmuDelta} AS DECIMAL(20,0))
+              BETWEEN 0 AND 9223372036854775807
     </update>
 </mapper>

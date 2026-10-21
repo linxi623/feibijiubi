@@ -106,6 +106,10 @@ public class VideoStatusEventConsumer {
                     throw new RetryableMessageException(
                             "负增量暂时无法应用"
                     );
+            case COUNTER_OUT_OF_RANGE ->
+                    throw new NonRetryableMessageException(
+                            "Redis 视频统计计数超出 0..Long.MAX_VALUE 范围"
+                    );
             case INVALID_FIELD, INVALID_REDIS_TYPE ->
                     throw new NonRetryableMessageException(
                             "Redis 视频统计数据结构非法"

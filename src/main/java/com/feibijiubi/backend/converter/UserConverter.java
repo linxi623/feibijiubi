@@ -9,7 +9,7 @@ public final class UserConverter {
     }
 
     public static UserCountVO toUserCountVO(Integer fansCount, Integer starCount,
-                                            Integer loveCount, Integer videoCount) {
+                                            Long loveCount, Integer videoCount) {
         UserCountVO userCountVO = new UserCountVO();
         userCountVO.setFansCount(defaultZero(fansCount));
         userCountVO.setStarCount(defaultZero(starCount));
@@ -50,5 +50,9 @@ public final class UserConverter {
 
     private static Integer defaultZero(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private static Long defaultZero(Long value) {
+        return value == null ? 0L : value;
     }
 }

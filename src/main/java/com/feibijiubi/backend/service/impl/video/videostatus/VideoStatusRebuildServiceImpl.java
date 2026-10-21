@@ -210,6 +210,9 @@ public class VideoStatusRebuildServiceImpl
         }
 
         private void add(VideoStatusDelta delta) {
+            // 只有符号 net 增量参与累计：允许中间先减后加，成否由 requireNonNegative 判定。
+            // 溢出用 Math.addExact 显式失败，由 classifyConfirmedPending 转成可重试异常，
+            // 不静默回绕成任意正数。
             play = Math.addExact(play, delta.playDelta());
             like = Math.addExact(like, delta.likeDelta());
             unlike = Math.addExact(unlike, delta.unlikeDelta());
@@ -221,6 +224,7 @@ public class VideoStatusRebuildServiceImpl
         }
 
         private void add(Totals other) {
+            // 基线 + 已确认待落库事件的净增量；基线非负契约在 SnapshotService 读取时已校验。
             play = Math.addExact(play, other.play);
             like = Math.addExact(like, other.like);
             unlike = Math.addExact(unlike, other.unlike);
@@ -232,6 +236,7 @@ public class VideoStatusRebuildServiceImpl
         }
 
         private void requireNonNegative(Integer vid) {
+            // 防御深度：即使 addExact 溢出分支被绕过，也不允许负值进入 Redis 初始化。
             if (play < 0 || like < 0 || unlike < 0 || comment < 0
                     || coin < 0 || share < 0 || collect < 0 || danmu < 0) {
                 throw new ArithmeticException(

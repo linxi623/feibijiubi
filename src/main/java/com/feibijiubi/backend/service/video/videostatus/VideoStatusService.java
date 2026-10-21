@@ -16,6 +16,7 @@ public interface VideoStatusService {
         DUPLICATE,
         NEEDS_REBUILD,
         NEGATIVE_RESULT,
+        COUNTER_OUT_OF_RANGE,
         INVALID_FIELD,
         INVALID_REDIS_TYPE
     }

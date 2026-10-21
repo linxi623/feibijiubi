@@ -45,15 +45,16 @@ public record VideoStatusDelta(
     }
 
     public VideoStatusDelta plus(VideoStatusDelta other) {
+        // T02: 批次累计溢出必须显式失败，不能静默回绕。
         return new VideoStatusDelta(
-                playDelta + other.playDelta,
-                likeDelta + other.likeDelta,
-                unlikeDelta + other.unlikeDelta,
-                commentDelta + other.commentDelta,
-                coinDelta + other.coinDelta,
-                shareDelta + other.shareDelta,
-                collectDelta + other.collectDelta,
-                danmuDelta + other.danmuDelta
+                Math.addExact(playDelta, other.playDelta),
+                Math.addExact(likeDelta, other.likeDelta),
+                Math.addExact(unlikeDelta, other.unlikeDelta),
+                Math.addExact(commentDelta, other.commentDelta),
+                Math.addExact(coinDelta, other.coinDelta),
+                Math.addExact(shareDelta, other.shareDelta),
+                Math.addExact(collectDelta, other.collectDelta),
+                Math.addExact(danmuDelta, other.danmuDelta)
         );
     }
 

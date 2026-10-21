@@ -3,6 +3,7 @@ package com.feibijiubi.backend.service.impl.video.videostatus;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feibijiubi.backend.common.RetryableMessageException;
+import com.feibijiubi.backend.common.VideoStatusCounterRange;
 import com.feibijiubi.backend.entity.VideoStatus;
 import com.feibijiubi.backend.entity.VideoStatusConsumedEvent;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
@@ -51,14 +52,14 @@ public class VideoStatusRebuildSnapshotServiceImpl implements VideoStatusRebuild
 
         return new VideoStatusRebuildSnapshot(
                 vid,
-                valueOrZero(baseline.getPlayTimes()),
-                valueOrZero(baseline.getLikeTimes()),
-                valueOrZero(baseline.getUnlikeTimes()),
-                valueOrZero(baseline.getCommentTimes()),
-                valueOrZero(baseline.getCoinTimes()),
-                valueOrZero(baseline.getShareTimes()),
-                valueOrZero(baseline.getCollectTimes()),
-                valueOrZero(baseline.getDanmuTimes()),
+                baselineValue(baseline.getPlayTimes(), vid, "playTimes"),
+                baselineValue(baseline.getLikeTimes(), vid, "likeTimes"),
+                baselineValue(baseline.getUnlikeTimes(), vid, "unlikeTimes"),
+                baselineValue(baseline.getCommentTimes(), vid, "commentTimes"),
+                baselineValue(baseline.getCoinTimes(), vid, "coinTimes"),
+                baselineValue(baseline.getShareTimes(), vid, "shareTimes"),
+                baselineValue(baseline.getCollectTimes(), vid, "collectTimes"),
+                baselineValue(baseline.getDanmuTimes(), vid, "danmuTimes"),
                 candidates
         );
     }
@@ -116,7 +117,21 @@ public class VideoStatusRebuildSnapshotServiceImpl implements VideoStatusRebuild
         }
     }
 
-    private long valueOrZero(Integer value) {
-        return value == null ? 0L : value.longValue();
+    private long valueOrZero(Long value) {
+        return value == null ? 0L : value;
+    }
+
+    /**
+     * MySQL 基线直接进入重建累计，所以读取时就要守同一条非负契约：
+     * 出现负数只可能是 schema 漂移或人工篡改，属于永久数据错误，
+     * 不能悄悄流入累计再被当成“暂态溢出”无限重试。
+     * （列本身是 BIGINT UNSIGNED，超过 Long.MAX_VALUE 的值在 JDBC 映射阶段就会失败，
+     * 不会以负数形式抵达这里。）
+     */
+    private long baselineValue(Long value, Integer vid, String field) {
+        return VideoStatusCounterRange.require(
+                valueOrZero(value),
+                "videoStatus[" + vid + "]." + field
+        );
     }
 }

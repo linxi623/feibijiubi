@@ -2,6 +2,8 @@ package com.feibijiubi.backend.service.impl.video.videostatus;
 
 import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.common.RetryableMessageException;
+import com.feibijiubi.backend.common.VideoStatusCounterRange;
+import com.feibijiubi.backend.common.VideoStatusCounterRangeException;
 import com.feibijiubi.backend.config.VideoStatusProperties;
 import com.feibijiubi.backend.entity.VideoStatus;
 import com.feibijiubi.backend.entity.VideoStatusOutbox;
@@ -116,6 +118,8 @@ public class VideoStatusServiceImpl implements VideoStatusService {
             throw new RetryableMessageException("Redis 视频统计聚合脚本无返回值");
         }
         try {
+            // COUNTER_OUT_OF_RANGE 是合法的枚举值，会原样返回给消费者分类处理；
+            // 这里只兜底无法识别的返回码。
             return ApplyResult.valueOf(result);
         } catch (IllegalArgumentException e) {
             throw new RetryableMessageException(
@@ -180,28 +184,58 @@ public class VideoStatusServiceImpl implements VideoStatusService {
         }
 
         VideoStatus status = new VideoStatus();
-        status.setVid(parseInt(values, "vid"));
-        status.setPlayTimes(parseInt(values, "playTimes"));
-        status.setLikeTimes(parseInt(values, "likeTimes"));
-        status.setUnlikeTimes(parseInt(values, "unlikeTimes"));
-        status.setCommentTimes(parseInt(values, "commentTimes"));
-        status.setCoinTimes(parseInt(values, "coinTimes"));
-        status.setShareTimes(parseInt(values, "shareTimes"));
-        status.setCollectTimes(parseInt(values, "collectTimes"));
-        status.setDanmuTimes(parseInt(values, "danmuTimes"));
+        status.setVid(parseVid(values, "vid", vid));
+        status.setPlayTimes(parseCount(values, "playTimes", vid));
+        status.setLikeTimes(parseCount(values, "likeTimes", vid));
+        status.setUnlikeTimes(parseCount(values, "unlikeTimes", vid));
+        status.setCommentTimes(parseCount(values, "commentTimes", vid));
+        status.setCoinTimes(parseCount(values, "coinTimes", vid));
+        status.setShareTimes(parseCount(values, "shareTimes", vid));
+        status.setCollectTimes(parseCount(values, "collectTimes", vid));
+        status.setDanmuTimes(parseCount(values, "danmuTimes", vid));
         return status;
     }
 
-    private Integer parseInt(Map<String, String> map, String key) {
-        String value = map.get(key);
-        if (value == null || value.isBlank()) {
-            return 0;
+    /**
+     * T02: Redis 解析不得静默返回 0。缺失/非十进制/负数/超 Long 上限都会
+     * 抛出 {@link VideoStatusCounterRangeException}，由调用方显式处理。
+     */
+    private Long parseCount(
+            Map<String, String> map,
+            String key,
+            Integer vid
+    ) {
+        return VideoStatusCounterRange.parse(
+                map.get(key),
+                "videoStatus[" + vid + "]." + key
+        );
+    }
+
+    private Integer parseVid(
+            Map<String, String> map,
+            String key,
+            Integer vid
+    ) {
+        long parsed = VideoStatusCounterRange.parse(
+                map.get(key),
+                "videoStatus[" + vid + "]." + key
+        );
+        if (parsed > Integer.MAX_VALUE) {
+            throw new VideoStatusCounterRangeException(
+                    "videoStatus[" + vid + "]." + key,
+                    VideoStatusCounterRangeException.Reason.OVERFLOW,
+                    "Redis vid 超出 Integer 范围: value=" + parsed
+            );
         }
-        try {
-            return Integer.valueOf(value);
-        } catch (NumberFormatException e) {
-            log.warn("解析 Redis 视频统计字段失败: field={}, value={}", key, value);
-            return 0;
+        // 缓存 Hash 必须属于被查询的 vid：若 vid 字段指向别的视频，说明 key 与内容
+        // 已经错位，继续返回会把 A 的统计冒充成 B 的统计。
+        if (parsed != vid.longValue()) {
+            throw new IllegalStateException(
+                    "Redis 视频统计 vid 与请求不一致: field=videoStatus[" + vid + "]." + key
+                            + ", expected=" + vid
+                            + ", actual=" + parsed
+            );
         }
+        return (int) parsed;
     }
 }

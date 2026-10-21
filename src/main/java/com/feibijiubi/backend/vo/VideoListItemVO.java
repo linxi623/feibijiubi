@@ -12,8 +12,8 @@ public class VideoListItemVO {
     private String title;
     private String coverUrl;
     private Double duration;
-    private Integer playTimes;
-    private Integer commentTimes;
+    private Long playTimes;
+    private Long commentTimes;
     private LocalDateTime createdAt;
 
     private String nickname;

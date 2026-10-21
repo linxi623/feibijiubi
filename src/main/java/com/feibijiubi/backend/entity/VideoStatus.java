@@ -9,12 +9,13 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class VideoStatus {
     private Integer vid;
-    private Integer playTimes;
-    private Integer likeTimes;
-    private Integer unlikeTimes;
-    private Integer commentTimes;
-    private Integer coinTimes;
-    private Integer shareTimes;
-    private Integer collectTimes;
-    private Integer danmuTimes;
+    // T02: 计数统一 Long，支持 0..Long.MAX_VALUE；vid 等标识仍为 Integer。
+    private Long playTimes;
+    private Long likeTimes;
+    private Long unlikeTimes;
+    private Long commentTimes;
+    private Long coinTimes;
+    private Long shareTimes;
+    private Long collectTimes;
+    private Long danmuTimes;
 }

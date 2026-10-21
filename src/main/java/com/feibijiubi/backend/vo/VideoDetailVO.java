@@ -20,13 +20,13 @@ public class VideoDetailVO {
     private String videoUrl;
     private LocalDateTime createdAt;
 
-    private Integer playTimes;
-    private Integer likeTimes;
-    private Integer coinTimes;
-    private Integer collectTimes;
-    private Integer commentTimes;
-    private Integer danmuTimes;
-    private Integer shareTimes;
+    private Long playTimes;
+    private Long likeTimes;
+    private Long coinTimes;
+    private Long collectTimes;
+    private Long commentTimes;
+    private Long danmuTimes;
+    private Long shareTimes;
 
     private Boolean liked;
     private Byte coin;

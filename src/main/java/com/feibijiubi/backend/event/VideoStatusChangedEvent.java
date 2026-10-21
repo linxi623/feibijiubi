@@ -22,6 +22,10 @@ public record VideoStatusChangedEvent(
         if (type == null || delta == null || delta == 0) {
             throw new IllegalArgumentException("统计类型或增量不合法");
         }
+        // T02: 计数支持 0..Long.MAX_VALUE；绝对值超过 Long.MAX 的增量永远不可能合法。
+        if (delta == Long.MIN_VALUE) {
+            throw new IllegalArgumentException("统计增量超出 Long 范围");
+        }
         double expected = type.calculateHotScore(delta);
         if (hotScoreDelta == null
                 || !Double.isFinite(hotScoreDelta)

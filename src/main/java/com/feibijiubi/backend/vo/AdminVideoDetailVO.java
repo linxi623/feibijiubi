@@ -21,14 +21,14 @@ public class AdminVideoDetailVO {
     private Byte status;
     private LocalDateTime createdAt;
 
-    private Integer playTimes;
-    private Integer likeTimes;
-    private Integer unlikeTimes;
-    private Integer commentTimes;
-    private Integer coinTimes;
-    private Integer shareTimes;
-    private Integer collectTimes;
-    private Integer danmuTimes;
+    private Long playTimes;
+    private Long likeTimes;
+    private Long unlikeTimes;
+    private Long commentTimes;
+    private Long coinTimes;
+    private Long shareTimes;
+    private Long collectTimes;
+    private Long danmuTimes;
 
     private String avatarUrl;
     private String nickname;

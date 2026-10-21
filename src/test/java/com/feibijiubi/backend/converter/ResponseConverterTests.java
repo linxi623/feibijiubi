@@ -25,7 +25,7 @@ class ResponseConverterTests {
 
         assertEquals(0, count.getFansCount());
         assertEquals(0, count.getStarCount());
-        assertEquals(0, count.getLoveCount());
+        assertEquals(0L, count.getLoveCount());
         assertEquals(0, count.getVideoCount());
     }
 
@@ -40,7 +40,7 @@ class ResponseConverterTests {
         user.setGender((byte) 2);
         user.setCoin(10);
         user.setCreatedAt(LocalDateTime.of(2026, 7, 12, 10, 0));
-        UserCountVO count = UserConverter.toUserCountVO(1, 2, 3, 4);
+        UserCountVO count = UserConverter.toUserCountVO(1, 2, 3L, 4);
 
         UserVO vo = UserConverter.toUserVO(user, count, null);
 
@@ -89,7 +89,7 @@ class ResponseConverterTests {
         video.setVisibility((byte) 0);
         video.setStatus((byte) 0);
 
-        VideoStatus status = new VideoStatus(1, 10, 9, 8, 7, 6, 5, 4, 3);
+        VideoStatus status = new VideoStatus(1, 10L, 9L, 8L, 7L, 6L, 5L, 4L, 3L);
         User author = new User();
         author.setNickname("作者");
         author.setAvatarUrl("avatar");
@@ -100,10 +100,10 @@ class ResponseConverterTests {
 
         assertEquals(1, detail.getVid());
         assertEquals("待审核视频", detail.getTitle());
-        assertEquals(10, detail.getPlayTimes());
-        assertEquals(9, detail.getLikeTimes());
-        assertEquals(8, detail.getUnlikeTimes());
-        assertEquals(3, detail.getDanmuTimes());
+        assertEquals(10L, detail.getPlayTimes());
+        assertEquals(9L, detail.getLikeTimes());
+        assertEquals(8L, detail.getUnlikeTimes());
+        assertEquals(3L, detail.getDanmuTimes());
         assertEquals("作者", detail.getNickname());
         assertEquals(0, detail.getVideoCount());
         assertEquals(0, detail.getFansCount());

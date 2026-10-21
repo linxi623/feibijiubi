@@ -29,7 +29,7 @@ public interface VideoStatusMapper {
 
     int increaseShareTimes(Integer vid);
 
-    int countLikeByUid(Integer uid);
+    long countLikeByUid(Integer uid);
 
     int applyBatchDelta(
             @Param("vid") Integer vid,
