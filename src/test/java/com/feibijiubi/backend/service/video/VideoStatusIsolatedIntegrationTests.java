@@ -127,6 +127,9 @@ class VideoStatusIsolatedIntegrationTests {
     @Autowired VideoStatusConsumedEventMapper consumedMapper;
     @MockitoSpyBean VideoStatusRebuildSnapshotServiceImpl snapshots;
     @MockitoSpyBean VideoStatusVidMutex mutex;
+    @MockitoSpyBean VideoStatusConsumptionServiceImpl consumptionSpy;
+    /** 真实阻塞窗口重复轮数；每轮使用独立视频，独立 DB 与 Redis 状态。 */
+    private static final int WINDOW_ROUNDS = 100;
     int vid;
 
     @BeforeEach
@@ -148,6 +151,18 @@ class VideoStatusIsolatedIntegrationTests {
         RabbitAdmin admin = new RabbitAdmin(rabbit.getConnectionFactory());
         for (String queue : List.of(RabbitConstants.MAIN_QUEUE, RabbitConstants.RETRY_QUEUE,
                 RabbitConstants.DEAD_QUEUE)) admin.purgeQueue(queue, false);
+    }
+
+    /** 每轮窗口的独立 Oracle：新用户/新视频/play_times=0，Redis 键从未被写过。 */
+    int freshVideo() {
+        String username = "it-window-" + UUID.randomUUID();
+        jdbc.update("INSERT INTO users(username,password_hash,nickname) VALUES (?, 'test', 'test')", username);
+        int uid = jdbc.queryForObject("SELECT id FROM users WHERE username=?", Integer.class, username);
+        jdbc.update("INSERT INTO video(uid,title,mc_id,sc_id,cover_url,cover_key,video_url,video_key) "
+                + "VALUES (?, 'isolated-test', 'test', 'test', '', '', '', '')", uid);
+        int newVid = jdbc.queryForObject("SELECT MAX(vid) FROM video WHERE uid=?", Integer.class, uid);
+        jdbc.update("INSERT INTO video_status(vid,play_times) VALUES (?,0)", newVid);
+        return newVid;
     }
 
     VideoStatusChangedEvent event() {
@@ -359,6 +374,96 @@ class VideoStatusIsolatedIntegrationTests {
         await(() -> { scheduler.flushDirtyVideos(); return baseline() == 1; });
         assertEquals(1, current());
         await(this::queuesAreIdle);
+    }
+
+    /**
+     * T01 真实阻塞窗口：不再用“手工 stats.apply 但不 mark”构造中间态，而是让真实 Rabbit 消费者
+     * 在 {@code consumption.markRedisApplied} 之前被 latch 挡住（spy 的 doAnswer 阻塞真实方法调用），
+     * 主线程等到 latch 确认后才继续跑 -1 与 flush。
+     *
+     * <p>每轮（共 {@link #WINDOW_ROUNDS} 轮，每轮独立视频 + 独立 DB/Redis Oracle，不靠 sleep）：</p>
+     * <ol>
+     *   <li>+1 发布到主队列，真实监听线程执行 register → stats.apply（Redis 已 +1）→ 到达
+     *       markRedisApplied 阻塞点并 countDown；</li>
+     *   <li>窗口内 Oracle：Redis=1，+1 事件仍为 RECEIVED(0)，状态提交确实尚未发生；</li>
+     *   <li>主线程走 -1 的完整消费链（Redis=0，-1 事件=1，先于 +1 可见）；</li>
+     *   <li>flush 只看到 -1，DB 基线 0；</li>
+     *   <li>释放阻塞，+1 状态提交完成；再次 flush 后按实际分支断言。</li>
+     * </ol>
+     *
+     * <p>当前隔离 MySQL 默认（{@code BIGINT UNSIGNED} + 严格模式）下 -1 触发 1690 →
+     * {@code DataAccessException}，事件保持 status 1 并重新入 dirty，+1 可见后同批净零收敛。
+     * 本用例保留分支 A（status 3 隔离）的精确断言，但不声称该分叉必然发生或永久存在。</p>
+     */
+    @Test
+    void realConsumerBlockedBeforeMarkRedisAppliedKeepsLegalMinusOnePending() throws Exception {
+        int pendingBranch = 0;
+        int quarantinedBranch = 0;
+        for (int round = 0; round < WINDOW_ROUNDS; round++) {
+            vid = freshVideo();
+            var plus = event();
+            CountDownLatch blocked = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            doAnswer(call -> {
+                if (plus.eventId().equals(call.getArgument(0))) {
+                    blocked.countDown();
+                    if (!release.await(30, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("markRedisApplied 阻塞窗口未被释放");
+                    }
+                }
+                return call.callRealMethod();
+            }).when(consumptionSpy).markRedisApplied(anyString());
+
+            try {
+                rabbit.convertAndSend(RabbitConstants.MAIN_EXCHANGE, RabbitConstants.MAIN_ROUTING_KEY, plus);
+                assertTrue(blocked.await(30, TimeUnit.SECONDS),
+                        "真实消费者未到达 markRedisApplied 阻塞点，round=" + round);
+                assertEquals(1, current(), "窗口内 Redis 必须已应用 +1");
+                assertEquals(0, consumedMapper.selectByEventId(plus.eventId()).getProcessStatus(),
+                        "窗口内 +1 事件必须仍为 RECEIVED，状态提交尚未发生");
+
+                var minus = new VideoStatusChangedEvent(UUID.randomUUID().toString(), vid,
+                        VideoStatusEventType.PLAY, -1L, -1D, LocalDateTime.now(), 2, null);
+                applyAndMark(minus);
+                assertEquals(0, current());
+                assertEquals(1, consumedMapper.selectByEventId(minus.eventId()).getProcessStatus());
+
+                scheduler.flushDirtyVideos();
+                assertEquals(0, baseline(), "非负守卫不允许把 DB 写成负数或部分落库");
+                int firstAttempt = consumedMapper.selectByEventId(minus.eventId()).getProcessStatus();
+                assertNotEquals(2, firstAttempt, "合法的 -1 事件不允许在未落库时被标记为 FLUSHED");
+                assertTrue(firstAttempt == 1 || firstAttempt == 3,
+                        "首轮 flush 后 -1 只能保持待刷(1)或被隔离(3)，实际=" + firstAttempt);
+
+                release.countDown();
+                await(() -> consumedMapper.selectByEventId(plus.eventId()).getProcessStatus() == 1);
+                assertEquals(0, current(), "释放窗口只提交状态，不再改动 Redis（-1 已应用）");
+                // flush 触发不是本用例的被测对象：显式放回 dirty，保证下一次刷库一定执行。
+                redis.opsForSet().add(RedisKeyUtils.dirtyVideo(), String.valueOf(vid));
+                scheduler.flushDirtyVideos();
+
+                if (firstAttempt == 3) {
+                    quarantinedBranch++;
+                    assertEquals(1, baseline(), "分支 A：-1 被隔离后 +1 单独落库，DB=1");
+                    assertEquals(0, current());
+                    assertEquals(3, consumedMapper.selectByEventId(minus.eventId()).getProcessStatus());
+                    assertEquals(2, consumedMapper.selectByEventId(plus.eventId()).getProcessStatus());
+                } else {
+                    pendingBranch++;
+                    assertEquals(0, baseline(), "分支 B：同批净零后 DB 保持 0");
+                    assertEquals(0, current());
+                    assertEquals(2, consumedMapper.selectByEventId(minus.eventId()).getProcessStatus(),
+                            "分支 B：-1 必须延后到 +1 可见后完成状态迁移");
+                    assertEquals(2, consumedMapper.selectByEventId(plus.eventId()).getProcessStatus());
+                }
+            } finally {
+                release.countDown();
+            }
+        }
+        assertEquals(WINDOW_ROUNDS, pendingBranch + quarantinedBranch);
+        System.out.printf(Locale.ROOT,
+                "T01 blocked window rounds=%d pendingBranch=%d quarantinedBranch=%d%n",
+                WINDOW_ROUNDS, pendingBranch, quarantinedBranch);
     }
 
     @Test
