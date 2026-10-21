@@ -5,6 +5,7 @@ import com.feibijiubi.backend.common.RetryableMessageException;
 import com.feibijiubi.backend.common.VideoStatusFlushDataException;
 import com.feibijiubi.backend.common.VideoStatusFlushDeferredException;
 import com.feibijiubi.backend.config.VideoStatusProperties;
+import com.feibijiubi.backend.config.VideoStatusSchedulingConfig;
 import com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper;
 import com.feibijiubi.backend.metrics.VideoStatusTelemetry;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusBatchFlushService;
@@ -19,9 +20,11 @@ import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
@@ -113,7 +116,8 @@ public class VideoStatusBatchFlushScheduler {
 
     @Scheduled(
             fixedDelayString =
-                    "${app.video-status.flush-fixed-delay-ms:500}"
+                    "${app.video-status.flush-fixed-delay-ms:500}",
+            scheduler = VideoStatusSchedulingConfig.FLUSH_SCHEDULER_BEAN
     )
     public void flushDirtyVideos() {
         if (!properties.isAsyncEnabled()
@@ -126,7 +130,32 @@ public class VideoStatusBatchFlushScheduler {
                 RedisKeyUtils.dirtyVideo(),
                 properties.getFlushDirtyBatchSize()
         );
-        for (String rawVid : dirtyVids) {
+        if (dirtyVids == null || dirtyVids.isEmpty()) {
+            return;
+        }
+
+        long startedAt = System.nanoTime();
+        long budgetNanos = TimeUnit.MILLISECONDS.toNanos(
+                properties.getRoundBudgetMs()
+        );
+        Iterator<String> iterator = dirtyVids.iterator();
+
+        while (iterator.hasNext()) {
+            String rawVid = iterator.next();
+
+            // T06：预算检查放在“处理下一条之前”。已经开始的 vid 不会被强杀：
+            // 它由 100ms 锁等待 + 数据库事务/SQL 超时各自界定。
+            if (System.nanoTime() - startedAt >= budgetNanos) {
+                int requeued = requeueDirty(rawVid) + requeueAll(iterator);
+                log.warn(
+                        "视频统计刷库达到单轮预算，已把未处理 dirty 全部补回，"
+                                + "留待下一轮: budgetMs={}, requeued={}",
+                        properties.getRoundBudgetMs(),
+                        requeued
+                );
+                return;
+            }
+
             Integer vid = parseVid(rawVid);
             if (vid == null) {
                 log.error("dirty Set 包含非法 vid，已忽略: {}", rawVid);
@@ -142,10 +171,38 @@ public class VideoStatusBatchFlushScheduler {
         }
     }
 
+    /**
+     * 单轮预算用尽时把剩余 dirty 原样补回。绝不 SREM：
+     * 否则会误删并发消费者刚 SADD 的新标记，导致“无人落库”。
+     */
+    private int requeueAll(Iterator<String> remaining) {
+        int requeued = 0;
+        while (remaining.hasNext()) {
+            requeued += requeueDirty(remaining.next());
+        }
+        return requeued;
+    }
+
+    private int requeueDirty(String rawVid) {
+        Integer vid = parseVid(rawVid);
+        if (vid == null) {
+            log.error("dirty Set 包含非法 vid，已忽略: {}", rawVid);
+            return 0;
+        }
+        requeueDirty(vid);
+        return 1;
+    }
+
     private void flushOne(Integer vid) {
         long startedAt = System.nanoTime();
         try {
-            vidMutex.withLock(vid, () -> flushLocked(vid));
+            // T06：调度轮内只等 100ms，不让一个被占用的 vid 吃掉整轮预算；
+            // 消费/重建路径仍用 VidMutex 默认的 10 秒等待，语义不变。
+            vidMutex.withLock(
+                    vid,
+                    VideoStatusVidMutex.SCHEDULER_WAIT_TIME_MILLIS,
+                    () -> flushLocked(vid)
+            );
             recordFlush(VideoStatusTelemetry.Outcome.SUCCESS, startedAt);
         } catch (VideoStatusFlushDeferredException e) {
             recordFlush(VideoStatusTelemetry.Outcome.DEFERRED, startedAt);

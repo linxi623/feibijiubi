@@ -174,7 +174,7 @@ class VideoStatusTelemetryInstrumentationTests {
         JsonUtils jsonUtils = mock(JsonUtils.class);
 
         VideoStatusOutbox outbox = outbox();
-        when(claimService.claimBatch()).thenReturn(List.of(outbox));
+        when(claimService.claimBatch(1)).thenReturn(List.of(outbox), List.of());
         when(jsonUtils.fromJson(anyString(), eq(VideoStatusChangedEvent.class)))
                 .thenReturn(event());
 
@@ -220,6 +220,7 @@ class VideoStatusTelemetryInstrumentationTests {
 
         verifyNoInteractions(telemetry);
         verify(claimService, never()).claimBatch();
+        verify(claimService, never()).claimBatch(anyInt());
         verify(outboxMapper, never()).recoverExpiredSending(any(LocalDateTime.class));
     }
 
@@ -237,7 +238,7 @@ class VideoStatusTelemetryInstrumentationTests {
 
         VideoStatusOutbox outbox = outbox();
         outbox.setRetryCount(9);
-        when(claimService.claimBatch()).thenReturn(List.of(outbox));
+        when(claimService.claimBatch(1)).thenReturn(List.of(outbox), List.of());
         when(jsonUtils.fromJson(anyString(), eq(VideoStatusChangedEvent.class)))
                 .thenThrow(new IllegalStateException("bad payload"));
 
@@ -751,9 +752,9 @@ class VideoStatusTelemetryInstrumentationTests {
 
         VideoStatusVidMutex vidMutex = mock(VideoStatusVidMutex.class);
         doAnswer(call -> {
-            ((Runnable) call.getArgument(1)).run();
+            ((Runnable) call.getArgument(2)).run();
             return null;
-        }).when(vidMutex).withLock(anyInt(), any(Runnable.class));
+        }).when(vidMutex).withLock(anyInt(), anyLong(), any(Runnable.class));
 
         VideoStatusBatchFlushScheduler scheduler = new VideoStatusBatchFlushScheduler(
                 properties,

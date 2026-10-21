@@ -64,7 +64,7 @@ class VideoStatusOutboxRelayTests {
         var publisher = mock(VideoStatusEventPublisher.class);
         var jsonUtils = mock(JsonUtils.class);
 
-        when(claimService.claimBatch()).thenReturn(List.of(outbox(0)));
+        when(claimService.claimBatch(1)).thenReturn(List.of(outbox(0)), List.of());
         when(jsonUtils.fromJson(anyString(), eq(VideoStatusChangedEvent.class)))
                 .thenReturn(event());
         // 发布成功（已到达 RabbitMQ），但状态回写失败
@@ -93,7 +93,7 @@ class VideoStatusOutboxRelayTests {
         var publisher = mock(VideoStatusEventPublisher.class);
         var jsonUtils = mock(JsonUtils.class);
 
-        when(claimService.claimBatch()).thenReturn(List.of(outbox(0)));
+        when(claimService.claimBatch(1)).thenReturn(List.of(outbox(0)), List.of());
         when(jsonUtils.fromJson(anyString(), eq(VideoStatusChangedEvent.class)))
                 .thenReturn(event());
         when(outboxMapper.markSent(eq(EVENT_ID), eq(LEASE), any())).thenReturn(0);
@@ -115,7 +115,7 @@ class VideoStatusOutboxRelayTests {
         var publisher = mock(VideoStatusEventPublisher.class);
         var jsonUtils = mock(JsonUtils.class);
 
-        when(claimService.claimBatch()).thenReturn(List.of(outbox(9)));
+        when(claimService.claimBatch(1)).thenReturn(List.of(outbox(9)), List.of());
         when(jsonUtils.fromJson(anyString(), eq(VideoStatusChangedEvent.class)))
                 .thenReturn(event());
         doThrow(new IllegalStateException("broker down"))
@@ -177,12 +177,12 @@ class VideoStatusOutboxRelayTests {
         var outboxMapper = mock(VideoStatusOutboxMapper.class);
         var publisher = mock(VideoStatusEventPublisher.class);
         var jsonUtils = mock(JsonUtils.class);
-        when(claimService.claimBatch()).thenReturn(List.of());
+        when(claimService.claimBatch(1)).thenReturn(List.of());
 
         new VideoStatusOutboxRelay(claimService, outboxMapper, publisher,
                 properties(), jsonUtils).relay();
 
-        verify(claimService).claimBatch();
+        verify(claimService).claimBatch(1);
         verify(outboxMapper).recoverExpiredSending(any(LocalDateTime.class));
     }
 }

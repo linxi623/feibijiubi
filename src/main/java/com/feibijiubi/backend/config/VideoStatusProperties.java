@@ -30,6 +30,8 @@ public class VideoStatusProperties {
     public static final int MAX_REDIS_EVENT_TTL_DAYS = 3_650;
     public static final int MAX_CONSUMER_MAX_RETRIES = 100;
     public static final int MAX_LEASE_OR_CONFIRM_TIMEOUT_SECONDS = 3_600;
+    /** 单轮调度预算默认值（毫秒）。 */
+    public static final long DEFAULT_ROUND_BUDGET_MS = 5_000L;
 
     // 总开关，是否启用异步统计（业务侧写 Outbox、消费者落 Redis、调度器落库都以此为前提）
     private boolean asyncEnabled;
@@ -54,6 +56,12 @@ public class VideoStatusProperties {
     private int flushDirtyBatchSize = 100;
     private int flushEventBatchSize = 1000;
     private long flushRecoveryFixedDelayMs = 5000;
+    // 单轮调度预算（毫秒），单位与 T04 的其它时长配置一致。
+    // 投递 / 落库 / 恢复三条调度线程各自在每轮开始时记起点，在“领取或处理下一条之前”检查：
+    // 预算用尽就结束本轮，未处理的工作留在 Outbox / Redis dirty / 消费事件表里等下一轮。
+    // 它只限制“本轮还要不要继续拿新工作”，不能强杀正在进行的 publish confirm 或数据库事务
+    // （那些由 confirm timeout、vid 锁等待和 SQL 超时各自界定）。
+    private long roundBudgetMs = DEFAULT_ROUND_BUDGET_MS;
 
 
     /**
@@ -95,6 +103,7 @@ public class VideoStatusProperties {
                 1, MAX_LEASE_OR_CONFIRM_TIMEOUT_SECONDS);
         requireRange("consumerMaxRetries", consumerMaxRetries,
                 1, MAX_CONSUMER_MAX_RETRIES);
+        requirePositiveDelay("roundBudgetMs", roundBudgetMs);
     }
 
     private void requirePositiveDelay(String name, long value) {

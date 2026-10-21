@@ -32,8 +32,8 @@ class VideoStatusDirtySchedulingTests {
             dirty.clear();
             return popped;
         });
-        doAnswer(call -> { ((Runnable) call.getArgument(1)).run(); return null; })
-                .when(mutex).withLock(eq(7), any(Runnable.class));
+        doAnswer(call -> { ((Runnable) call.getArgument(2)).run(); return null; })
+                .when(mutex).withLock(eq(7), anyLong(), any(Runnable.class));
         when(mapper.countPendingByVid(7)).thenAnswer(call -> {
             // SELECT returned 0, but a consumer now executes SADD before caller resumes.
             dirty.add("7");

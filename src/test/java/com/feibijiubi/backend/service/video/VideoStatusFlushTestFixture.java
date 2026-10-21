@@ -92,9 +92,9 @@ final class VideoStatusFlushTestFixture {
         VideoStatusVidMutex mutex = mock(VideoStatusVidMutex.class);
         doAnswer(call -> {
             lockCalls++;
-            ((Runnable) call.getArgument(1)).run();
+            ((Runnable) call.getArgument(2)).run();
             return null;
-        }).when(mutex).withLock(anyInt(), any(Runnable.class));
+        }).when(mutex).withLock(anyInt(), anyLong(), any(Runnable.class));
 
         statusMapper = mock(VideoStatusMapper.class);
         when(statusMapper.selectByVid(anyInt())).thenAnswer(call -> {

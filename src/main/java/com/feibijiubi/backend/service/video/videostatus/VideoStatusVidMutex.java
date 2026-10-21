@@ -17,7 +17,18 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 public class VideoStatusVidMutex {
 
-    private static final long WAIT_TIME_SECONDS = 10L;
+    /**
+     * 默认锁等待时间：消费/重建等“必须拿到锁”的路径沿用 T01 以来的 10 秒，
+     * 语义不变（超时抛 {@link RetryableMessageException}）。
+     */
+    public static final long DEFAULT_WAIT_TIME_MILLIS = 10_000L;
+
+    /**
+     * 调度轮内的锁等待上限：批量落库是“扫一批 vid、能落就落”，
+     * 一个视频被长时间占用时不该把整轮预算耗在等锁上，因此只等 100ms，
+     * 没拿到就把 dirty 放回 Set，留给下一轮。
+     */
+    public static final long SCHEDULER_WAIT_TIME_MILLIS = 100L;
 
     private final RedissonClient redissonClient;
 
@@ -29,8 +40,22 @@ public class VideoStatusVidMutex {
     private VideoStatusTelemetry telemetry;
 
     public <T> T withLock(Integer vid, Supplier<T> action) {
+        return withLock(vid, DEFAULT_WAIT_TIME_MILLIS, action);
+    }
+
+    /**
+     * T06 新增的等待时间重载：只改“最多等多久”，锁本身、Watchdog 续租、
+     * 超时异常类型与指标语义全部保持原样。
+     *
+     * @param waitTimeMillis 获取锁的最长等待时间（毫秒），必须大于 0
+     */
+    public <T> T withLock(Integer vid, long waitTimeMillis, Supplier<T> action) {
         Objects.requireNonNull(vid, "vid 不能为空");
         Objects.requireNonNull(action, "action 不能为空");
+        if (waitTimeMillis <= 0) {
+            throw new IllegalArgumentException(
+                    "锁等待时间必须大于 0 毫秒，当前值：" + waitTimeMillis);
+        }
 
         RLock lock = redissonClient.getLock(RedisKeyUtils.lockKey(vid));
         boolean acquired = false;
@@ -39,8 +64,8 @@ public class VideoStatusVidMutex {
         try {
             // 不传 leaseTime，使用 Redisson Watchdog 自动续租
             acquired = lock.tryLock(
-                    WAIT_TIME_SECONDS,
-                    TimeUnit.SECONDS
+                    waitTimeMillis,
+                    TimeUnit.MILLISECONDS
             );
 
             if (!acquired) {
@@ -86,9 +111,13 @@ public class VideoStatusVidMutex {
     }
 
     public void withLock(Integer vid, Runnable action) {
+        withLock(vid, DEFAULT_WAIT_TIME_MILLIS, action);
+    }
+
+    public void withLock(Integer vid, long waitTimeMillis, Runnable action) {
         Objects.requireNonNull(action, "action 不能为空");
 
-        withLock(vid, () -> {
+        withLock(vid, waitTimeMillis, () -> {
             action.run();
             return null;
         });

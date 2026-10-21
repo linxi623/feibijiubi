@@ -1,6 +1,7 @@
 package com.feibijiubi.backend.mq;
 
 import com.feibijiubi.backend.config.VideoStatusProperties;
+import com.feibijiubi.backend.config.VideoStatusSchedulingConfig;
 import com.feibijiubi.backend.entity.VideoStatusOutbox;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
 import com.feibijiubi.backend.mapper.VideoStatusOutboxMapper;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
@@ -21,6 +23,13 @@ import java.util.List;
 public class VideoStatusOutboxRelay {
 
     private static final int MAX_PUBLISH_RETRIES = 10;
+
+    /**
+     * T06：每轮逐条领取。旧行为是“一次预领 outboxBatchSize 条再慢慢 publish”，
+     * 租约从第一条就开始计时，整批等待 confirm 时后面的消息会先过期。
+     * 改成每次只领 1 条、领完立刻发布，租约窗口只覆盖它自己。
+     */
+    private static final int CLAIM_ONE = 1;
 
     private final VideoStatusOutboxClaimService claimService;
     private final VideoStatusOutboxMapper outboxMapper;
@@ -42,10 +51,16 @@ public class VideoStatusOutboxRelay {
      * 与 {@code outbox-relay-enabled}（本实例是否承担投递）。任一为 false 时本方法直接返回，
      * 不领取、不恢复租约、不发布；消费者、批量落库与 dirty 恢复不受该开关影响，
      * 因此可以安全地把“停投”做成独立维护动作。</p>
+     *
+     * <p>T06 单轮预算：每轮最多处理 {@code outbox-batch-size} 条，并且在下一次领取之前
+     * 检查 {@code round-budget-ms}。预算用尽就结束本轮，未领取的事件仍在 Outbox 表里，
+     * 下一轮继续。预算只决定“还要不要拿新的一条”，已经开始的 publish 不会被强杀：
+     * 它由 {@code publish-confirm-timeout-seconds} 界定，之后照常走 markSent / markPending。</p>
      */
     @Scheduled(
             fixedDelayString =
-                    "${app.video-status.outbox-fixed-delay-ms:1000}"
+                    "${app.video-status.outbox-fixed-delay-ms:1000}",
+            scheduler = VideoStatusSchedulingConfig.RELAY_SCHEDULER_BEAN
     )
     public void relay() {
         if (!isRelayRoleEnabled()) {
@@ -54,10 +69,41 @@ public class VideoStatusOutboxRelay {
 
         heartbeat(VideoStatusTelemetry.Operation.RELAY_TICK);
         recoverExpiredLease();
-        List<VideoStatusOutbox> claimed = claimService.claimBatch();
-        for (VideoStatusOutbox outbox : claimed) {
-            publishOne(outbox);
+
+        long startedAt = System.nanoTime();
+        long budgetNanos = budgetNanos();
+        int maxPerRound = properties.getOutboxBatchSize();
+        int published = 0;
+
+        for (int index = 0; index < maxPerRound; index++) {
+            if (budgetExhausted(startedAt, budgetNanos)) {
+                log.warn(
+                        "视频统计 Outbox 投递达到单轮预算，本轮已处理 {} 条，"
+                                + "剩余事件保留在 Outbox 表等待下一轮: budgetMs={}",
+                        published,
+                        properties.getRoundBudgetMs()
+                );
+                break;
+            }
+
+            List<VideoStatusOutbox> claimed = claimService.claimBatch(CLAIM_ONE);
+            if (claimed.isEmpty()) {
+                // 没有待投递事件：本轮结束，不必把预算空转完。
+                break;
+            }
+            for (VideoStatusOutbox outbox : claimed) {
+                publishOne(outbox);
+                published++;
+            }
         }
+    }
+
+    private long budgetNanos() {
+        return TimeUnit.MILLISECONDS.toNanos(properties.getRoundBudgetMs());
+    }
+
+    private boolean budgetExhausted(long startedAt, long budgetNanos) {
+        return System.nanoTime() - startedAt >= budgetNanos;
     }
 
     /**
