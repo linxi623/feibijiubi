@@ -3,30 +3,105 @@ package com.feibijiubi.backend.mq;
 import com.feibijiubi.backend.common.RedisOperationException;
 import com.feibijiubi.backend.common.RetryableMessageException;
 import com.feibijiubi.backend.common.VideoStatusFlushDataException;
+import com.feibijiubi.backend.common.VideoStatusFlushDeferredException;
 import com.feibijiubi.backend.config.VideoStatusProperties;
 import com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusBatchFlushService;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusVidMutex;
 import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
 import com.feibijiubi.backend.utils.redis.operation.RedisSetOperations;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class VideoStatusBatchFlushScheduler {
+
+    /**
+     * T03 延后重试的常量退避：落在 1s..30s 区间内，先固定常量，
+     * 后续 T04/T05 再改成可配置项。常量只影响“多久重试一次”，不影响正确性。
+     */
+    static final long DEFER_BACKOFF_MILLIS = 2_000L;
+
+    /** 同一 vid 连续延后达到该次数后只升级为告警日志，仍然不隔离、不改写统计。 */
+    static final int DEFER_ALERT_BUDGET = 30;
+
+    /** 超过预算后每隔这么多次再打一条 ERROR，避免每 2 秒刷一条日志。 */
+    private static final int DEFER_ALERT_REPEAT = 30;
+
+    /** 本地退避表的硬上限：LRU 淘汰只影响效率（提前重试），不影响正确性。 */
+    static final int MAX_DEFERRAL_ENTRIES = 4096;
 
     private final VideoStatusProperties properties;
     private final RedisSetOperations redisSetOperations;
     private final VideoStatusBatchFlushService batchFlushService;
     private final VideoStatusConsumedEventMapper consumedEventMapper;
     private final VideoStatusVidMutex vidMutex;
+    private final Clock clock;
+
+    /**
+     * 每个 vid 的本地退避状态。只存在于当前实例内存：
+     * 重启/淘汰/多实例都会让退避“忘记”，代价只是提前再试一次，
+     * 因为 dirty 标记与 status 1 事件始终保留在 Redis/MySQL 中。
+     */
+    private final Map<Integer, DeferralState> deferrals =
+            Collections.synchronizedMap(
+                    new LinkedHashMap<>(16, 0.75f, true) {
+                        @Override
+                        protected boolean removeEldestEntry(
+                                Map.Entry<Integer, DeferralState> eldest
+                        ) {
+                            return size() > MAX_DEFERRAL_ENTRIES;
+                        }
+                    }
+            );
+
+    @Autowired
+    public VideoStatusBatchFlushScheduler(
+            VideoStatusProperties properties,
+            RedisSetOperations redisSetOperations,
+            VideoStatusBatchFlushService batchFlushService,
+            VideoStatusConsumedEventMapper consumedEventMapper,
+            VideoStatusVidMutex vidMutex
+    ) {
+        this(
+                properties,
+                redisSetOperations,
+                batchFlushService,
+                consumedEventMapper,
+                vidMutex,
+                Clock.systemUTC()
+        );
+    }
+
+    /**
+     * 测试注入可控时钟：延后退避用 {@link Clock#millis()} 判定，
+     * 测试可直接推进时间，不靠 sleep 碰运气。
+     */
+    public VideoStatusBatchFlushScheduler(
+            VideoStatusProperties properties,
+            RedisSetOperations redisSetOperations,
+            VideoStatusBatchFlushService batchFlushService,
+            VideoStatusConsumedEventMapper consumedEventMapper,
+            VideoStatusVidMutex vidMutex,
+            Clock clock
+    ) {
+        this.properties = properties;
+        this.redisSetOperations = redisSetOperations;
+        this.batchFlushService = batchFlushService;
+        this.consumedEventMapper = consumedEventMapper;
+        this.vidMutex = vidMutex;
+        this.clock = clock;
+    }
 
     @Scheduled(
             fixedDelayString =
@@ -48,6 +123,12 @@ public class VideoStatusBatchFlushScheduler {
                 log.error("dirty Set 包含非法 vid，已忽略: {}", rawVid);
                 continue;
             }
+            if (isBackingOff(vid)) {
+                // 退避未到期：不取 vid 锁、不查 SQL，只把 dirty 放回去，
+                // 避免“每 500ms 锁 + SELECT ... FOR UPDATE”的热循环。
+                requeueDirty(vid);
+                continue;
+            }
             flushOne(vid);
         }
     }
@@ -55,6 +136,8 @@ public class VideoStatusBatchFlushScheduler {
     private void flushOne(Integer vid) {
         try {
             vidMutex.withLock(vid, () -> flushLocked(vid));
+        } catch (VideoStatusFlushDeferredException e) {
+            defer(vid, e);
         } catch (VideoStatusFlushDataException e) {
             handleDataError(e);
         } catch (DataAccessException
@@ -73,7 +156,49 @@ public class VideoStatusBatchFlushScheduler {
                 vid,
                 properties.getFlushEventBatchSize()
         );
+        // 正常刷库成功：清空该 vid 的退避，下一次延后重新从预算开始计数。
+        deferrals.remove(vid);
         refreshDirtyMembership(vid);
+    }
+
+    /**
+     * 暂态延后：保留 dirty 标记、保留 status 1 事件、不改写统计，
+     * 只记录退避时间与次数；超过预算只升级日志告警，绝不转人工修复。
+     */
+    private void defer(Integer vid, VideoStatusFlushDeferredException error) {
+        DeferralState state = deferrals.computeIfAbsent(
+                vid,
+                key -> new DeferralState()
+        );
+        state.attempts++;
+        state.nextAttemptAtMillis = clock.millis() + DEFER_BACKOFF_MILLIS;
+        // 注意：defer 时绝不 SREM dirty，也绝不 markFlushRepairRequired。
+        requeueDirty(vid);
+
+        if (state.attempts <= DEFER_ALERT_BUDGET) {
+            log.warn(
+                    "视频统计刷库延后，等待依赖事件落库: vid={}, attempts={}, reason={}",
+                    vid,
+                    state.attempts,
+                    error.getReason()
+            );
+            return;
+        }
+        if ((state.attempts - DEFER_ALERT_BUDGET) % DEFER_ALERT_REPEAT == 0) {
+            log.error(
+                    "视频统计刷库延后已超过告警预算，事件仍保留待刷（不隔离、不篡改）: "
+                            + "vid={}, attempts={}, ids={}, reason={}",
+                    vid,
+                    state.attempts,
+                    error.getConsumedEventIds(),
+                    error.getReason()
+            );
+        }
+    }
+
+    private boolean isBackingOff(Integer vid) {
+        DeferralState state = deferrals.get(vid);
+        return state != null && clock.millis() < state.nextAttemptAtMillis;
     }
 
     private void handleDataError(VideoStatusFlushDataException error) {
@@ -83,6 +208,7 @@ public class VideoStatusBatchFlushScheduler {
                     error.getConsumedEventIds(),
                     error.getErrorSummary()
             );
+            deferrals.remove(vid);
             refreshDirtyMembership(vid);
             log.error(
                     "视频统计刷库数据异常，事件已转人工修复: vid={}, ids={}",
@@ -103,6 +229,9 @@ public class VideoStatusBatchFlushScheduler {
     private void refreshDirtyMembership(Integer vid) {
         if (consumedEventMapper.countPendingByVid(vid) > 0) {
             requeueDirty(vid);
+        } else {
+            // 该 vid 已无待刷事件：本地退避状态没有意义，及时释放内存。
+            deferrals.remove(vid);
         }
         // 当前 vid 已由 SPOP 取出。无待刷事件时无需 SREM：
         // 否则会误删 count 查询之后，无锁消费者刚刚 SADD 的新标记。
@@ -127,5 +256,10 @@ public class VideoStatusBatchFlushScheduler {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private static final class DeferralState {
+        private int attempts;
+        private long nextAttemptAtMillis;
     }
 }

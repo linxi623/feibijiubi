@@ -1,25 +1,13 @@
 package com.feibijiubi.backend.service.video;
 
-import com.feibijiubi.backend.config.VideoStatusProperties;
-import com.feibijiubi.backend.entity.VideoStatusConsumedEvent;
-import com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper;
-import com.feibijiubi.backend.mapper.VideoStatusMapper;
-import com.feibijiubi.backend.mq.VideoStatusBatchFlushScheduler;
-import com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusBatchFlushServiceImpl;
-import com.feibijiubi.backend.service.video.videostatus.VideoStatusVidMutex;
-import com.feibijiubi.backend.utils.redis.operation.RedisSetOperations;
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * T01 确定性故障基线：负增量落库顺序窗口。
+ * T03 确定性回归：负增量落库顺序窗口。
  *
  * <p>复现顺序（与 MQ 到达先后无关，只与“状态提交”先后有关）：</p>
  * <ol>
@@ -30,144 +18,91 @@ import static org.mockito.Mockito.*;
  *       MySQL 基线为 0 时该批次的非负守卫不满足。</li>
  * </ol>
  *
- * <p>读代码确认的现状（{@code VideoStatusBatchFlushServiceImpl} +
- * {@code VideoStatusBatchFlushScheduler}）：{@code applyBatchDelta} 影响 0 行即抛
- * {@code VideoStatusFlushDataException}，调度器把它转成
- * {@code markFlushRepairRequired}，于是合法的 -1 事件被永久隔离为 status 3，
- * 不会延后等待 +1 落库。这里断言的就是该缺陷，不是期望行为。</p>
+ * <p>T03 之后的期望行为：-1 被<b>延后</b>（事件保持 status 1、dirty 保留、统计不变），
+ * 而不是被隔离成 status 3；+1 状态提交完成后，延后的 -1 自动收敛，
+ * 最终 DB=Redis=0、两个合法事件均 FLUSHED(2)、0 次误隔离。</p>
  *
- * <p><b>T03 改造要求</b>：本用例必须改为收敛回归断言——延后/重试而不是隔离，
- * +1 落库后 DB=Redis=0、两个事件均 FLUSHED(2)、无 status 3。
- * 在 T03 完成前不得用 {@code @Disabled} 掩盖本用例。</p>
+ * <p>本类不再断言“当前缺陷”，也不再靠 sleep 或真实 MQ 碰运气：
+ * 使用 {@link VideoStatusFlushTestFixture} 的可控时钟，重复 100 轮，每轮独立状态。</p>
  */
 class VideoStatusFlushOrderingTests {
 
-    private static final int VID = 42;
+    private static final int VID = VideoStatusFlushTestFixture.DEFAULT_VID;
+    private static final int ROUNDS = 100;
 
-    private static VideoStatusConsumedEvent consumedEvent(
-            long id,
-            String eventId,
-            long delta,
-            int processStatus
-    ) {
-        VideoStatusConsumedEvent event = new VideoStatusConsumedEvent();
-        event.setId(id);
-        event.setEventId(eventId);
-        event.setVid(VID);
-        event.setEventType("PLAY");
-        event.setDelta(delta);
-        event.setProcessStatus(processStatus);
-        event.setConsumerRetryCount(0);
-        event.setLastAttemptAt(LocalDateTime.now());
-        event.setConsumedAt(LocalDateTime.now());
-        return event;
+    /** 30 秒大于规范允许的最大常量退避（1s..30s），推进后必然到期。 */
+    private static final long BEYOND_MAX_BACKOFF_MILLIS = 30_001L;
+
+    @Test
+    void pausedPlusOneCommitDefersLegalMinusOneThenConvergesInEveryRound() {
+        int deferredRounds = 0;
+        for (int round = 0; round < ROUNDS; round++) {
+            VideoStatusFlushTestFixture fixture =
+                    new VideoStatusFlushTestFixture();
+            fixture.addRow(VID, 0);
+            // +1：Redis 已成功，markRedisApplied 未提交（status 仍为 0，flush 看不到）
+            fixture.addEvent(1L, "PLAY", 1L, 0);
+            // -1：Redis 与状态提交均已完成（status 1，flush 可见）
+            fixture.addEvent(2L, "PLAY", -1L, 1);
+            fixture.markDirty(VID);
+
+            fixture.runScheduler();
+
+            assertEquals(1, fixture.statusOf(2L),
+                    "round=" + round + "：合法 -1 只能保持待刷，不允许隔离");
+            assertEquals(0, fixture.statusOf(1L),
+                    "round=" + round + "：暂停中的 +1 不能被本批选中");
+            assertEquals(0, fixture.playOf(VID),
+                    "round=" + round + "：不能把 DB 写成负数或部分落库");
+            assertTrue(fixture.repairedIds().isEmpty(),
+                    "round=" + round + "：0 次误隔离");
+            assertTrue(fixture.dirtyContains(VID),
+                    "round=" + round + "：延后必须保留 dirty 标记");
+            deferredRounds++;
+
+            // 释放窗口：+1 状态提交完成，依赖事件变得可见
+            fixture.setEventStatus(1L, 1);
+            fixture.advance(BEYOND_MAX_BACKOFF_MILLIS);
+            fixture.runScheduler();
+
+            assertEquals(2, fixture.statusOf(2L),
+                    "round=" + round + "：延后的 -1 必须自动收敛为 FLUSHED");
+            assertEquals(2, fixture.statusOf(1L),
+                    "round=" + round + "：+1 必须 FLUSHED");
+            assertEquals(0, fixture.playOf(VID),
+                    "round=" + round + "：最终 DB 必须为 0");
+            assertTrue(fixture.repairedIds().isEmpty(),
+                    "round=" + round + "：收敛过程中也不允许隔离");
+            assertFalse(fixture.dirtyContains(VID),
+                    "round=" + round + "：收敛后不应残留 dirty");
+        }
+        assertEquals(ROUNDS, deferredRounds);
     }
 
     @Test
-    void pausedPlusOneCommitQuarantinesLegalMinusOneInsteadOfDeferringIt() {
-        // +1：Redis 已成功，markRedisApplied 未提交（status 仍为 0，flush 看不到）
-        VideoStatusConsumedEvent pausedPlusOne =
-                consumedEvent(1L, "plus-one", 1L, 0);
-        // -1：Redis 与状态提交均已完成（status 1，flush 可见）
-        VideoStatusConsumedEvent committedMinusOne =
-                consumedEvent(2L, "minus-one", -1L, 1);
+    void minusOneWhoseDependencyNeverArrivesStaysPendingAcrossBudget() {
+        VideoStatusFlushTestFixture fixture =
+                new VideoStatusFlushTestFixture();
+        fixture.addRow(VID, 0);
+        // 依赖的 +1 永远停留在 RECEIVED(0)：status0 长期滞留
+        fixture.addEvent(1L, "PLAY", 1L, 0);
+        fixture.addEvent(2L, "PLAY", -1L, 1);
+        fixture.markDirty(VID);
 
-        var properties = new VideoStatusProperties();
-        properties.setAsyncEnabled(true);
-        properties.setSchedulingEnabled(true);
+        for (int attempt = 1; attempt <= 40; attempt++) {
+            fixture.runScheduler();
+            assertEquals(1, fixture.statusOf(2L),
+                    "attempt=" + attempt + "：仍不允许篡改为 0 或隔离");
+            assertEquals(0, fixture.statusOf(1L));
+            assertEquals(0, fixture.playOf(VID));
+            assertTrue(fixture.dirtyContains(VID),
+                    "attempt=" + attempt + "：dirty 必须一直保留");
+            fixture.advance(BEYOND_MAX_BACKOFF_MILLIS);
+        }
 
-        var sets = mock(RedisSetOperations.class);
-        when(sets.pop(anyString(), anyLong()))
-                .thenReturn(Set.of(String.valueOf(VID)));
-
-        var mutex = mock(VideoStatusVidMutex.class);
-        doAnswer(call -> {
-            ((Runnable) call.getArgument(1)).run();
-            return null;
-        }).when(mutex).withLock(eq(VID), any(Runnable.class));
-
-        var consumedMapper = mock(VideoStatusConsumedEventMapper.class);
-        // 真实 SQL 条件 process_status = 1：暂停中的 +1 不会被这一批选中
-        List<VideoStatusConsumedEvent> rows =
-                List.of(pausedPlusOne, committedMinusOne);
-        when(consumedMapper.selectPendingForUpdate(eq(VID), anyInt()))
-                .thenAnswer(call -> rows.stream()
-                        .filter(row -> row.getProcessStatus() == 1)
-                        .toList());
-        when(consumedMapper.markFlushRepairRequired(anyList(), anyString()))
-                .thenReturn(1);
-        // 隔离后该 vid 已无 status=1 事件，调度器不再重新加入 dirty
-        when(consumedMapper.countPendingByVid(VID)).thenReturn(0);
-
-        var statusMapper = mock(VideoStatusMapper.class);
-        // MySQL 基线为 0，非负守卫不满足 → 影响 0 行
-        when(statusMapper.applyBatchDelta(eq(VID), any())).thenReturn(0);
-
-        var flush = new VideoStatusBatchFlushServiceImpl(
-                consumedMapper,
-                statusMapper
-        );
-        var scheduler = new VideoStatusBatchFlushScheduler(
-                properties,
-                sets,
-                flush,
-                consumedMapper,
-                mutex
-        );
-
-        scheduler.flushDirtyVideos();
-
-        // 暂停中的 +1 从未进入本批：状态仍是 0，也不会被标记 FLUSHED
-        assertEquals(0, pausedPlusOne.getProcessStatus());
-        verify(consumedMapper, never()).markFlushed(List.of(1L));
-        // 当前缺陷 1：-1 在“+1 尚未提交”的窗口里被判定为数据异常并永久隔离
-        verify(consumedMapper).markFlushRepairRequired(
-                eq(List.of(2L)),
-                contains("非负")
-        );
-        // 当前缺陷 2：没有 markFlushed，也没有延后重试（不重新加入 dirty）
-        verify(consumedMapper, never()).markFlushed(anyList());
-        verify(sets, never()).add(anyString(), any(String[].class));
-        // 数据未被篡改：只尝试了一次批量更新（被守卫拒绝），没有改成 0 或部分落库
-        verify(statusMapper, times(1)).applyBatchDelta(eq(VID), any());
-        verify(statusMapper, never()).increasePlayTimes(anyInt());
-    }
-
-    @Test
-    void singleMinusOneBatchAtZeroBaselineNeverReachesFlushed() {
-        // 同一窗口的另一种表现：即使没有 +1 参与，-1 单独成批也只能落到 status 3
-        var properties = new VideoStatusProperties();
-        properties.setAsyncEnabled(true);
-        properties.setSchedulingEnabled(true);
-
-        var sets = mock(RedisSetOperations.class);
-        when(sets.pop(anyString(), anyLong()))
-                .thenReturn(Set.of(String.valueOf(VID)));
-        var mutex = mock(VideoStatusVidMutex.class);
-        doAnswer(call -> {
-            ((Runnable) call.getArgument(1)).run();
-            return null;
-        }).when(mutex).withLock(eq(VID), any(Runnable.class));
-
-        var consumedMapper = mock(VideoStatusConsumedEventMapper.class);
-        when(consumedMapper.selectPendingForUpdate(eq(VID), anyInt()))
-                .thenReturn(List.of(consumedEvent(7L, "only-minus", -1L, 1)));
-        when(consumedMapper.markFlushRepairRequired(anyList(), anyString()))
-                .thenReturn(1);
-        when(consumedMapper.countPendingByVid(VID)).thenReturn(0);
-
-        var statusMapper = mock(VideoStatusMapper.class);
-        when(statusMapper.applyBatchDelta(eq(VID), any())).thenReturn(0);
-
-        new VideoStatusBatchFlushScheduler(
-                properties,
-                sets,
-                new VideoStatusBatchFlushServiceImpl(consumedMapper, statusMapper),
-                consumedMapper,
-                mutex
-        ).flushDirtyVideos();
-
-        verify(consumedMapper).markFlushRepairRequired(eq(List.of(7L)), anyString());
-        verify(consumedMapper, never()).markFlushed(anyList());
+        assertTrue(fixture.repairedIds().isEmpty(),
+                "超过延后预算只允许告警，不允许转人工修复");
+        assertFalse(fixture.repairErrors().stream()
+                .anyMatch(error -> error.contains("非负")));
     }
 }

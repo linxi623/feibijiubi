@@ -217,6 +217,30 @@
         FOR UPDATE SKIP LOCKED
     </select>
 
+    <!--
+      T03 上限侧失败的唯一一次有界备选：同一 vid / status 1，改为负增量优先。
+      只解决“limit=1 时正增量优先永远选中同一个 +1、合法 -1 排不上队”的不收敛边界。
+      走同一 idx_video_status_consumed_pending (process_status, vid, id)，
+      在同一事务 / 同一 vid 锁内执行，不修改任何事件状态来挪队列。
+    -->
+    <select id="selectPendingNegativeFirstForUpdate"
+            resultMap="VideoStatusConsumedEventResultMap">
+        SELECT id,
+               event_id,
+               vid,
+               event_type,
+               delta,
+               process_status,
+               redis_applied_at
+        FROM video_status_consumed_event
+        WHERE vid = #{vid}
+          AND process_status = 1
+        ORDER BY CASE WHEN delta &lt; 0 THEN 0 ELSE 1 END,
+                 id
+        LIMIT #{limit}
+        FOR UPDATE SKIP LOCKED
+    </select>
+
     <update id="markFlushed">
         UPDATE video_status_consumed_event
         SET process_status = 2,
