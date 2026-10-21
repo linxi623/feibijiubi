@@ -1,6 +1,6 @@
 # 互动统计链路改进执行计划与 TODO
 
-> 状态：执行中；T01 已验收，T02 候选退回修正，T04 已准备但未合入。仅表中已完成且有证据的项代表已实现能力。
+> 状态：执行中；T01—T04 已验收并合入，接续 T05 可观测能力。仅表中已完成且有证据的项代表已实现能力；不代表批准生产上线。
 >
 > 范围：互动入口 → Outbox → RabbitMQ → Redis → 消费事件 → 批量落库 → 重建/补偿。
 > 原则：先验证正确性，再补恢复闭环，再治理稳定性，最后优化吞吐。
@@ -28,9 +28,9 @@
 | 完成 | 顺序/ID | 优先级 | 任务 | 前置依赖 | 当前状态 | 验收证据 |
 |---|---|---|---|---|---|---|
 | [x] | 01 / T01 | P0 | 冻结不变量、隔离测试与故障复现基线 | 无 | 已完成 | [基线报告 §8](video-status-improvement-baseline.md)：单测31通过；隔离25用例/1可选跳过；真实阻塞100轮 |
-| [ ] | 02 / T02 | P0 | 验证并修正非负 SQL、统一计数类型 | T01 | 进行中 | cn 子代理候选 6b95cf6；父验收38用例1失败，退回；[交接记录](video-status-improvement-handoff.md) |
-| [ ] | 03 / T03 | P0 | 修复负增量落库顺序窗口与错误分类 | T02 | 待开始 | — |
-| [ ] | 04 / T04 | P0 | 修复失效开关、明确运行角色及开关契约 | T01；按序在 T03 后交付 | 待验收 | global 子代理候选746c50e，父复跑19单测通过；依赖/切换演练未完成，未合入 |
+| [x] | 02 / T02 | P0 | 验证并修正非负 SQL、统一计数类型 | T01 | 已完成 | a9a3ad9；最终87单测通过/62隔离用例0失败1可选跳过；真实计数/事务回滚见下方验收记录 |
+| [x] | 03 / T03 | P0 | 修复负增量落库顺序窗口与错误分类 | T02 | 已完成 | c4d6e99；真实消费者阻塞100轮全部延后后收敛、0误隔离；真实上限LIMIT1拆批收敛 |
+| [x] | 04 / T04 | P0 | 修复失效开关、明确运行角色及开关契约 | T01；按序在 T03 后交付 | 已完成 | fe11d03；配置绑定/启动拒绝6用例，角色13用例，真实维护切换最终DB=Redis=6、4异步2同步 |
 | [ ] | 05 / T05 | P1 | 建立最小链路指标与积压告警 | T03、T04 | 待开始 | — |
 | [ ] | 06 / T06 | P1 | 隔离调度资源、限制单轮任务预算 | T05 | 待开始 | — |
 | [ ] | 07 / T07 | P1 | 完善 Outbox 发布、回写、租约处理 | T06 | 待开始 | — |
@@ -347,6 +347,19 @@ docker compose -f compose.test.yaml stop
 - T02 执行模型：`my-workbuddy/cn:deepseek-v4.1-flash`；global 模型交叉审查。父代理验收未通过，WIP 6b95cf6 仅保存在独立工作树。
 - T04 由 global 模型提前准备（计划允许的 T01 后独立项），候选746c50e。19 个单测父复验通过，但依赖/演练未满足，不勾选完成、不合入。
 - 失败证据、待修点、候选路径与下一步见 [阶段交接](video-status-improvement-handoff.md)。后续必须修复再验收，不能绕过 T02/T03 开展吞吐改造。
+
+### T02—T04 最终验收记录（2026-10-21）
+
+- 执行：cn/global DeepSeek v4.1 Flash 子代理，父代理多轮退回、修正并独立复跑；合入提交 T02 `a9a3ad9`，T03 `c4d6e99`，T04 `fe11d03`。初轮失败与候选保存在阶段交接，不隐去失败历史。
+- 环境：Windows 本机、Java21.0.9/编译目标17；独立 `compose.test.yaml`，MySQL8.4.11，Redis7.4、RabbitMQ4；默认 SQL mode 见基线报告。未使用正式资源、未输出应用凭证。
+- 命令1：`./mvnw clean '-Dtest=*Tests,!BackendApplicationTests,!VideoStatusIsolatedIntegrationTests,!VideoStatusSqlBaselineTests,!VideoStatusCounterIsolatedTests,!VideoStatusLuaCounterTests,!VideoStatusCounterTransactionTests' test`，87 tests，0 failures/errors/skipped。
+- 命令2：`./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusSqlBaselineTests,VideoStatusCounterIsolatedTests,VideoStatusLuaCounterTests,VideoStatusCounterTransactionTests,VideoStatusIsolatedIntegrationTests' test`，62 tests，0 failures/errors，1 skipped（可选benchmark）。父代理日志 `/tmp/p0-all-unit.log`、`/tmp/p0-all-it.log`，可用相同命令复跑；临时日志不作为唯一长期证据，固定断言在测试源码中。
+- 核心证据：30亿 DB/Redis→Java→VO与个人获赞；Long.MAX上界与>2^53精确Lua；校验失败current/processed/dirty/hot不变；真实事务中计数已更新后markFlushed抛错/0行均回滚；同步点赞关系在上限/下限拒绝后回滚。
+- 顺序：真实消费者latch阻塞100轮，`deferred=100/quarantined=0`，释放后DB=Redis=0且两个事件FLUSHED。父代理额外发现并修正上限反向窗口、求和中间溢出、LIMIT1正优先饥饿；mock各100轮与真实MySQL负优先备选均收敛。重复、门闩、无锁快路径、并发flush回归通过。
+- 配置：relay=false不领取/恢复/发布；真实绑定及@PostConstruct坏参数启动失败，不连接基础设施。维护演练停止输入并排空，再sync写DB、持锁重建派生缓存、恢复async；最终4异步+2同步，DB=Redis=6，无额外Outbox或重复事件。没有新增生产热切换/强制重建入口。
+- 设计：不改DDL；SQL用DECIMAL守卫、计数Long、Lua字符串精确算术；flush BigInteger求净量，边界不足延后2s、4096条本地LRU、超过预算只告警、不误隔离。上限失败最多一次负优先锁定备选；dirty不SREM、vid锁/无TTL token门闩保留。
+- 风险/回滚：先盘点>Long与>Integer（含聚合）再部署；T02/T03配套、旧新不兼容消费者不得混跑。不要删除幂等或门闩；优先暂停并向前修复，不把旧版误隔离当作安全回滚。任意Redis运行时故障/数据丢失、进程崩溃与大规模性能仍不在本阶段保证范围，交T09/T12/T16；持续边界不足需T05指标与T10处置。
+- 文档：`AGENTS.md`/`CLAUDE.md`保持一致，`docs/api.md`及三篇对应教程同步。下一任务T05，P0实现出口已通过，但不批准自动上线。
 
 ### 计划变更记录
 

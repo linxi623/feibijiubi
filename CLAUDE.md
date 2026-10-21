@@ -133,6 +133,32 @@ The flow is:
    takes over after a crash); use noeviction. Dirty refresh only re-adds pending vids, never removes
    a marker concurrently added by an unlocked consumer. Recovery remains required.
 
+### Accepted correctness and runtime contracts (T02–T04)
+
+- All eight video counters and personal received-like totals use `Long`, range `0..Long.MAX_VALUE`;
+  identifiers remain `Integer`. SQL computes guarded updates with `DECIMAL(20,0)` (no unsigned
+  subtraction or blanket signed cast); Redis Lua validates canonical decimal strings before exact
+  `HINCRBY`, without converting counters through floating point. Bad cached fields raise explicit
+  errors, not false zeroes. JSON counters remain numbers: clients need lossless parsing above 2^53-1.
+- Flush uses `BigInteger` for batch net sums. A temporary lower/upper bound violation defers with a
+  bounded local 2-second backoff; repeated deferral alerts but never silently clears or quarantines
+  legal events. On an upper-bound/net-overflow batch it tries at most one negative-first locked
+  batch, preserving progress with batch size 1. Unknown types and missing statistics rows still
+  enter controlled repair. Statistics and FLUSHED markers remain one MySQL transaction.
+- `outbox-relay-enabled` defaults true and is enforced: false skips lease recovery, claim and
+  publish, independently of listener/flush. Startup validates batch/duration/retry/replay parameters
+  and logs the local role matrix. Async without scheduling is legal for maintenance/split roles,
+  but needs another flusher. Switching sync/async requires stopped ingress, drained events/queues,
+  and coordinated cache rebuild; it is not a supported live hot-switch operation.
+- No schema change in T02–T04. Before rollout, audit counters above Long.MAX and rollback risks
+  above Integer.MAX; deploy compatible writers together. Do not deploy T02 without T03. Redis
+  validation failure causes no writes; arbitrary Redis runtime failures/data loss are NOT covered
+  by a generic rollback or exactly-once promise.
+
+Guides: `docs/tutorial/video-status-counter-range.md`, `video-status-flush-defer.md`, and
+`video-status-runtime-roles.md` (all under `docs/tutorial/`). Acceptance progress and remaining
+recovery/observability work: `docs/tutorial/video-status-improvement-plan.md`.
+
 Consumer retry/dead-letter behavior is driven by the typed exceptions in `common/`:
 `RetryableMessageException`, `NonRetryableMessageException`, `RepairRequiredMessageException`.
 

@@ -61,6 +61,15 @@ http://localhost:8080
 
 > 当前全局异常处理器没有显式设置 HTTP Status，因此已处理的业务异常通常仍返回 HTTP 200；调用方应主要根据响应 JSON 中的 `code` 判断结果。
 
+#### 视频互动统计计数与一致性（T02—T04）
+
+- 视频八项计数（详情、列表已有对应字段、管理员详情）以及用户 `loveCount` 使用非负 64 位整数，范围 `0..9223372036854775807`；`vid` / `uid` 等标识类型不变。
+- JSON 仍输出 **number**，未改为 string。`3000000000` 可精确传输；超过 `9007199254740991` 时前端必须使用无损 JSON 解析/BigInt，不能先用默认 `JSON.parse` 转成 Number 再转 BigInt。
+- 主要 HTTP 查询仍读 MySQL 最终统计，不承诺所有接口实时；异步事件在消费/刷库期间可能尚未体现在响应里。Redis 坏字段不再被解释为 0，明确返回数据错误。
+- 同步取消或上限拒绝会回滚同事务内的关系更新。异步刷库的暂态下界/上界不足保留事件并延后，不强制清零，不立即隔离合法取消。
+- `outbox-relay-enabled=false` 仅停止本实例 Outbox 领取/投递，不停止消费和落库。运行角色合法性、启动校验和同步/异步维护切换见 [角色契约](tutorial/video-status-runtime-roles.md)；没有新增切换或强制重建 HTTP 接口。
+- 部署/回滚范围盘点见 [计数范围](tutorial/video-status-counter-range.md)，时序与退避见 [刷库延后](tutorial/video-status-flush-defer.md)。T02/T03 必须配套部署，不能混跑不兼容写入者。
+
 ### 1.5 常见业务状态码
 
 | code | 说明 |

@@ -183,9 +183,7 @@ docker compose -f compose.test.yaml up -d --wait
     → `66 tests, 0 failures, 0 errors, 0 skipped`。
 - 隔离 IT：`15 tests, 0 failures, 1 skipped`（可选 benchmark），输出
   `T03 blocked window rounds=100 deferred=100 quarantined=0`。
-  **该结果来自 §2.1 之前的上一轮执行**；本轮（新增备选查询）只做了单测与 mapper XML 结构校验，
-  **未重跑隔离 IT**，也**未跑任何 MQ/真实链路**，不能据此宣称 `selectPendingNegativeFirstForUpdate`
-  已在真实 MySQL 上验证。父代理整合 T04 时需要补跑隔离 IT。
+  此为子代理上一轮结果。父代理最终补跑：87 个无基础设施用例全通过；62 个隔离用例中61通过、1个可选跳过。真实 MySQL 新用例 `upperBoundarySplitBatchMakesProgressUsingRealNegativeFirstQuery` 验证上限依赖未确认时延后、依赖确认后 LIMIT=1 负优先备选先落库，再刷 +1，两个事件都 FLUSHED，DB=Redis=Long.MAX。100轮真实消费者下界窗口也全部收敛。
 
 ## 6. 已知限制与后续任务
 
@@ -215,5 +213,5 @@ docker compose -f compose.test.yaml up -d --wait
 - 撤销 §2.1 时删除 `selectPendingNegativeFirstForUpdate`（接口 + XML）与 `flushNegativeFirstFallbackOnce`，
   `classifyZeroRowUpdate` 的上界分支恢复为直接抛 `VideoStatusFlushDeferredException`；
   回滚后 `limit = 1` + 上界边界会重新退化为“永不收敛的延后”，需同时回退 `flushEventBatchSize` 边界场景的期望；
-- 回滚不清空 dirty、不修改事件状态、不改动 `video_status`，因此不会造成重复计数；
-  已经处于 status 1 的延后事件在回滚后会重新走旧的隔离分支（这是回滚的已知代价，需观察 status 3 数量）。
+- 以上描述仅用于理解撤销代码的影响，不构成安全上线回滚许可。旧版会再次误隔离合法事件；存在延后事件时，优先停投/停刷保留证据并向前修复。必须排空或协调处置、统一停旧启新，并确认兼容后才可撤销。
+- 不清空 dirty、事件、processed 或门闩；不能仅凭没有删数据就承诺任意回滚不会重复计数。
