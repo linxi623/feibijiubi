@@ -143,4 +143,46 @@ class VideoStatusOutboxRelayTests {
         verifyNoInteractions(claimService, publisher);
         verify(outboxMapper, never()).recoverExpiredSending(any());
     }
+
+    @Test
+    void relayFlagFalseStopsClaimRecoverAndPublishButKeepsAsyncOn() {
+        // T04：outbox-relay-enabled 是独立的“停投”开关。
+        // async=true 时仍可只停投递：本实例不领取、不恢复租约、不发布，
+        // 消费与批量落库由其他组件继续承担（见 VideoStatusRuntimeRoleContractTests）。
+        var claimService = mock(VideoStatusOutboxClaimService.class);
+        var outboxMapper = mock(VideoStatusOutboxMapper.class);
+        var publisher = mock(VideoStatusEventPublisher.class);
+        var jsonUtils = mock(JsonUtils.class);
+        var properties = properties();
+        assertTrue(properties.isAsyncEnabled());
+        properties.setOutboxRelayEnabled(false);
+
+        new VideoStatusOutboxRelay(claimService, outboxMapper, publisher,
+                properties, jsonUtils).relay();
+
+        verifyNoInteractions(claimService, publisher, jsonUtils);
+        verify(outboxMapper, never()).recoverExpiredSending(any());
+        verify(outboxMapper, never()).markSent(anyString(), anyString(), any());
+        verify(outboxMapper, never()).markPending(anyString(), anyString(), any(), any());
+        verify(outboxMapper, never()).markFailed(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void relayFlagDefaultsToTrueSoExistingDeploymentsKeepPublishing() {
+        // 默认值必须是 true：仓库内 application.yml 未显式配置该键时，
+        // 历史行为（async=true 即投递）不能被一个新增开关默默关掉。
+        assertTrue(new VideoStatusProperties().isOutboxRelayEnabled());
+
+        var claimService = mock(VideoStatusOutboxClaimService.class);
+        var outboxMapper = mock(VideoStatusOutboxMapper.class);
+        var publisher = mock(VideoStatusEventPublisher.class);
+        var jsonUtils = mock(JsonUtils.class);
+        when(claimService.claimBatch()).thenReturn(List.of());
+
+        new VideoStatusOutboxRelay(claimService, outboxMapper, publisher,
+                properties(), jsonUtils).relay();
+
+        verify(claimService).claimBatch();
+        verify(outboxMapper).recoverExpiredSending(any(LocalDateTime.class));
+    }
 }

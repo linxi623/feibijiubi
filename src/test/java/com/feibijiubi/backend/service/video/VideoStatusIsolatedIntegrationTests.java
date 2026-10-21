@@ -5,7 +5,9 @@ import com.feibijiubi.backend.config.*;
 import com.feibijiubi.backend.event.*;
 import com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper;
 import com.feibijiubi.backend.mq.*;
+import com.feibijiubi.backend.service.impl.video.UserVideoServiceImpl;
 import com.feibijiubi.backend.service.impl.video.videostatus.*;
+import com.feibijiubi.backend.service.video.UserVideoService;
 import com.feibijiubi.backend.service.video.videostatus.*;
 import com.feibijiubi.backend.utils.JsonUtils;
 import com.feibijiubi.backend.utils.rabbitmq.RabbitConstants;
@@ -102,7 +104,8 @@ class VideoStatusIsolatedIntegrationTests {
             VideoStatusEventFingerprintServiceImpl.class, VideoStatusEventConsumer.class,
             VideoStatusMessageForwarder.class, VideoStatusEventPublisher.class,
             VideoStatusOutboxClaimService.class, VideoStatusOutboxRelay.class,
-            VideoStatusBatchFlushScheduler.class, RedisUtils.class, JsonUtils.class,
+            UserVideoServiceImpl.class,
+            RedisUtils.class, JsonUtils.class,
             RedisHashOperations.class, RedisSetOperations.class})
     static class TestApplication {
         @Bean(destroyMethod = "shutdown")
@@ -110,6 +113,56 @@ class VideoStatusIsolatedIntegrationTests {
             Config config = new Config();
             config.useSingleServer().setAddress("redis://127.0.0.1:16379");
             return Redisson.create(config);
+        }
+
+        /** T03：可推进时钟，用来验证延后退避到期，不靠 sleep。 */
+        @Bean
+        MutableClock videoStatusFlushClock() {
+            return new MutableClock();
+        }
+
+        @Bean
+        VideoStatusBatchFlushScheduler videoStatusBatchFlushScheduler(
+                VideoStatusProperties properties,
+                RedisSetOperations redisSetOperations,
+                VideoStatusBatchFlushService batchFlushService,
+                VideoStatusConsumedEventMapper consumedEventMapper,
+                VideoStatusVidMutex vidMutex,
+                MutableClock clock
+        ) {
+            return new VideoStatusBatchFlushScheduler(
+                    properties,
+                    redisSetOperations,
+                    batchFlushService,
+                    consumedEventMapper,
+                    vidMutex,
+                    clock
+            );
+        }
+    }
+
+    /** 可控时钟：每轮窗口推进固定毫秒数，使延后退避确定到期。 */
+    static final class MutableClock extends java.time.Clock {
+        private final java.util.concurrent.atomic.AtomicLong millis =
+                new java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis());
+
+        void advance(Duration duration) {
+            millis.addAndGet(duration.toMillis());
+        }
+
+        @Override
+        public java.time.ZoneId getZone() {
+            return java.time.ZoneOffset.UTC;
+        }
+
+        @Override
+        public java.time.Clock withZone(java.time.ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public java.time.Instant instant() {
+            return java.time.Instant.ofEpochMilli(millis.get());
         }
     }
 
@@ -119,7 +172,11 @@ class VideoStatusIsolatedIntegrationTests {
     @Autowired VideoStatusConsumptionService consumption;
     @Autowired VideoStatusEventFingerprintService fingerprint;
     @Autowired VideoStatusBatchFlushScheduler scheduler;
+    @Autowired com.feibijiubi.backend.service.video.videostatus.VideoStatusBatchFlushService flushService;
+    @Autowired MutableClock flushClock;
     @Autowired VideoStatusOutboxRelay relay;
+    @Autowired UserVideoService userVideoService;
+    @Autowired VideoStatusProperties properties;
     @Autowired TransactionTemplate tx;
     @Autowired RabbitTemplate rabbit;
     @Autowired ObjectMapper json;
@@ -153,6 +210,32 @@ class VideoStatusIsolatedIntegrationTests {
                 RabbitConstants.DEAD_QUEUE)) admin.purgeQueue(queue, false);
     }
 
+    @Test
+    void upperBoundarySplitBatchMakesProgressUsingRealNegativeFirstQuery() {
+        jdbc.update("UPDATE video_status SET play_times=? WHERE vid=?", Long.MAX_VALUE, vid);
+        rebuild.ensureInitialized(vid);
+        var minus = new VideoStatusChangedEvent(UUID.randomUUID().toString(), vid,
+                VideoStatusEventType.PLAY, -1L, -1D, LocalDateTime.now(), 2, null);
+        consumption.register(minus, fingerprint.hash(minus));
+        assertEquals(VideoStatusService.ApplyResult.APPLIED, stats.apply(minus));
+        var plus = event();
+        applyAndMark(plus);
+        assertEquals(Long.MAX_VALUE, current());
+        assertThrows(com.feibijiubi.backend.common.VideoStatusFlushDeferredException.class,
+                () -> mutex.withLock(vid, () -> flushService.flushOneVideo(vid, 1)));
+        assertEquals(Long.MAX_VALUE, baseline());
+        assertEquals(1, consumedMapper.selectByEventId(plus.eventId()).getProcessStatus());
+        consumption.markRedisApplied(minus.eventId());
+        mutex.withLock(vid, () -> flushService.flushOneVideo(vid, 1));
+        assertEquals(Long.MAX_VALUE - 1, baseline());
+        assertEquals(2, consumedMapper.selectByEventId(minus.eventId()).getProcessStatus());
+        assertEquals(1, consumedMapper.selectByEventId(plus.eventId()).getProcessStatus());
+        mutex.withLock(vid, () -> flushService.flushOneVideo(vid, 1));
+        assertEquals(Long.MAX_VALUE, baseline());
+        assertEquals(Long.MAX_VALUE, current());
+        assertEquals(2, consumedMapper.selectByEventId(plus.eventId()).getProcessStatus());
+    }
+
     /** 每轮窗口的独立 Oracle：新用户/新视频/play_times=0，Redis 键从未被写过。 */
     int freshVideo() {
         String username = "it-window-" + UUID.randomUUID();
@@ -160,6 +243,21 @@ class VideoStatusIsolatedIntegrationTests {
         int uid = jdbc.queryForObject("SELECT id FROM users WHERE username=?", Integer.class, username);
         jdbc.update("INSERT INTO video(uid,title,mc_id,sc_id,cover_url,cover_key,video_url,video_key) "
                 + "VALUES (?, 'isolated-test', 'test', 'test', '', '', '', '')", uid);
+        int newVid = jdbc.queryForObject("SELECT MAX(vid) FROM video WHERE uid=?", Integer.class, uid);
+        jdbc.update("INSERT INTO video_status(vid,play_times) VALUES (?,0)", newVid);
+        return newVid;
+    }
+
+    /**
+     * 维护演练用视频：已发布（status=1）且 duration&gt;0，真实 {@link UserVideoService}
+     * 的异步入口与同步基线入口都能通过生产校验。
+     */
+    int freshPublishedVideo() {
+        String username = "it-drill-" + UUID.randomUUID();
+        jdbc.update("INSERT INTO users(username,password_hash,nickname) VALUES (?, 'test', 'test')", username);
+        int uid = jdbc.queryForObject("SELECT id FROM users WHERE username=?", Integer.class, username);
+        jdbc.update("INSERT INTO video(uid,title,mc_id,sc_id,cover_url,cover_key,video_url,video_key,duration,status) "
+                + "VALUES (?, 'isolated-drill', 'test', 'test', '', '', '', '', 12.5, 1)", uid);
         int newVid = jdbc.queryForObject("SELECT MAX(vid) FROM video WHERE uid=?", Integer.class, uid);
         jdbc.update("INSERT INTO video_status(vid,play_times) VALUES (?,0)", newVid);
         return newVid;
@@ -183,6 +281,78 @@ class VideoStatusIsolatedIntegrationTests {
 
     long baseline() {
         return jdbc.queryForObject("SELECT play_times FROM video_status WHERE vid=?", Long.class, vid);
+    }
+
+    // ---------------------------------------------------------------- T04 维护演练探针
+
+    int outboxRows(Integer forVid) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM video_status_outbox WHERE aggregate_id=?",
+                Integer.class, forVid);
+    }
+
+    int pendingOutbox(Integer forVid) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM video_status_outbox "
+                + "WHERE aggregate_id=? AND status IN (0,1)", Integer.class, forVid);
+    }
+
+    int outboxSent(Integer forVid) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM video_status_outbox "
+                + "WHERE aggregate_id=? AND status=2", Integer.class, forVid);
+    }
+
+    int consumedRows(Integer forVid) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM video_status_consumed_event WHERE vid=?",
+                Integer.class, forVid);
+    }
+
+    int unfinishedConsumed(Integer forVid) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM video_status_consumed_event "
+                + "WHERE vid=? AND process_status IN (0,1)", Integer.class, forVid);
+    }
+
+    int consumedFlushed(Integer forVid) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM video_status_consumed_event "
+                + "WHERE vid=? AND process_status=2", Integer.class, forVid);
+    }
+
+    /**
+     * 维护窗口“排空”：投递角色把本 vid 的 Outbox 0/1 全部发布，消费者把事件推进到 1，
+     * 落库调度推进到 2，最后确认主/重试/死信队列 ready 与 unacked 都为 0。
+     * 只针对本测试 vid，不清理其他用例或部署的数据。
+     */
+    void drainOwnPipeline() throws Exception {
+        await(() -> {
+            relay.relay();
+            return pendingOutbox(vid) == 0 && queuesAreIdle();
+        });
+        await(() -> {
+            scheduler.flushDirtyVideos();
+            return unfinishedConsumed(vid) == 0;
+        });
+        await(this::queuesAreIdle);
+        assertEquals(0, pendingOutbox(vid), "排空后本 vid 不得残留 Outbox status=0/1");
+        assertEquals(0, unfinishedConsumed(vid), "排空后本 vid 不得残留 process_status=0/1");
+    }
+
+    /**
+     * 维护演练的重建步骤：持本 vid 锁 → 确认没有未完成事件 → 删除本测试 vid 的 current 派生缓存 →
+     * 调用真实 {@code VideoStatusRebuildService#ensureInitialized} 从 DB 基线 + 已确认事件重建。
+     *
+     * <p>这是<b>测试内</b>的维护动作，不是生产能力：生产没有受控强制重建入口（见运行角色文档 §7）。</p>
+     */
+    void rebuildCurrentCacheUnderLock() {
+        mutex.withLock(vid, () -> {
+            assertEquals(0, pendingOutbox(vid), "持锁时必须确认没有未投递 Outbox");
+            assertEquals(0, unfinishedConsumed(vid), "持锁时必须确认没有未落库消费事件");
+            String currentKey = RedisKeyUtils.videoStatus(vid);
+            assertTrue(Boolean.TRUE.equals(redis.delete(currentKey)),
+                    "删除前 current 必须存在；且只删除本测试 vid 的派生缓存");
+            assertFalse(Boolean.TRUE.equals(redis.hasKey(currentKey)));
+            // Redisson 可重入锁：ensureInitialized 在同一线程再次获取同一把 vid 锁。
+            rebuild.ensureInitialized(vid);
+            assertFalse(Boolean.TRUE.equals(redis.hasKey(RedisKeyUtils.videoStatusRebuildGate(vid))),
+                    "重建必须释放门闩");
+        });
     }
 
     void await(BooleanSupplier condition) throws Exception {
@@ -377,7 +547,7 @@ class VideoStatusIsolatedIntegrationTests {
     }
 
     /**
-     * T01 真实阻塞窗口：不再用“手工 stats.apply 但不 mark”构造中间态，而是让真实 Rabbit 消费者
+     * T03 真实阻塞窗口：不再用“手工 stats.apply 但不 mark”构造中间态，而是让真实 Rabbit 消费者
      * 在 {@code consumption.markRedisApplied} 之前被 latch 挡住（spy 的 doAnswer 阻塞真实方法调用），
      * 主线程等到 latch 确认后才继续跑 -1 与 flush。
      *
@@ -387,18 +557,19 @@ class VideoStatusIsolatedIntegrationTests {
      *       markRedisApplied 阻塞点并 countDown；</li>
      *   <li>窗口内 Oracle：Redis=1，+1 事件仍为 RECEIVED(0)，状态提交确实尚未发生；</li>
      *   <li>主线程走 -1 的完整消费链（Redis=0，-1 事件=1，先于 +1 可见）；</li>
-     *   <li>flush 只看到 -1，DB 基线 0；</li>
-     *   <li>释放阻塞，+1 状态提交完成；再次 flush 后按实际分支断言。</li>
+     *   <li>flush 只看到 -1，DB 基线 0；T03 要求此时<b>延后</b>（status 1 + dirty 保留），
+     *       不允许隔离为 status 3，也不允许把统计改成 0；</li>
+     *   <li>释放阻塞使 +1 状态提交完成，推进退避时钟后再次 flush：
+     *       两个合法事件均 FLUSHED(2)，DB=Redis=0，0 次误隔离。</li>
      * </ol>
      *
-     * <p>当前隔离 MySQL 默认（{@code BIGINT UNSIGNED} + 严格模式）下 -1 触发 1690 →
-     * {@code DataAccessException}，事件保持 status 1 并重新入 dirty，+1 可见后同批净零收敛。
-     * 本用例保留分支 A（status 3 隔离）的精确断言，但不声称该分叉必然发生或永久存在。</p>
+     * <p>退避使用 {@link MutableClock} 推进（31 秒 &gt; 规范允许的最大常量退避），
+     * 不依赖真实等待；延后时已把 dirty 放回，所以本轮不需要手工补 SADD。</p>
      */
     @Test
-    void realConsumerBlockedBeforeMarkRedisAppliedKeepsLegalMinusOnePending() throws Exception {
-        int pendingBranch = 0;
-        int quarantinedBranch = 0;
+    void realConsumerBlockedBeforeMarkRedisAppliedDefersLegalMinusOneThenConverges() throws Exception {
+        int deferredRounds = 0;
+        int quarantined = 0;
         for (int round = 0; round < WINDOW_ROUNDS; round++) {
             vid = freshVideo();
             var plus = event();
@@ -430,40 +601,41 @@ class VideoStatusIsolatedIntegrationTests {
 
                 scheduler.flushDirtyVideos();
                 assertEquals(0, baseline(), "非负守卫不允许把 DB 写成负数或部分落库");
-                int firstAttempt = consumedMapper.selectByEventId(minus.eventId()).getProcessStatus();
-                assertNotEquals(2, firstAttempt, "合法的 -1 事件不允许在未落库时被标记为 FLUSHED");
-                assertTrue(firstAttempt == 1 || firstAttempt == 3,
-                        "首轮 flush 后 -1 只能保持待刷(1)或被隔离(3)，实际=" + firstAttempt);
+                assertEquals(1, consumedMapper.selectByEventId(minus.eventId()).getProcessStatus(),
+                        "T03：合法的 -1 只能延后，不允许隔离为 status 3，round=" + round);
+                assertEquals(0, consumedMapper.selectByEventId(plus.eventId()).getProcessStatus(),
+                        "暂停中的 +1 不能被本批选中，round=" + round);
+                assertTrue(Boolean.TRUE.equals(redis.opsForSet().isMember(
+                                RedisKeyUtils.dirtyVideo(), String.valueOf(vid))),
+                        "T03：延后必须保留 dirty 标记，round=" + round);
+                deferredRounds++;
 
                 release.countDown();
                 await(() -> consumedMapper.selectByEventId(plus.eventId()).getProcessStatus() == 1);
                 assertEquals(0, current(), "释放窗口只提交状态，不再改动 Redis（-1 已应用）");
-                // flush 触发不是本用例的被测对象：显式放回 dirty，保证下一次刷库一定执行。
-                redis.opsForSet().add(RedisKeyUtils.dirtyVideo(), String.valueOf(vid));
-                scheduler.flushDirtyVideos();
 
-                if (firstAttempt == 3) {
-                    quarantinedBranch++;
-                    assertEquals(1, baseline(), "分支 A：-1 被隔离后 +1 单独落库，DB=1");
-                    assertEquals(0, current());
-                    assertEquals(3, consumedMapper.selectByEventId(minus.eventId()).getProcessStatus());
-                    assertEquals(2, consumedMapper.selectByEventId(plus.eventId()).getProcessStatus());
-                } else {
-                    pendingBranch++;
-                    assertEquals(0, baseline(), "分支 B：同批净零后 DB 保持 0");
-                    assertEquals(0, current());
-                    assertEquals(2, consumedMapper.selectByEventId(minus.eventId()).getProcessStatus(),
-                            "分支 B：-1 必须延后到 +1 可见后完成状态迁移");
-                    assertEquals(2, consumedMapper.selectByEventId(plus.eventId()).getProcessStatus());
-                }
+                // 退避到期后自动收敛：不手工补 SADD，验证 defer 时保留了 dirty
+                flushClock.advance(Duration.ofSeconds(31));
+                scheduler.flushDirtyVideos();
+                assertEquals(0, baseline(), "同批净零后 DB 保持 0");
+                assertEquals(0, current());
+                assertEquals(2, consumedMapper.selectByEventId(minus.eventId()).getProcessStatus(),
+                        "延后的 -1 必须在 +1 可见后自动收敛，round=" + round);
+                assertEquals(2, consumedMapper.selectByEventId(plus.eventId()).getProcessStatus(),
+                        "+1 必须 FLUSHED，round=" + round);
+                quarantined += jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM video_status_consumed_event "
+                                + "WHERE vid=? AND process_status=3",
+                        Integer.class, vid);
             } finally {
                 release.countDown();
             }
         }
-        assertEquals(WINDOW_ROUNDS, pendingBranch + quarantinedBranch);
+        assertEquals(WINDOW_ROUNDS, deferredRounds);
+        assertEquals(0, quarantined, "合法事件不允许被误隔离");
         System.out.printf(Locale.ROOT,
-                "T01 blocked window rounds=%d pendingBranch=%d quarantinedBranch=%d%n",
-                WINDOW_ROUNDS, pendingBranch, quarantinedBranch);
+                "T03 blocked window rounds=%d deferred=%d quarantined=%d%n",
+                WINDOW_ROUNDS, deferredRounds, quarantined);
     }
 
     @Test
@@ -553,5 +725,157 @@ class VideoStatusIsolatedIntegrationTests {
         await(this::queuesAreIdle);
         scheduler.flushDirtyVideos();
         assertFalse(Boolean.TRUE.equals(redis.opsForSet().isMember(RedisKeyUtils.dirtyVideo(), "" + vid)));
+    }
+
+    /**
+     * T04 维护演练（受控 sync → async → sync），全部走真实开关与真实入口：
+     * {@code properties} 是应用实际注入的 {@link VideoStatusProperties} 实例，
+     * 业务写入走真实 {@link UserVideoService#increasePlayCount(Integer)}（async=true 时写 Outbox，
+     * async=false 时同步落 DB），不是测试自己拼 SQL 模拟。
+     *
+     * <p>演练顺序（每步都有断言，不靠 sleep）：</p>
+     * <ol>
+     *   <li>异步入口写 Outbox，不碰 DB/Redis；relay + 真实消费者 + flush 收敛；</li>
+     *   <li>停输入，并用真实 {@code outbox-relay-enabled=false} 证明停投：事件留在 Outbox、队列为空；
+     *       恢复开关后排空；</li>
+     *   <li>切 sync 前显式排空（Outbox 0/1=0、消费 0/1=0、队列 0、本 vid 不在 dirty）；</li>
+     *   <li>{@code async-enabled=false} 后用真实同步入口写 DB 基线，验证 Redis 派生值确实落后；</li>
+     *   <li>持 vid 锁 + 确认无未完成事件，删除本测试自己的 current，再 ensureInitialized 重建；</li>
+     *   <li>恢复 async，下一条事件继续累加：无遗漏、无重复、不被旧缓存覆盖；</li>
+     *   <li>再走一轮 sync → 重建 → async，证明流程可重复；</li>
+     *   <li>最终校验事件数 / 落库数 / 唯一 eventId / dirty / 热点分。</li>
+     * </ol>
+     *
+     * <p>本用例模拟“维护窗口内的操作顺序”，不证明运行期热切换安全：生产修改配置仍需重启，
+     * 且没有受控强制重建入口（见 {@code docs/tutorial/video-status-runtime-roles.md} §4/§7）。</p>
+     */
+    @Test
+    void controlledSyncAsyncSyncMaintenanceDrillConvergesWithoutLossOrStaleCache() throws Exception {
+        vid = freshPublishedVideo();
+        boolean asyncBefore = properties.isAsyncEnabled();
+        boolean relayBefore = properties.isOutboxRelayEnabled();
+        try {
+            assertTrue(asyncBefore, "隔离集成环境必须以 async-enabled=true 启动");
+            assertTrue(relayBefore, "隔离集成环境必须以 outbox-relay-enabled=true 启动");
+
+            // ---------- 1. 异步入口（真实 UserVideoService）只写 Outbox ----------
+            userVideoService.increasePlayCount(vid);
+            assertEquals(1, outboxRows(vid), "异步入口只写一条 Outbox 事件");
+            assertEquals(1, pendingOutbox(vid), "新事件必须先停留在 status=0");
+            assertEquals(0, baseline(), "异步入口不得直接改 DB 基线");
+            assertFalse(Boolean.TRUE.equals(redis.hasKey(RedisKeyUtils.videoStatus(vid))),
+                    "异步入口不得直接改 Redis");
+            drainOwnPipeline();
+            await(() -> {
+                scheduler.flushDirtyVideos();
+                return baseline() == 1;
+            });
+            assertEquals(1, current());
+            assertEquals(1, outboxSent(vid));
+            assertEquals(1, consumedFlushed(vid));
+
+            // ---------- 2. 停输入 + 真实停投开关：relay 不领取不发布 ----------
+            userVideoService.increasePlayCount(vid);
+            properties.setOutboxRelayEnabled(false);
+            relay.relay();
+            assertEquals(1, pendingOutbox(vid), "停投时 Outbox 必须保持 status=0，等待恢复");
+            assertEquals(1, consumedRows(vid), "停投时事件不得进入消费表");
+            assertTrue(queuesAreIdle(), "停投时不得发布任何消息");
+            properties.setOutboxRelayEnabled(true);
+            drainOwnPipeline();
+            await(() -> {
+                scheduler.flushDirtyVideos();
+                return baseline() == 2;
+            });
+            assertEquals(2, current());
+            assertEquals(2, outboxSent(vid));
+            assertEquals(2, consumedFlushed(vid));
+
+            // ---------- 3. 切 sync 前排空（本 vid 自己的管道） ----------
+            drainOwnPipeline();
+            assertEquals(0, pendingOutbox(vid));
+            assertEquals(0, unfinishedConsumed(vid));
+            assertTrue(queuesAreIdle());
+            assertFalse(Boolean.TRUE.equals(redis.opsForSet().isMember(
+                    RedisKeyUtils.dirtyVideo(), String.valueOf(vid))), "排空后本 vid 不应是 dirty");
+
+            // ---------- 4. 真实同步入口写 DB 基线；Redis 派生值此时落后 ----------
+            properties.setAsyncEnabled(false);
+            long baselineBeforeSync = baseline();
+            long currentBeforeSync = current();
+            int outboxBeforeSync = outboxRows(vid);
+            int consumedBeforeSync = consumedRows(vid);
+            userVideoService.increasePlayCount(vid);
+            assertEquals(baselineBeforeSync + 1, baseline(), "同步路径直接提交 DB 基线");
+            assertEquals(currentBeforeSync, current(), "同步路径不写 Redis，派生缓存必须显式重建");
+            assertEquals(outboxBeforeSync, outboxRows(vid), "同步路径不得新增 Outbox");
+            assertEquals(consumedBeforeSync, consumedRows(vid), "同步路径不得新增消费事件");
+
+            // ---------- 5. 持锁确认无未完成事件，删除自己的 current，ensureInitialized 重建 ----------
+            rebuildCurrentCacheUnderLock();
+            assertEquals(baseline(), current(), "重建后 Redis current 必须等于 DB 基线");
+            assertEquals((double) baseline(), redis.opsForZSet().score(
+                    RedisKeyUtils.feedHotVideos(), String.valueOf(vid)), "热点分数同样以基线重建");
+            assertFalse(Boolean.TRUE.equals(redis.opsForSet().isMember(
+                    RedisKeyUtils.dirtyVideo(), String.valueOf(vid))));
+
+            // ---------- 6. 恢复 async：下一条事件无遗漏/无重复/不被旧缓存覆盖 ----------
+            properties.setAsyncEnabled(true);
+            long baselineBeforeAsync = baseline();
+            userVideoService.increasePlayCount(vid);
+            assertEquals(1, pendingOutbox(vid), "恢复异步后事件先停留在 Outbox");
+            drainOwnPipeline();
+            await(() -> {
+                scheduler.flushDirtyVideos();
+                return baseline() == baselineBeforeAsync + 1;
+            });
+            assertEquals(baselineBeforeAsync + 1, current(),
+                    "重建后的缓存必须继续累加，不得回退到旧值");
+            assertEquals((double) baseline(), redis.opsForZSet().score(
+                    RedisKeyUtils.feedHotVideos(), String.valueOf(vid)));
+
+            // ---------- 7. 第二轮 sync -> 重建，验证流程可重复 ----------
+            drainOwnPipeline();
+            properties.setAsyncEnabled(false);
+            long baselineBeforeSecondSync = baseline();
+            userVideoService.increasePlayCount(vid);
+            assertEquals(baselineBeforeSecondSync + 1, baseline());
+            assertEquals(baselineBeforeSecondSync, current(), "同步写入后缓存仍落后 1");
+            rebuildCurrentCacheUnderLock();
+            assertEquals(baseline(), current());
+
+            // ---------- 8. 回归 async，最终一次事件验证收敛 ----------
+            properties.setAsyncEnabled(true);
+            long baselineBeforeFinal = baseline();
+            userVideoService.increasePlayCount(vid);
+            drainOwnPipeline();
+            await(() -> {
+                scheduler.flushDirtyVideos();
+                return baseline() == baselineBeforeFinal + 1;
+            });
+
+            int asyncEvents = 4;
+            int syncWrites = 2;
+            assertEquals(asyncEvents + syncWrites, baseline(),
+                    "总增量 = 4 次异步事件 + 2 次同步基线写入");
+            assertEquals(baseline(), current(), "最终 DB 与 Redis 必须一致");
+            assertEquals(asyncEvents, outboxRows(vid), "每个异步事件恰好一行 Outbox");
+            assertEquals(asyncEvents, outboxSent(vid), "所有 Outbox 必须已发送");
+            assertEquals(asyncEvents, consumedRows(vid), "每个事件恰好一行消费记录");
+            assertEquals(asyncEvents, consumedFlushed(vid), "所有消费记录必须已落库");
+            assertEquals(asyncEvents, jdbc.queryForObject(
+                    "SELECT COUNT(DISTINCT event_id) FROM video_status_consumed_event WHERE vid=?",
+                    Integer.class, vid), "同一 eventId 不得产生重复消费行");
+            assertEquals((double) baseline(), redis.opsForZSet().score(
+                    RedisKeyUtils.feedHotVideos(), String.valueOf(vid)), "热点分数与基线一致");
+            assertFalse(Boolean.TRUE.equals(redis.opsForSet().isMember(
+                    RedisKeyUtils.dirtyVideo(), String.valueOf(vid))), "收敛后不得残留 dirty");
+            System.out.printf(Locale.ROOT,
+                    "T04 maintenance drill vid=%d asyncEvents=%d syncWrites=%d baseline=%d current=%d%n",
+                    vid, asyncEvents, syncWrites, baseline(), current());
+        } finally {
+            properties.setAsyncEnabled(asyncBefore);
+            properties.setOutboxRelayEnabled(relayBefore);
+        }
     }
 }

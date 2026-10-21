@@ -27,14 +27,19 @@ public class VideoStatusOutboxRelay {
     private final JsonUtils jsonUtils;
 
     /**
-     * 从消息表中定期扫描待发送的消息并发布
+     * 从消息表中定期扫描待发送的消息并发布。
+     *
+     * <p>投递角色受两个开关约束：{@code async-enabled}（异步链路总开关，保持既有含义）
+     * 与 {@code outbox-relay-enabled}（本实例是否承担投递）。任一为 false 时本方法直接返回，
+     * 不领取、不恢复租约、不发布；消费者、批量落库与 dirty 恢复不受该开关影响，
+     * 因此可以安全地把“停投”做成独立维护动作。</p>
      */
     @Scheduled(
             fixedDelayString =
                     "${app.video-status.outbox-fixed-delay-ms:1000}"
     )
     public void relay() {
-        if (!properties.isAsyncEnabled()) {
+        if (!isRelayRoleEnabled()) {
             return;
         }
 
@@ -87,6 +92,11 @@ public class VideoStatusOutboxRelay {
             log.warn("视频统计 Outbox 发布失败，将重试, eventId={}",
                     outbox.getEventId(), e);
         }
+    }
+
+    private boolean isRelayRoleEnabled() {
+        return properties.isAsyncEnabled()
+                && properties.isOutboxRelayEnabled();
     }
 
     // 恢复已经超时的Outbox消息租约，避免消息一直卡在“发送中”的状态

@@ -36,8 +36,13 @@ spring:
 
 app:
   video-status:
+    # 四个开关 = 四个可独立部署的角色，说明见 docs/tutorial/video-status-runtime-roles.md
+    # async-enabled：业务侧是否写 Outbox（false = 同步直接写统计）
     async-enabled: false
+    # outbox-relay-enabled：本实例是否承担 Outbox→RabbitMQ 投递；false 不影响消费与落库
     outbox-relay-enabled: false
+    # scheduling-enabled：本实例是否承担批量落库 + dirty 恢复；async=true 且此项=false 时
+    # 必须有其他实例落库，否则为“无人落库”
     scheduling-enabled: true
     redis-event-ttl-days: 30
     outbox-batch-size: 100
