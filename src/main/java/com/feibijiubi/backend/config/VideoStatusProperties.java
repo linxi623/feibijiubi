@@ -18,7 +18,7 @@ public class VideoStatusProperties {
     private long outboxFixedDelayMs = 1000;
     // 分布式租约过期时间，某个实例处理不完由其他实例接管，防止死锁
     private int outboxLeaseSeconds = 60;
-    // 消费者返回确认消息的最长时间，超时定义为发送失败
+    // mq返回确认消息的最长时间，超时定义为发送失败
     private int publishConfirmTimeoutSeconds = 5;
 
     private int consumerMaxRetries = 5;
