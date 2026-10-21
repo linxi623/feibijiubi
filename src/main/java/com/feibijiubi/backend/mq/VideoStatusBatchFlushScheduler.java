@@ -6,6 +6,7 @@ import com.feibijiubi.backend.common.VideoStatusFlushDataException;
 import com.feibijiubi.backend.common.VideoStatusFlushDeferredException;
 import com.feibijiubi.backend.config.VideoStatusProperties;
 import com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper;
+import com.feibijiubi.backend.metrics.VideoStatusTelemetry;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusBatchFlushService;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusVidMutex;
 import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
@@ -47,6 +48,13 @@ public class VideoStatusBatchFlushScheduler {
     private final VideoStatusConsumedEventMapper consumedEventMapper;
     private final VideoStatusVidMutex vidMutex;
     private final Clock clock;
+
+    /**
+     * T05 只读观测：允许为 null（纯构造测试/未装配指标的隔离配置）。
+     * 指标失败不得改变 dirty/退避/修复分类。
+     */
+    @Autowired(required = false)
+    private VideoStatusTelemetry telemetry;
 
     /**
      * 每个 vid 的本地退避状态。只存在于当前实例内存：
@@ -113,6 +121,7 @@ public class VideoStatusBatchFlushScheduler {
             return;
         }
 
+        heartbeat(VideoStatusTelemetry.Operation.FLUSH_TICK);
         Set<String> dirtyVids = redisSetOperations.pop(
                 RedisKeyUtils.dirtyVideo(),
                 properties.getFlushDirtyBatchSize()
@@ -134,20 +143,57 @@ public class VideoStatusBatchFlushScheduler {
     }
 
     private void flushOne(Integer vid) {
+        long startedAt = System.nanoTime();
         try {
             vidMutex.withLock(vid, () -> flushLocked(vid));
+            recordFlush(VideoStatusTelemetry.Outcome.SUCCESS, startedAt);
         } catch (VideoStatusFlushDeferredException e) {
+            recordFlush(VideoStatusTelemetry.Outcome.DEFERRED, startedAt);
             defer(vid, e);
         } catch (VideoStatusFlushDataException e) {
+            recordFlush(VideoStatusTelemetry.Outcome.FAILURE, startedAt);
             handleDataError(e);
         } catch (DataAccessException
                  | RetryableMessageException
                  | RedisOperationException e) {
+            recordFlush(VideoStatusTelemetry.Outcome.FAILURE, startedAt);
             requeueDirty(vid);
             log.warn("视频统计批量刷库暂时失败，将重试: vid={}", vid, e);
         } catch (Exception e) {
+            recordFlush(VideoStatusTelemetry.Outcome.FAILURE, startedAt);
             requeueDirty(vid);
             log.error("视频统计批量刷库发生未知异常，将保留 dirty: vid={}", vid, e);
+        }
+    }
+
+    private void heartbeat(VideoStatusTelemetry.Operation operation) {
+        VideoStatusTelemetry target = telemetry;
+        if (target == null) {
+            return;
+        }
+        try {
+            target.heartbeat(operation);
+        } catch (RuntimeException ignored) {
+            // 心跳失败不影响调度。
+        }
+    }
+
+    private void recordFlush(
+            VideoStatusTelemetry.Outcome outcome,
+            long startedAt
+    ) {
+        VideoStatusTelemetry target = telemetry;
+        if (target == null) {
+            return;
+        }
+        try {
+            target.record(
+                    VideoStatusTelemetry.Operation.FLUSH,
+                    outcome,
+                    System.nanoTime() - startedAt
+            );
+        } catch (RuntimeException ignored) {
+            // 指标自身失败不得改变退避/修复/重试分类。
         }
     }
 

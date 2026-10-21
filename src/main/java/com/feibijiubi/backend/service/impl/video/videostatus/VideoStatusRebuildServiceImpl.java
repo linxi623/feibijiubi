@@ -3,6 +3,7 @@ package com.feibijiubi.backend.service.impl.video.videostatus;
 import com.feibijiubi.backend.common.RetryableMessageException;
 import com.feibijiubi.backend.enums.VideoStatusConsumeProcessStatus;
 import com.feibijiubi.backend.event.VideoStatusDelta;
+import com.feibijiubi.backend.metrics.VideoStatusTelemetry;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusRebuildService;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusRebuildSnapshot;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusRebuildSnapshotService;
@@ -12,6 +13,7 @@ import com.feibijiubi.backend.utils.redis.RedisUtils;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
@@ -35,15 +37,52 @@ public class VideoStatusRebuildServiceImpl
     private final VideoStatusVidMutex vidMutex;
     private final RedisUtils redisUtils;
 
+    /**
+     * T05 只读观测：允许为 null（纯构造测试/未装配指标的隔离配置）。
+     * 指标失败不得改变初始化/门闩释放语义。
+     */
+    @Autowired(required = false)
+    private VideoStatusTelemetry telemetry;
+
     @Override
     public void ensureInitialized(Integer vid) {
         validateVid(vid);
-        vidMutex.withLock(vid, () -> ensureInitializedUnderVidLock(vid));
+        long startedAt = System.nanoTime();
+        try {
+            vidMutex.withLock(vid, () -> ensureInitializedUnderVidLock(vid));
+            recordRebuild(VideoStatusTelemetry.Outcome.SUCCESS, startedAt);
+        } catch (RuntimeException e) {
+            recordRebuild(VideoStatusTelemetry.Outcome.FAILURE, startedAt);
+            throw e;
+        }
+    }
+
+    private void recordRebuild(
+            VideoStatusTelemetry.Outcome outcome,
+            long startedAt
+    ) {
+        VideoStatusTelemetry target = telemetry;
+        if (target == null) {
+            return;
+        }
+        try {
+            target.record(
+                    VideoStatusTelemetry.Operation.REBUILD,
+                    outcome,
+                    System.nanoTime() - startedAt
+            );
+        } catch (RuntimeException ignored) {
+            // 指标自身失败不得改变重建结果。
+        }
     }
 
     private void ensureInitializedUnderVidLock(Integer vid) {
         String gateKey = RedisKeyUtils.videoStatusRebuildGate(vid);
-        String ownerToken = UUID.randomUUID().toString();
+        // T05：token 前缀携带创建时刻（epochMillis），让门闩“停留多久”可被按需观测；
+        // Lua 仍只做整串相等比较，协议不变，仍然不设 TTL。
+        // 旧格式（纯 UUID）的存量门闩可被识别为“时长未知”，不会被误读。
+        String ownerToken = System.currentTimeMillis() + "-"
+                + UUID.randomUUID();
         try {
             // 先关闭无锁增量入口，再读快照；同一 vid 锁同时阻止刷库。
             // 不设 TTL，避免慢重建期间门闩自行失效。崩溃后下位持锁者覆盖接管。

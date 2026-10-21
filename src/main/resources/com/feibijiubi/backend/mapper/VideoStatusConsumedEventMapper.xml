@@ -207,7 +207,8 @@
                event_type,
                delta,
                process_status,
-               redis_applied_at
+               redis_applied_at,
+               payload
         FROM video_status_consumed_event
         WHERE vid = #{vid}
           AND process_status = 1
@@ -231,7 +232,8 @@
                event_type,
                delta,
                process_status,
-               redis_applied_at
+               redis_applied_at,
+               payload
         FROM video_status_consumed_event
         WHERE vid = #{vid}
           AND process_status = 1

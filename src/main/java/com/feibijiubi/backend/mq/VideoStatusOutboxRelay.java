@@ -4,9 +4,11 @@ import com.feibijiubi.backend.config.VideoStatusProperties;
 import com.feibijiubi.backend.entity.VideoStatusOutbox;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
 import com.feibijiubi.backend.mapper.VideoStatusOutboxMapper;
+import com.feibijiubi.backend.metrics.VideoStatusTelemetry;
 import com.feibijiubi.backend.utils.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -27,6 +29,13 @@ public class VideoStatusOutboxRelay {
     private final JsonUtils jsonUtils;
 
     /**
+     * T05 只读观测：允许为 null（纯构造测试/未装配指标的隔离配置）。
+     * 指标失败只丢样本，不影响领取、发布与状态回写。
+     */
+    @Autowired(required = false)
+    private VideoStatusTelemetry telemetry;
+
+    /**
      * 从消息表中定期扫描待发送的消息并发布。
      *
      * <p>投递角色受两个开关约束：{@code async-enabled}（异步链路总开关，保持既有含义）
@@ -43,6 +52,7 @@ public class VideoStatusOutboxRelay {
             return;
         }
 
+        heartbeat(VideoStatusTelemetry.Operation.RELAY_TICK);
         recoverExpiredLease();
         List<VideoStatusOutbox> claimed = claimService.claimBatch();
         for (VideoStatusOutbox outbox : claimed) {
@@ -55,6 +65,7 @@ public class VideoStatusOutboxRelay {
      * @param outbox
      */
     private void publishOne(VideoStatusOutbox outbox) {
+        long startedAt = System.nanoTime();
         try {
             VideoStatusChangedEvent event = jsonUtils.fromJson(
                     outbox.getPayload(),
@@ -66,6 +77,7 @@ public class VideoStatusOutboxRelay {
                     outbox.getLeaseToken(),
                     LocalDateTime.now()
             );
+            recordPublish(VideoStatusTelemetry.Outcome.SUCCESS, startedAt);
         } catch (Exception e) {
             String error = truncate(e.getMessage());
             if (outbox.getRetryCount() + 1 >= MAX_PUBLISH_RETRIES) {
@@ -74,6 +86,7 @@ public class VideoStatusOutboxRelay {
                         outbox.getLeaseToken(),
                         error
                 );
+                recordPublish(VideoStatusTelemetry.Outcome.FAILURE, startedAt);
                 log.error("视频统计 Outbox 发布最终失败, eventId={}",
                         outbox.getEventId(), e);
                 return;
@@ -89,8 +102,40 @@ public class VideoStatusOutboxRelay {
                     LocalDateTime.now().plusSeconds(delaySeconds),
                     error
             );
+            recordPublish(VideoStatusTelemetry.Outcome.FAILURE, startedAt);
             log.warn("视频统计 Outbox 发布失败，将重试, eventId={}",
                     outbox.getEventId(), e);
+        }
+    }
+
+    private void heartbeat(VideoStatusTelemetry.Operation operation) {
+        VideoStatusTelemetry target = telemetry;
+        if (target == null) {
+            return;
+        }
+        try {
+            target.heartbeat(operation);
+        } catch (RuntimeException ignored) {
+            // 心跳失败不影响调度。
+        }
+    }
+
+    private void recordPublish(
+            VideoStatusTelemetry.Outcome outcome,
+            long startedAt
+    ) {
+        VideoStatusTelemetry target = telemetry;
+        if (target == null) {
+            return;
+        }
+        try {
+            target.record(
+                    VideoStatusTelemetry.Operation.PUBLISH,
+                    outcome,
+                    System.nanoTime() - startedAt
+            );
+        } catch (RuntimeException ignored) {
+            // 指标自身失败不得改变发布/重试/失败分类。
         }
     }
 

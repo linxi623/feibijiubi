@@ -8,11 +8,15 @@ import com.feibijiubi.backend.entity.VideoStatusConsumedEvent;
 import com.feibijiubi.backend.event.VideoStatusDelta;
 import com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper;
 import com.feibijiubi.backend.mapper.VideoStatusMapper;
+import com.feibijiubi.backend.metrics.VideoStatusTelemetry;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusBatchFlushService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigInteger;
 import java.util.Arrays;
@@ -32,6 +36,13 @@ public class VideoStatusBatchFlushServiceImpl
 
     private final VideoStatusConsumedEventMapper consumedEventMapper;
     private final VideoStatusMapper videoStatusMapper;
+
+    /**
+     * T05 只读观测：允许为 null（纯构造测试/未装配指标的隔离配置）。
+     * 只在事务提交后上报端到端延迟，指标失败不影响业务结果。
+     */
+    @Autowired(required = false)
+    private VideoStatusTelemetry telemetry;
 
     /**
      * 取一个视频的一批数据进行刷库，如果没有刷库，就直接返回。
@@ -146,12 +157,12 @@ public class VideoStatusBatchFlushServiceImpl
 
         if (delta.isZero()) {
             // 净零批次不需要写统计，但仍要推进事件状态（T02 验收要求）。
-            markFlushed(vid, ids);
+            markFlushed(vid, events);
             return BatchOutcome.FLUSHED;
         }
 
         if (videoStatusMapper.applyBatchDelta(vid, delta) == 1) {
-            markFlushed(vid, ids);
+            markFlushed(vid, events);
             return BatchOutcome.FLUSHED;
         }
 
@@ -250,11 +261,58 @@ public class VideoStatusBatchFlushServiceImpl
         );
     }
 
-    private void markFlushed(Integer vid, List<Long> ids) {
+    private void markFlushed(
+            Integer vid,
+            List<VideoStatusConsumedEvent> events
+    ) {
+        List<Long> ids = idsOf(events);
         if (consumedEventMapper.markFlushed(ids) != ids.size()) {
             throw new RetryableMessageException(
                     "事件 FLUSHED 数量与锁定数量不一致，vid=" + vid
             );
+        }
+        recordFlushedLatencyAfterCommit(events);
+    }
+
+    /**
+     * T05：事件创建→FLUSHED 的端到端延迟只在事务真正提交后上报。
+     *
+     * <p>用 {@code afterCommit} 而不是提交前上报，是为了让回滚的批次不产生“成功”样本：
+     * 事务回滚时 Spring 不会调用 afterCommit。payload 由指标实现自行解析，
+     * 解析失败/指标自身异常一律吞掉，绝不改变已确定的业务结果。</p>
+     */
+    private void recordFlushedLatencyAfterCommit(
+            List<VideoStatusConsumedEvent> events
+    ) {
+        VideoStatusTelemetry target = telemetry;
+        if (target == null || events.isEmpty()) {
+            return;
+        }
+        try {
+            if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+                // 无事务上下文（如纯单测直调）时不上报，避免把未提交的落库记成成功。
+                return;
+            }
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            for (VideoStatusConsumedEvent event : events) {
+                                String payload = event.getPayload();
+                                if (payload == null) {
+                                    continue;
+                                }
+                                try {
+                                    target.recordFlushedPayload(payload);
+                                } catch (RuntimeException ignored) {
+                                    // 坏 payload / 指标自身失败不得影响已提交业务。
+                                }
+                            }
+                        }
+                    }
+            );
+        } catch (RuntimeException ignored) {
+            // 注册观测失败不改变落库结果。
         }
     }
 

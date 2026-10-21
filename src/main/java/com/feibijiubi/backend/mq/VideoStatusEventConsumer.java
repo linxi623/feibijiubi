@@ -8,6 +8,7 @@ import com.feibijiubi.backend.common.RetryableMessageException;
 import com.feibijiubi.backend.config.VideoStatusProperties;
 import com.feibijiubi.backend.enums.RegistrationResult;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
+import com.feibijiubi.backend.metrics.VideoStatusTelemetry;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusConsumptionService;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusEventFingerprintService;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusService;
@@ -18,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +37,13 @@ public class VideoStatusEventConsumer {
     private final VideoStatusMessageForwarder forwarder;
     private final VideoStatusProperties properties;
 
+    /**
+     * T05 只读观测：允许为 null（纯构造测试/未装配指标的隔离配置）。
+     * 指标失败不影响解析、业务处理、转发与 ACK/NACK 边界。
+     */
+    @Autowired(required = false)
+    private VideoStatusTelemetry telemetry;
+
     @RabbitListener(
             queues = RabbitConstants.MAIN_QUEUE,
             containerFactory = "videoStatusListenerContainerFactory"
@@ -42,19 +51,23 @@ public class VideoStatusEventConsumer {
     public void consume(Message message, Channel channel) throws IOException {
         long deliveryTag = message.getMessageProperties().getDeliveryTag();
         VideoStatusChangedEvent event = null;
+        long startedAt = System.nanoTime();
 
         try {
             event = parseAndValidate(message);
             process(event);
         } catch (RepairRequiredMessageException e) {
+            recordConsume(VideoStatusTelemetry.Outcome.FAILURE, startedAt);
             forwardDeadThenAck(message, channel, deliveryTag, e);
             return;
         } catch (NonRetryableMessageException e) {
+            recordConsume(VideoStatusTelemetry.Outcome.FAILURE, startedAt);
             forwardDeadThenAck(message, channel, deliveryTag, e);
             return;
         } catch (RetryableMessageException
                  | RedisOperationException
                  | DataAccessException e) {
+            recordConsume(VideoStatusTelemetry.Outcome.FAILURE, startedAt);
             forwardRetryOrDeadThenAck(
                     message,
                     channel,
@@ -64,6 +77,7 @@ public class VideoStatusEventConsumer {
             );
             return;
         } catch (Exception e) {
+            recordConsume(VideoStatusTelemetry.Outcome.FAILURE, startedAt);
             forwardDeadThenAck(
                     message,
                     channel,
@@ -76,9 +90,29 @@ public class VideoStatusEventConsumer {
             return;
         }
 
+        recordConsume(VideoStatusTelemetry.Outcome.SUCCESS, startedAt);
         // 业务处理已经成功。ACK 失败不能再把正常消息转入 Retry/DLQ；
         // 让 IOException 交给监听容器处理，连接恢复后由 eventId 幂等吸收重投。
         channel.basicAck(deliveryTag, false);
+    }
+
+    private void recordConsume(
+            VideoStatusTelemetry.Outcome outcome,
+            long startedAt
+    ) {
+        VideoStatusTelemetry target = telemetry;
+        if (target == null) {
+            return;
+        }
+        try {
+            target.record(
+                    VideoStatusTelemetry.Operation.CONSUME,
+                    outcome,
+                    System.nanoTime() - startedAt
+            );
+        } catch (RuntimeException ignored) {
+            // 指标自身失败不得改变异常分类与 ACK 边界。
+        }
     }
 
     private void process(VideoStatusChangedEvent event) {

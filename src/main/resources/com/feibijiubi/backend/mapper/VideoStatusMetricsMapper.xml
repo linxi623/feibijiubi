@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  T05 只读观测 SQL。禁止在此文件加入 insert/update/delete：
+  指标采集不能改变链路状态，也不得降低幂等性。
+  所有语句都封顶（LIMIT）并带 timeout（秒），采样失败由 Java 侧标记 stale。
+-->
+<mapper namespace="com.feibijiubi.backend.metrics.VideoStatusMetricsMapper">
+
+    <!--
+      封顶计数：MySQL 只扫描最多 cap 行索引项，返回 <= cap。
+      Java 侧把 count >= cap 解释为“至少 cap 条”，明确不给出精确值。
+      走 idx_video_status_outbox_poll(status, ...) 或
+      idx_video_status_outbox_created(status, created_at, id) 的 status 前缀。
+    -->
+    <select id="countOutboxStatusCapped" resultType="java.lang.Integer" timeout="3">
+        SELECT COUNT(*)
+        FROM (
+            SELECT 1
+            FROM video_status_outbox
+            WHERE status = #{status}
+            LIMIT #{cap}
+        ) capped
+    </select>
+
+    <!--
+      最老事件年龄：先按 (status, created_at, id) 索引取第一行，
+      再由数据库 NOW(3) 计算年龄。不使用 ORDER BY id，
+      因为 id 顺序不等于真实最老顺序（回填/重放会让 id 与时间错序）。
+    -->
+    <select id="selectOldestOutboxAgeMillis" resultType="java.lang.Long" timeout="3">
+        SELECT CAST(
+                   TIMESTAMPDIFF(MICROSECOND, created_at, NOW(3)) / 1000
+               AS SIGNED)
+        FROM video_status_outbox
+        WHERE status = #{status}
+        ORDER BY created_at, id
+        LIMIT 1
+    </select>
+
+    <select id="countConsumedStatusCapped" resultType="java.lang.Integer" timeout="3">
+        SELECT COUNT(*)
+        FROM (
+            SELECT 1
+            FROM video_status_consumed_event
+            WHERE process_status = #{processStatus}
+            LIMIT #{cap}
+        ) capped
+    </select>
+
+    <select id="selectOldestConsumedAgeMillis" resultType="java.lang.Long" timeout="3">
+        SELECT CAST(
+                   TIMESTAMPDIFF(MICROSECOND, consumed_at, NOW(3)) / 1000
+               AS SIGNED)
+        FROM video_status_consumed_event
+        WHERE process_status = #{processStatus}
+        ORDER BY consumed_at, id
+        LIMIT 1
+    </select>
+
+    <!--
+      必备索引检查：旧库没有执行 T05 migration 时，这里返回 0，
+      Java 侧只输出诊断（需要执行哪个 migration），不退化成全表扫描。
+    -->
+    <select id="indexExists" resultType="java.lang.Integer" timeout="3">
+        SELECT COUNT(*)
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE()
+          AND table_name = #{tableName}
+          AND index_name = #{indexName}
+    </select>
+
+</mapper>

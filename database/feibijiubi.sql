@@ -275,6 +275,8 @@ CREATE TABLE video_status_outbox (
     PRIMARY KEY (id),
     UNIQUE KEY uk_video_status_outbox_event_id (event_id),
     KEY idx_video_status_outbox_poll (status, next_retry_at, sending_at, id),
+    -- T05：观测采样按 status 取真实最老（created_at 顺序），见 database/migrations/t05-video-status-observability-indexes.sql
+    KEY idx_video_status_outbox_created (status, created_at, id),
     CONSTRAINT fk_video_status_outbox_vid
         FOREIGN KEY (aggregate_id) REFERENCES video (vid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -300,6 +302,8 @@ CREATE TABLE video_status_consumed_event (
     UNIQUE KEY uk_video_status_consumed_event_id (event_id),
     KEY idx_video_status_consumed_pending (process_status, vid, id),
     KEY idx_video_status_consumed_recovery (process_status, last_attempt_at, id),
+    -- T05：观测采样按 process_status 取真实最老（consumed_at 顺序），见 database/migrations/t05-video-status-observability-indexes.sql
+    KEY idx_video_status_consumed_created (process_status, consumed_at, id),
     CONSTRAINT fk_video_status_consumed_vid
         FOREIGN KEY (vid) REFERENCES video (vid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
