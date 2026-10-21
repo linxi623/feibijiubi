@@ -2,6 +2,7 @@
 -- KEYS[2] dirty set
 -- KEYS[3] processed event key
 -- KEYS[4] hot videos zset
+-- KEYS[5] rebuild gate (unique owner token)
 -- ARGV[1] current field
 -- ARGV[2] event delta
 -- ARGV[3] vid
@@ -14,6 +15,11 @@ local function redisType(key)
         return result['ok']
     end
     return result
+end
+
+-- 与增量写入原子互斥：门闩存在时禁止写入，调用方进入持锁慢路径。
+if redis.call('EXISTS', KEYS[5]) == 1 then
+    return 'NEEDS_REBUILD'
 end
 
 if redis.call('EXISTS', KEYS[1]) == 0 then

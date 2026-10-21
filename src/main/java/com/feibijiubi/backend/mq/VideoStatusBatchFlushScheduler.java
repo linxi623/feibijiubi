@@ -103,12 +103,10 @@ public class VideoStatusBatchFlushScheduler {
     private void refreshDirtyMembership(Integer vid) {
         if (consumedEventMapper.countPendingByVid(vid) > 0) {
             requeueDirty(vid);
-        } else {
-            redisSetOperations.remove(
-                    RedisKeyUtils.dirtyVideo(),
-                    String.valueOf(vid)
-            );
         }
+        // 当前 vid 已由 SPOP 取出。无待刷事件时无需 SREM：
+        // 否则会误删 count 查询之后，无锁消费者刚刚 SADD 的新标记。
+        // 即使残留一次空调度，也好过丢失新事件的唤醒。
     }
 
     private void requeueDirty(Integer vid) {

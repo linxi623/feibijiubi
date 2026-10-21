@@ -1,10 +1,12 @@
 -- KEYS[1] current stats hash
 -- KEYS[2] dirty set
 -- KEYS[3] hot videos zset
+-- KEYS[4] rebuild gate
 -- ARGV[1] vid
 -- ARGV[2] hot score
 -- ARGV[3..10] current values
 -- ARGV[11] has pending events
+-- ARGV[12] unique rebuild owner token
 
 local function redisType(key)
     local result = redis.call('TYPE', key)
@@ -12,6 +14,11 @@ local function redisType(key)
         return result['ok']
     end
     return result
+end
+
+-- Redis 重启、门闩丢失或被新重建者接管后，旧快照不得发布。
+if redis.call('GET', KEYS[4]) ~= ARGV[12] then
+    return 'STALE_REBUILD'
 end
 
 if redis.call('EXISTS', KEYS[1]) == 1 then

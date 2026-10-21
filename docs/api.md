@@ -1429,8 +1429,10 @@ curl -X POST "http://localhost:8080/api/videos/1/collect?isCollect=false" \
   -H "Authorization: Bearer <token>"
 ```
 
-> 互动计数（播放/点赞/投币/收藏/分享）不会直接落库，而是先更新 Redis 计数，再经 RabbitMQ 事件与批量
-> 聚合任务异步写入 `video_status`。相关设计见 `docs/video-status-full-flow-design.md`。
+> 互动计数（播放/点赞/投币/收藏/分享）由业务事务写入 outbox，再经 RabbitMQ 消费更新 Redis，
+> 最后由批量聚合任务异步写入 `video_status`。正常 Redis 更新使用 Lua 幂等快路径，不获取 vid
+> 分布式锁；缓存缺失/重建时才进入持锁慢路径，并使用令牌门闩与刷库协调。HTTP 接口和响应不变，
+> 统计仍为最终一致。详见 `docs/tutorial/video-status-lock-free-fast-path.md`。
 
 ---
 

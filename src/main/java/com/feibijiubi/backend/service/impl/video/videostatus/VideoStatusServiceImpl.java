@@ -60,7 +60,8 @@ public class VideoStatusServiceImpl implements VideoStatusService {
     @Override
     public ApplyResult apply(VideoStatusChangedEvent event) {
         event.validate();
-        return vidMutex.withLock(event.vid(), () -> applyWithRebuild(event));
+        // 正常路径仅执行一次 Lua；只有缓存缺失/重建门闩关闭时才进入加锁慢路径。
+        return applyWithRebuild(event);
     }
 
     private ApplyResult applyWithRebuild(VideoStatusChangedEvent event) {
@@ -69,14 +70,22 @@ public class VideoStatusServiceImpl implements VideoStatusService {
             return result;
         }
 
-        videoStatusRebuildService.ensureInitialized(event.vid());
-        result = execute(event);
-        if (result == ApplyResult.NEEDS_REBUILD) {
-            throw new RetryableMessageException(
-                    "Redis 视频统计重建后仍缺少 current，vid=" + event.vid()
-            );
-        }
-        return result;
+        return vidMutex.withLock(event.vid(), () -> {
+            // 等锁期间其他消费者可能已完成重建；先重试，避免重复设置门闩。
+            ApplyResult retry = execute(event);
+            if (retry != ApplyResult.NEEDS_REBUILD) {
+                return retry;
+            }
+            // ensureInitialized 使用同一把可重入锁。
+            videoStatusRebuildService.ensureInitialized(event.vid());
+            retry = execute(event);
+            if (retry == ApplyResult.NEEDS_REBUILD) {
+                throw new RetryableMessageException(
+                        "Redis 视频统计重建后仍缺少 current，vid=" + event.vid()
+                );
+            }
+            return retry;
+        });
     }
 
 
@@ -87,7 +96,8 @@ public class VideoStatusServiceImpl implements VideoStatusService {
                 RedisKeyUtils.videoStatus(event.vid()),
                 RedisKeyUtils.dirtyVideo(),
                 RedisKeyUtils.processedKey(event.eventId()),
-                RedisKeyUtils.feedHotVideos()
+                RedisKeyUtils.feedHotVideos(),
+                RedisKeyUtils.videoStatusRebuildGate(event.vid())
         );
 
         String result = redisUtils.executeScript(

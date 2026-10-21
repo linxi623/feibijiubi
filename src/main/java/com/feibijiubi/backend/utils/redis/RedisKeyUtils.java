@@ -22,6 +22,11 @@ public class RedisKeyUtils {
         return RedisConstants.VIDEO_STATUS_PREFIX + vid;
     }
 
+    /** 不设置 TTL：重建崩溃后由下一位持有 vid 锁的调用者接管清理。 */
+    public static String videoStatusRebuildGate(Integer vid) {
+        return RedisConstants.VIDEO_STATUS_PREFIX + "rebuild-gate:" + vid;
+    }
+
     public static String feedHotVideos() {
         return RedisConstants.FEED_HOT_VIDEOS_PREFIX;
     }

@@ -16,6 +16,7 @@ video_status_consumed_event.process_status = 1
 
 ```text
 消费者登记 event(status=0)
+  -> 增量 Lua：正常不加锁；遇到 current 缺失/重建门闩才进入持锁慢路径
   -> Redis current + dirty + processed + hot
   -> markRedisApplied(eventId)
   -> event(status=1)
@@ -236,7 +237,7 @@ SADD dirty:video:v1 {vid}
 2. 对每个 vid 获取分布式锁。
 3. 调用 `flushOneVideo(vid, flushEventBatchSize)`。
 4. 查询该 vid 是否仍有状态 1。
-5. 有则重新加入 dirty Set，没有则从 Set 删除。
+5. 有则重新加入 dirty Set，没有则不做删除（SPOP 已取出；额外 SREM 会误删无锁消费者新加的标记）。
 
 dirty Set 只是加速索引。`VideoStatusDirtyRecoveryScheduler` 会定期从消费事件表查询状态 1 的 vid 并补回。
 
@@ -287,7 +288,11 @@ rebuilt current
   + processed Key 已存在的 status 0 事件
 ```
 
-重建完成后，如果存在状态 1 事件，会重新加入 dirty Set，刷库任务继续处理。
+重建持有与刷库相同的 vid 锁，并在取快照前设置无 TTL、UUID 令牌归属的 Redis 门闩；正常增量 Lua 看到门闩后不写入。初始化和释放都验证令牌，禁止旧快照发布或旧线程清理新门闩。崩溃残留门闩由下一位持锁者接管。
+
+重建完成后，有待落库净增量时会重新加入 dirty Set，刷库任务继续处理；净增量为零等场景仍由状态 1 扫描恢复兜底。
+
+完整协议、故障边界、隔离 Docker 测试与上线要求见 [无锁快路径手册](video-status-lock-free-fast-path.md)。
 
 ## 11. 测试重点
 

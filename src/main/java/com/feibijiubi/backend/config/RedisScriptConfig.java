@@ -32,6 +32,14 @@ public class RedisScriptConfig {
     }
 
     @Bean
+    DefaultRedisScript<Long> videoStatusReleaseGateScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setLocation(new ClassPathResource("lua/video-status-release-gate.lua"));
+        script.setResultType(Long.class);
+        return script;
+    }
+
+    @Bean
     DefaultRedisScript<String> videoStatusInitScript() {
         DefaultRedisScript<String> redisScript = new DefaultRedisScript<>();
         redisScript.setLocation(

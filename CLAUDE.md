@@ -1,6 +1,7 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents (Claude Code and others) when working with code in this
+repository. It is kept identical to `CLAUDE.md`.
 
 ## Project overview
 
@@ -115,24 +116,31 @@ Notable packages:
 Interaction counts (play / like / coin / collect / share) are **not** written straight to the DB.
 The flow is:
 
-1. Interaction → atomic Redis counter update (`lua/video-status-increment.lua`) and a
-   `VideoStatusChangedEvent` / `VideoStatusDelta`.
+1. Interaction → MySQL outbox event in the business transaction (`VideoStatusChangedEvent` /
+   `VideoStatusDelta`); Redis is updated by the consumer, not before publishing.
 2. **Outbox pattern**: `VideoStatusOutbox` rows are claimed (`VideoStatusOutboxClaimService`) and relayed
    to RabbitMQ (`VideoStatusOutboxRelay`) with publisher confirms.
 3. **Consumer** (`VideoStatusEventConsumer` → `VideoStatusConsumptionServiceImpl`) applies deltas
-   idempotently, guarded by `VideoStatusConsumedEvent` + a fingerprint service and a per-vid Redisson
-   mutex (`VideoStatusVidMutex`).
+   idempotently, guarded by `VideoStatusConsumedEvent`, fingerprint checks, and atomic Redis Lua.
+   The normal apply path takes no vid lock. Cache misses/rebuild gates enter a locked slow path.
 4. **Batch flush** (`VideoStatusBatchFlushScheduler` → `...BatchFlushServiceImpl`) locks and reads a
    batch of status-1 consumed events for one video, applies their deltas to the `video_status` table,
    and marks those events status 2 in the same MySQL transaction.
 5. **Recovery / rebuild** schedulers recover dirty video IDs and rebuild Redis current state from the
-   MySQL baseline plus confirmed status-0/1 consumed events (`VideoStatusRebuild*`).
+   MySQL baseline plus confirmed status-0/1 consumed events (`VideoStatusRebuild*`). Rebuild holds the
+   same vid lock as flush and closes a token-owned Redis gate before loading the snapshot; increment
+   Lua checks this gate, initialization/release verify its token. Gates have no TTL (next lock owner
+   takes over after a crash); use noeviction. Dirty refresh only re-adds pending vids, never removes
+   a marker concurrently added by an unlocked consumer. Recovery remains required.
 
 Consumer retry/dead-letter behavior is driven by the typed exceptions in `common/`:
 `RetryableMessageException`, `NonRetryableMessageException`, `RepairRequiredMessageException`.
 
-Design docs: `docs/video-status-full-flow-design.md`,
-`docs/video-status-batch-aggregation-implementation.md`, `docs/video-stats-redis-mq-design.md`.
+Design docs: `docs/tutorial/video-status-full-flow-design.md`,
+`docs/tutorial/video-status-batch-aggregation-implementation.md`,
+`docs/tutorial/video-stats-redis-mq-design.md`, and
+`docs/tutorial/video-status-lock-free-fast-path.md` (protocol, failure limits, rollout and tests).
+Do not mix old/new consumers during rollout: old Lua does not honor the rebuild gate.
 
 ## Data & docs
 
@@ -153,6 +161,16 @@ user-account service, and Redis utils under `src/test/java/...`.
 - Passwords are still stored/compared in plaintext (learning stage; a `TODO` marks where hashing goes).
 - Business errors return HTTP 200 with a business `code` in the `ApiResponse` body; the global handler
   wraps unhandled errors as `code = 500`.
+
+## Isolated video-statistics integration tests
+
+`docker compose -f compose.test.yaml up -d --wait` starts the independent `feibijiubi-test` project
+(MySQL 13307, Redis 16379, RabbitMQ 15673 / management 15674). Never merge it with `compose.yaml`.
+Run `./mvnw -DvideoStatusIT=true -Dtest=VideoStatusIsolatedIntegrationTests test`; add
+`-DvideoStatusBenchmark=true` for an optional diagnostic hot-path comparison. Tests replace
+application.yml, reject non-isolated endpoint overrides before connecting, seed new rows and purge
+only the dedicated test queues. Existing deployment volumes are never used. Normal test runs skip
+this opt-in suite. Stop with `docker compose -f compose.test.yaml stop` to preserve test data.
 
 ## Docker Compose deployment
 

@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -26,6 +27,9 @@ public class VideoStatusRebuildServiceImpl
 
     @Resource(name = "videoStatusInitScript")
     private DefaultRedisScript<String> videoStatusInitScript;
+
+    @Resource(name = "videoStatusReleaseGateScript")
+    private DefaultRedisScript<Long> videoStatusReleaseGateScript;
 
     private final VideoStatusRebuildSnapshotService snapshotService;
     private final VideoStatusVidMutex vidMutex;
@@ -38,16 +42,31 @@ public class VideoStatusRebuildServiceImpl
     }
 
     private void ensureInitializedUnderVidLock(Integer vid) {
-        if (Boolean.TRUE.equals(
-                redisUtils.hasKey(RedisKeyUtils.videoStatus(vid))
-        )) {
-            return;
-        }
+        String gateKey = RedisKeyUtils.videoStatusRebuildGate(vid);
+        String ownerToken = UUID.randomUUID().toString();
+        try {
+            // 先关闭无锁增量入口，再读快照；同一 vid 锁同时阻止刷库。
+            // 不设 TTL，避免慢重建期间门闩自行失效。崩溃后下位持锁者覆盖接管。
+            redisUtils.setString(gateKey, ownerToken);
+            if (Boolean.TRUE.equals(
+                    redisUtils.hasKey(RedisKeyUtils.videoStatus(vid))
+            )) {
+                return;
+            }
 
-        // load() 位于独立 Spring Bean，返回时只读事务已经结束。
-        VideoStatusRebuildSnapshot snapshot = snapshotService.load(vid);
-        InitialValues values = classifyConfirmedPending(snapshot);
-        initializeRedis(snapshot, values);
+            // load() 位于独立 Spring Bean，返回时只读事务已经结束。
+            VideoStatusRebuildSnapshot snapshot = snapshotService.load(vid);
+            InitialValues values = classifyConfirmedPending(snapshot);
+            initializeRedis(snapshot, values, ownerToken);
+        } finally {
+            try {
+                redisUtils.executeScript(videoStatusReleaseGateScript,
+                        List.of(gateKey), ownerToken);
+            } catch (RuntimeException e) {
+                // 保留门闩是安全失败；后续消费进入慢路径，由新持锁者接管。
+                log.warn("释放视频统计重建门闩失败，后续慢路径将接管: vid={}", vid, e);
+            }
+        }
     }
 
     /**
@@ -101,19 +120,22 @@ public class VideoStatusRebuildServiceImpl
 
     private void initializeRedis(
             VideoStatusRebuildSnapshot snapshot,
-            InitialValues values
+            InitialValues values,
+            String ownerToken
     ) {
         List<String> keys = List.of(
                 RedisKeyUtils.videoStatus(snapshot.vid()),
                 RedisKeyUtils.dirtyVideo(),
-                RedisKeyUtils.feedHotVideos()
+                RedisKeyUtils.feedHotVideos(),
+                RedisKeyUtils.videoStatusRebuildGate(snapshot.vid())
         );
 
-        List<String> args = new ArrayList<>(11);
+        List<String> args = new ArrayList<>(12);
         args.add(String.valueOf(snapshot.vid()));
         args.add(String.valueOf(values.hotScore()));
         values.current().appendTo(args);
         args.add(String.valueOf(values.pending().isNonZero()));
+        args.add(ownerToken);
 
         String result = redisUtils.executeScript(
                 videoStatusInitScript,
