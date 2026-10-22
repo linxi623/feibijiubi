@@ -33,6 +33,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -63,6 +64,9 @@ import static org.mockito.Mockito.*;
 @org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @ActiveProfiles("video-status-isolated")
 @ContextConfiguration(initializers = VideoStatusIsolatedIntegrationTests.IsolationGuard.class)
+// This class runs a real queue listener; close the context at class end so a
+// cached context cannot keep consuming messages during the next IT class.
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class VideoStatusIsolatedIntegrationTests {
     /** Runs before beans/listeners can connect, including environment-variable overrides. */
     static class IsolationGuard implements ApplicationContextInitializer<ConfigurableApplicationContext> {

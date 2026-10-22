@@ -8,10 +8,17 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.amqp.rabbit.listener.MessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -162,6 +169,61 @@ class VideoStatusConsumerRecoveryControllerTests {
 
         assertFalse(controller.requestRecovery("after shutdown"));
         verify(scheduler).shutdownNow();
+    }
+
+    @Test
+    void concurrentRecoveryRequestsAcceptExactlyOneCycle() throws Exception {
+        when(container.isRunning()).thenReturn(true);
+        int callers = 16;
+        ExecutorService pool = Executors.newFixedThreadPool(callers);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<Boolean>> results = new ArrayList<>();
+            for (int i = 0; i < callers; i++) {
+                int caller = i;
+                results.add(pool.submit(() -> {
+                    start.await();
+                    return controller.requestRecovery("burst-" + caller);
+                }));
+            }
+            start.countDown();
+
+            int accepted = 0;
+            for (Future<Boolean> result : results) {
+                if (result.get(10, TimeUnit.SECONDS)) {
+                    accepted++;
+                }
+            }
+
+            assertEquals(1, accepted,
+                    "only one concurrent recovery request may own the cycle");
+            assertTrue(controller.isRecoveryInProgress());
+            verify(scheduler, times(1)).schedule(any(Runnable.class), eq(0L),
+                    eq(TimeUnit.MILLISECONDS));
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void destroyDuringInFlightRecoveryMakesPendingTasksNoOps() throws Exception {
+        when(container.isRunning()).thenReturn(true, false, false);
+        when(scheduler.awaitTermination(anyLong(), any(TimeUnit.class)))
+                .thenReturn(true);
+
+        controller.requestRecovery("forward failed");
+        Runnable stopTask = firstScheduledTask(0L);
+        clearInvocations(scheduler);
+
+        controller.destroy();
+        stopTask.run();
+
+        verify(container, never()).stop();
+        verify(container, never()).start();
+        verify(scheduler, never()).schedule(any(Runnable.class), anyLong(),
+                any(TimeUnit.class));
+        assertFalse(controller.isRecoveryInProgress());
+        assertFalse(controller.requestRecovery("after shutdown"));
     }
 
     private Runnable firstScheduledTask(long delayMillis) {

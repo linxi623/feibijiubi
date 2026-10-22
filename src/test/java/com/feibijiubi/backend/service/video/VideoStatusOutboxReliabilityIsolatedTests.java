@@ -22,6 +22,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -101,6 +102,9 @@ import static org.mockito.Mockito.verify;
 @org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @ActiveProfiles("video-status-isolated")
 @ContextConfiguration(initializers = VideoStatusIsolatedIntegrationTests.IsolationGuard.class)
+// This class reuses the IT application context, which starts the real consumer; close
+// it after the class so the consumer cannot steal messages from a later test class.
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class VideoStatusOutboxReliabilityIsolatedTests {
 
     /** 等“下一轮退避到期”的上限：1 秒退避 + 调度余量。 */

@@ -209,7 +209,7 @@ public class VideoStatusConsumerRecoveryController implements DisposableBean {
         }
     }
 
-    boolean isRecoveryInProgress() {
+    public boolean isRecoveryInProgress() {
         return recoveryInProgress.get();
     }
 

@@ -27,6 +27,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.annotation.DirtiesContext;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -67,6 +68,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ActiveProfiles("video-status-isolated")
 @ContextConfiguration(initializers =
         VideoStatusIsolatedIntegrationTests.IsolationGuard.class)
+// Start and stop a real listener in this class; a cached context would keep that
+// consumer alive and steal messages from the next isolated IT class.
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class VideoStatusConsumerRetryLifecycleIsolatedTests {
 
@@ -86,7 +90,7 @@ class VideoStatusConsumerRetryLifecycleIsolatedTests {
     RabbitAdmin admin;
 
     @BeforeEach
-    void prepare() {
+    void prepare() throws Exception {
         try (var connection = Objects.requireNonNull(jdbc.getDataSource())
                 .getConnection()) {
             assertTrue(connection.getMetaData().getURL()
@@ -97,6 +101,9 @@ class VideoStatusConsumerRetryLifecycleIsolatedTests {
         }
         admin = new RabbitAdmin(rabbit.getConnectionFactory());
         unpauseRedis();
+        // A previous test may have triggered a scheduled stop/restart.  Wait for
+        // that cycle to finish before taking over the container lifecycle.
+        stopListenerWhenRecoveryIdle();
         purgeDedicatedQueues();
         MessageListenerContainer container = container();
         if (!container.isRunning()) {
@@ -105,14 +112,40 @@ class VideoStatusConsumerRetryLifecycleIsolatedTests {
     }
 
     @AfterEach
-    void restore() {
+    void restore() throws Exception {
         unpauseRedis();
-        MessageListenerContainer container = container();
-        if (container.isRunning()) {
-            container.stop();
-        }
+        // Never race the recovery controller's asynchronous restart: it may still
+        // have a stop/start scheduled from the forwarding-failure test.  Starting
+        // the container from two threads corrupts the container's consumer set
+        // ("A stopped container should not have consumers") and a late restart
+        // can consume messages of a test that deliberately stopped the listener.
+        stopListenerWhenRecoveryIdle();
         purgeDedicatedQueues();
-        container.start();
+        container().start();
+    }
+
+    /**
+     * Stops the listener only while no recovery cycle is in flight.  The recovery
+     * controller keeps its gate set until its restart task has completed, so a
+     * false gate means no scheduled task can start the container behind our back.
+     */
+    private void stopListenerWhenRecoveryIdle() throws Exception {
+        long end = System.nanoTime() + 30_000_000_000L;
+        while (System.nanoTime() < end) {
+            if (!recovery.isRecoveryInProgress()) {
+                MessageListenerContainer container = container();
+                if (container.isRunning()) {
+                    container.stop();
+                }
+                if (!recovery.isRecoveryInProgress()) {
+                    assertTrue(!container.isRunning(),
+                            "listener must be stopped after recovery is idle");
+                    return;
+                }
+            }
+            Thread.sleep(20);
+        }
+        throw new AssertionError("consumer recovery did not become idle in 30 seconds");
     }
 
     @Test
@@ -223,7 +256,10 @@ class VideoStatusConsumerRetryLifecycleIsolatedTests {
         assertFixedTtl(RabbitConstants.RETRY_QUEUE_120S, 120_000);
 
         MessageListenerContainer container = container();
-        container.stop();
+        // Take over the listener only after any scheduled stop/restart has finished,
+        // otherwise a late recovery task could restart it during the TTL window.
+        stopListenerWhenRecoveryIdle();
+        assertTrue(!container.isRunning());
         purgeDedicatedQueues();
 
         long startedAt = System.nanoTime();
@@ -276,8 +312,12 @@ class VideoStatusConsumerRetryLifecycleIsolatedTests {
         }
 
         // 恢复后必须收敛（或按重试预算进入可重放 DLQ），不能静默消失。
-        await(() -> currentNullable(vid) != null
-                || deadQueueDepth() > 0, 240);
+        // 不能只等 current 键“出现”：重建初始化会先写入基线 0，事件应用完成前
+        // 该键已经存在，过早把 0 当成收敛会掩盖仍在处理的恢复流程。
+        await(() -> {
+            Long value = currentNullable(vid);
+            return (value != null && value == 1L) || deadQueueDepth() > 0;
+        }, 240);
         long current = currentNullable(vid) == null ? 0L : currentNullable(vid);
         assertTrue(current == 1L || deadQueueDepth() == 1,
                 "Redis 恢复后事件必须安全收敛或进入可重放 DLQ，实际 current="
