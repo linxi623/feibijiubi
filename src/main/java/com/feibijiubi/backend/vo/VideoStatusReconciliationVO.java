@@ -64,7 +64,10 @@ public class VideoStatusReconciliationVO {
 
     /**
      * 按 process_status 0/1/2/3 的有界账本数量。
-     * {@code truncated=true} 时每个数量都只是“至少”下界，不能相加当作历史总量真值。
+     *
+     * <p>每个 {@code statusXCapped=true} 表示该状态至少达到 {@code cap} 行，
+     * 对应数量只是下界；{@code truncated} 是四个状态的兼容汇总。
+     * 计数故意不做无界 COUNT：保守截断不是 bug，而是只读诊断的明确边界。</p>
      */
     @Data
     @AllArgsConstructor
@@ -74,13 +77,19 @@ public class VideoStatusReconciliationVO {
         private final long status1;
         private final long status2;
         private final long status3;
+        private final boolean status0Capped;
+        private final boolean status1Capped;
+        private final boolean status2Capped;
+        private final boolean status3Capped;
         private final boolean truncated;
         private final String note;
     }
 
     /**
-     * 最近 {@code limit + 1} 行安全事件的类型增量投影。
-     * 类型 delta 用 BigInteger 汇总，避免 long 溢出；截断时只是窗口下界。
+     * 最近 {@code limit} 行安全事件的类型增量投影。
+     * 查询最多读取 {@code limit + 1} 行，但第 {@code limit + 1} 行只用于判定截断，
+     * 不计入 {@code rowCount}/{@code deltaByType}。类型 delta 用 BigInteger 汇总，
+     * 避免 long 溢出；截断时只是窗口下界。
      */
     @Data
     @AllArgsConstructor
@@ -88,8 +97,10 @@ public class VideoStatusReconciliationVO {
         private final int requestedLimit;
         private final int rowCount;
         private final boolean truncated;
+        private final boolean indexAvailable;
         private final Map<String, BigInteger> deltaByType;
         private final int unknownTypeCount;
+        private final int nullDeltaCount;
         private final BigInteger unknownTypeDelta;
         private final Long minEventId;
         private final Long maxEventId;

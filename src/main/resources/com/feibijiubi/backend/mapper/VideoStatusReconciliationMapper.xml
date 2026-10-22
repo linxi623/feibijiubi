@@ -9,6 +9,9 @@
     * 本文件只有 SELECT，禁止加入 insert/update/delete；
     * 每条语句都带 timeout（秒），并且结果行数有 LIMIT 上界；
     * 不使用无界 SUM/COUNT；账本计数用派生表 LIMIT cap 封顶；
+    * 事件投影最多读取 limit + 1 行，第 limit + 1 行只用于判断截断，不进入汇总；
+    * 事件投影前先用只读 information_schema 查询确认 (vid, id) 有效前缀，
+      缺索引时服务层返回空投影而不是对大表做 filesort；
     * 业务关系真值先 LIMIT cap 行再聚合，截断由 Java 侧标记；
     * 不选择 payload / last_error / 租约 token，避免把敏感明细带出接口。
 
@@ -87,8 +90,29 @@
     </select>
 
     <!--
+      只读索引探测：事件窗口要求 (vid, id) 是某个索引的有效前缀。
+      只看 information_schema，不扫描业务表；无该前缀时服务层直接返回空投影，
+      避免对大表做 filesort。
+    -->
+    <select id="countEventProjectionIndexPrefix"
+            resultType="int"
+            timeout="3">
+        SELECT COUNT(*)
+        FROM (
+            SELECT index_name
+            FROM information_schema.statistics
+            WHERE table_schema = DATABASE()
+              AND table_name = 'video_status_consumed_event'
+              AND column_name IN ('vid', 'id')
+            GROUP BY index_name
+            HAVING MAX(CASE WHEN seq_in_index = 1 AND column_name = 'vid' THEN 1 ELSE 0 END) = 1
+               AND MAX(CASE WHEN seq_in_index = 2 AND column_name = 'id' THEN 1 ELSE 0 END) = 1
+        ) valid_prefix
+    </select>
+
+    <!--
       安全投影：只取 id / process_status / event_type / delta。
-      按 (vid, id) 索引倒序扫描，最多 limit 行；不读取 payload 或错误原文。
+      按 (vid, id) 索引倒序扫描，最多 limit + 1 行；不读取 payload 或错误原文。
     -->
     <select id="selectEventProjection"
             resultMap="EventProjectionResultMap"

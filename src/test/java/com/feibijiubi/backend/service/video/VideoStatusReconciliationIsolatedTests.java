@@ -43,6 +43,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -50,6 +51,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * T10 只读对账的真实隔离集成测试：MySQL 13307 + Redis 16379，绝不复用部署环境。
@@ -106,6 +110,8 @@ class VideoStatusReconciliationIsolatedTests {
     @Autowired
     StringRedisTemplate redis;
     @Autowired
+    RedisHashOperations redisHashOperations;
+    @Autowired
     ObjectMapper objectMapper;
 
     int vid;
@@ -122,6 +128,9 @@ class VideoStatusReconciliationIsolatedTests {
         vid = newVideo();
         jdbc.update("INSERT INTO video_status(vid) VALUES (?)", vid);
         redisKey = RedisKeyUtils.videoStatus(vid);
+
+        // 确保真实隔离库已执行 T10 索引迁移；迁移本身幂等，且不修改数据。
+        ensureReconciliationIndex();
 
         // 每个新 vid 的 Redis key 由本测试拥有；先清理上次中断可能留下的同名 key。
         redis.delete(redisKey);
@@ -216,6 +225,10 @@ class VideoStatusReconciliationIsolatedTests {
         assertEquals(3L, result.getLedger().getStatus1());
         assertEquals(1L, result.getLedger().getStatus2());
         assertEquals(0L, result.getLedger().getStatus3());
+        assertFalse(result.getLedger().isStatus0Capped());
+        assertTrue(result.getLedger().isStatus1Capped());
+        assertFalse(result.getLedger().isStatus2Capped());
+        assertFalse(result.getLedger().isStatus3Capped());
         assertTrue(result.getLedger().isTruncated());
         assertTrue(result.getUncertainties().contains("LEDGER_COUNTS_TRUNCATED"));
         assertTrue(result.getLedger().getNote().contains("下界"));
@@ -264,6 +277,7 @@ class VideoStatusReconciliationIsolatedTests {
                 projection.getDeltaByType().get("LIKE"),
                 "event delta sum must use BigInteger beyond Long range");
         assertEquals(1, projection.getUnknownTypeCount());
+        assertEquals(0, projection.getNullDeltaCount());
         assertEquals(BigInteger.valueOf(7L), projection.getUnknownTypeDelta());
         assertEquals(idsDesc.get(idsDesc.size() - 1), projection.getMinEventId());
         assertEquals(idsDesc.get(0), projection.getMaxEventId());
@@ -273,7 +287,50 @@ class VideoStatusReconciliationIsolatedTests {
         String serialized = objectMapper.writeValueAsString(result);
         assertFalse(serialized.contains(payloadSecret), "response must not contain payload details");
         assertFalse(serialized.contains(lastErrorSecret), "response must not contain raw last_error");
-        assertFalse(result.isIncomplete());
+        assertTrue(result.getUncertainties().contains("EVENT_PROJECTION_UNKNOWN_TYPE"),
+                "unknown event types must be an explicit uncertainty");
+        assertTrue(result.isIncomplete(), "unknown event types make the projection incomplete");
+    }
+
+    @Test
+    void missingEventProjectionIndexSkipsExpensiveQueryAndIsIncomplete() {
+        insertConsumed("PLAY", 1L, 2);
+        AtomicInteger eventProjectionCalls = new AtomicInteger();
+        VideoStatusReconciliationMapper noIndexMapper =
+                mock(VideoStatusReconciliationMapper.class);
+        when(noIndexMapper.countEventProjectionIndexPrefix()).thenReturn(0);
+        when(noIndexMapper.selectDbCounts(anyInt()))
+                .thenAnswer(invocation -> reconciliationMapper.selectDbCounts(
+                        invocation.getArgument(0)));
+        when(noIndexMapper.countLedgerByStatus(anyInt(), anyInt(), anyInt()))
+                .thenAnswer(invocation -> reconciliationMapper.countLedgerByStatus(
+                        invocation.getArgument(0),
+                        invocation.getArgument(1),
+                        invocation.getArgument(2)));
+        when(noIndexMapper.selectRelationAggregate(anyInt(), anyInt()))
+                .thenAnswer(invocation -> reconciliationMapper.selectRelationAggregate(
+                        invocation.getArgument(0),
+                        invocation.getArgument(1)));
+        when(noIndexMapper.selectEventProjection(anyInt(), anyInt()))
+                .thenAnswer(invocation -> {
+                    eventProjectionCalls.incrementAndGet();
+                    return reconciliationMapper.selectEventProjection(
+                            invocation.getArgument(0),
+                            invocation.getArgument(1));
+                });
+
+        VideoStatusReconciliationServiceImpl service =
+                new VideoStatusReconciliationServiceImpl(noIndexMapper, redisHashOperations);
+        VideoStatusReconciliationVO result = service.reconcile(vid, 10);
+
+        assertEquals(0, eventProjectionCalls.get(),
+                "missing index must skip the expensive event projection query");
+        assertFalse(result.getEventProjection().isIndexAvailable());
+        assertEquals(0, result.getEventProjection().getRowCount());
+        assertTrue(result.getEventProjection().getDeltaByType().values()
+                .stream().allMatch(BigInteger.ZERO::equals));
+        assertTrue(result.getUncertainties().contains("INDEX_MISSING"));
+        assertTrue(result.isIncomplete());
     }
 
     @Test
@@ -295,12 +352,14 @@ class VideoStatusReconciliationIsolatedTests {
         VideoStatusReconciliationVO result = reconciliationService.reconcile(vid, limit);
         VideoStatusReconciliationVO.EventProjection projection = result.getEventProjection();
         assertTrue(projection.isTruncated());
-        assertEquals(cap, projection.getRowCount());
+        assertEquals(limit, projection.getRowCount(), "rowCount must not include the limit + 1 probe row");
         assertEquals(idsDesc.get(0), projection.getMaxEventId());
-        assertEquals(idsDesc.get(2), projection.getMinEventId(),
-                "only the newest cap rows are visible; the oldest event is outside the window");
+        assertEquals(idsDesc.get(1), projection.getMinEventId(),
+                "only the newest limit rows are counted; the probe row is outside the projection");
         assertEquals(BigInteger.ZERO, projection.getDeltaByType().get("PLAY"),
                 "the oldest PLAY event is outside the truncated window");
+        assertEquals(BigInteger.ZERO, projection.getDeltaByType().get("LIKE"),
+                "the limit + 1 probe row must not be counted");
         assertTrue(result.getUncertainties().contains("EVENT_PROJECTION_TRUNCATED"));
         assertTrue(result.isIncomplete());
     }
@@ -408,6 +467,8 @@ class VideoStatusReconciliationIsolatedTests {
         assertTrue(possibleKeys.contains("idx_video_status_consumed_vid_id"),
                 "real event projection SQL must be able to use the (vid, id) index, got: "
                         + possibleKeys);
+        assertTrue(reconciliationMapper.countEventProjectionIndexPrefix() > 0,
+                "the read-only information_schema check must detect the (vid, id) prefix");
     }
 
     // ------------------------------------------------------------- 6) Redis 计数
@@ -537,6 +598,13 @@ class VideoStatusReconciliationIsolatedTests {
         Map<String, String> zeros = new LinkedHashMap<>();
         REDIS_FIELDS.forEach(field -> zeros.put(field, "0"));
         return zeros;
+    }
+
+    private void ensureReconciliationIndex() {
+        jdbc.execute((ConnectionCallback<Void>) connection -> {
+            ScriptUtils.executeSqlScript(connection, new FileSystemResource(MIGRATION));
+            return null;
+        });
     }
 
     private void insertConsumed(String eventType, long delta, int processStatus) {

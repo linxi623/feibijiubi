@@ -4,6 +4,7 @@ import com.feibijiubi.backend.common.RedisOperationException;
 import com.feibijiubi.backend.entity.VideoStatus;
 import com.feibijiubi.backend.entity.VideoStatusReconciliationEventRow;
 import com.feibijiubi.backend.entity.VideoStatusReconciliationRelationAggregate;
+import com.feibijiubi.backend.event.VideoStatusEventType;
 import com.feibijiubi.backend.mapper.VideoStatusReconciliationMapper;
 import com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusReconciliationServiceImpl;
 import com.feibijiubi.backend.utils.redis.operation.RedisHashOperations;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,6 +46,7 @@ class VideoStatusReconciliationTests {
         service = new VideoStatusReconciliationServiceImpl(mapper, redisHashOperations);
 
         when(mapper.selectDbCounts(anyInt())).thenReturn(dbCounts());
+        when(mapper.countEventProjectionIndexPrefix()).thenReturn(1);
         when(mapper.countLedgerByStatus(anyInt(), anyInt(), anyInt())).thenReturn(0L);
         when(mapper.selectEventProjection(anyInt(), anyInt())).thenReturn(List.of());
         when(mapper.selectRelationAggregate(anyInt(), anyInt()))
@@ -92,6 +95,10 @@ class VideoStatusReconciliationTests {
                 .isEqualTo(BigInteger.valueOf(3L));
         assertThat(result.getEventProjection().getMinEventId()).isEqualTo(1L);
         assertThat(result.getEventProjection().getMaxEventId()).isEqualTo(2L);
+        assertThat(result.getEventProjection().getDeltaByType().keySet())
+                .containsExactlyElementsOf(Arrays.stream(VideoStatusEventType.values())
+                        .map(Enum::name)
+                        .toList());
 
         assertThat(result.getRelations().isSampled()).isTrue();
         assertThat(result.getRelations().isUsableForConclusion()).isTrue();
@@ -121,8 +128,16 @@ class VideoStatusReconciliationTests {
 
         assertThat(result.getLedger().isTruncated()).isTrue();
         assertThat(result.getLedger().getStatus1()).isEqualTo(3L);
+        assertThat(result.getLedger().isStatus0Capped()).isFalse();
+        assertThat(result.getLedger().isStatus1Capped()).isTrue();
+        assertThat(result.getLedger().isStatus2Capped()).isFalse();
+        assertThat(result.getLedger().isStatus3Capped()).isFalse();
         assertThat(result.getEventProjection().isTruncated()).isTrue();
-        assertThat(result.getEventProjection().getRowCount()).isEqualTo(3);
+        assertThat(result.getEventProjection().getRowCount()).isEqualTo(2);
+        assertThat(result.getEventProjection().getDeltaByType().get("LIKE"))
+                .isEqualTo(BigInteger.valueOf(2L));
+        assertThat(result.getEventProjection().getMinEventId()).isEqualTo(2L);
+        assertThat(result.getEventProjection().getMaxEventId()).isEqualTo(3L);
         assertThat(result.getRelations().isTruncated()).isTrue();
         assertThat(result.getRelations().isLowerBound()).isTrue();
         assertThat(result.getRelations().isUsableForConclusion()).isFalse();
@@ -133,6 +148,45 @@ class VideoStatusReconciliationTests {
                 "RELATION_SAMPLE_TRUNCATED"
         );
         assertThat(result.getLedger().getNote()).contains("下界");
+    }
+
+    @Test
+    void unknownEventTypeAndNullDeltaAreExplicitUncertaintiesAndIncomplete() {
+        VideoStatusReconciliationEventRow nullDelta = eventRow(3L, 1, "PLAY", 1L);
+        nullDelta.setDelta(null);
+        when(mapper.selectEventProjection(anyInt(), anyInt())).thenReturn(List.of(
+                eventRow(2L, 1, "MYSTERY_EVENT", 7L),
+                nullDelta
+        ));
+
+        VideoStatusReconciliationVO result = service.reconcile(VID, 100);
+
+        VideoStatusReconciliationVO.EventProjection projection = result.getEventProjection();
+        assertThat(projection.getUnknownTypeCount()).isEqualTo(1);
+        assertThat(projection.getNullDeltaCount()).isEqualTo(1);
+        assertThat(projection.getUnknownTypeDelta()).isEqualTo(BigInteger.valueOf(7L));
+        assertThat(result.getUncertainties()).contains(
+                "EVENT_PROJECTION_UNKNOWN_TYPE",
+                "EVENT_PROJECTION_NULL_DELTA"
+        );
+        assertThat(result.isIncomplete()).isTrue();
+    }
+
+    @Test
+    void missingEventProjectionIndexSkipsExpensiveQueryAndIsIncomplete() {
+        when(mapper.countEventProjectionIndexPrefix()).thenReturn(0);
+
+        VideoStatusReconciliationVO result = service.reconcile(VID, 100);
+
+        VideoStatusReconciliationVO.EventProjection projection = result.getEventProjection();
+        assertThat(projection.isIndexAvailable()).isFalse();
+        assertThat(projection.getRowCount()).isZero();
+        assertThat(projection.isTruncated()).isFalse();
+        assertThat(projection.getDeltaByType().values())
+                .containsOnly(BigInteger.ZERO);
+        assertThat(result.getUncertainties()).contains("INDEX_MISSING");
+        assertThat(result.isIncomplete()).isTrue();
+        verify(mapper, never()).selectEventProjection(anyInt(), anyInt());
     }
 
     @Test
@@ -248,7 +302,7 @@ class VideoStatusReconciliationTests {
             long id,
             int processStatus,
             String eventType,
-            long delta
+            Long delta
     ) {
         VideoStatusReconciliationEventRow row = new VideoStatusReconciliationEventRow();
         row.setId(id);

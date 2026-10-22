@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,9 @@ import java.util.Map;
  *       因此明确标记 {@code CONCURRENT_OBSERVATION_NOT_ATOMIC}；</li>
  *   <li>所有账本/事件/关系查询最多读取 {@code limit + 1} 行，达到上界即标记截断，
  *       截断结果只能当“至少/窗口下界”，不参与 SAFE 结论；</li>
+ *   <li>事件投影的第 {@code limit + 1} 行只用于判断截断，绝不进入 rowCount/delta 汇总；
+ *       未知事件类型、null delta 或缺少 {@code (vid, id)} 索引都会明确标记 uncertainty
+ *       并令结果 incomplete；缺索引时直接跳过昂贵的事件投影查询；</li>
  *   <li>历史 ledger 的 SUM 不是 DB 真值；本接口只展示窗口内事件类型 delta 的
  *       BigInteger 汇总，并保留截断标记；</li>
  *   <li>Redis 只读取八个计数字段并做 canonical 非负十进制 Long 校验；
@@ -46,6 +50,9 @@ public class VideoStatusReconciliationServiceImpl
 
     static final String LEDGER_COUNTS_TRUNCATED = "LEDGER_COUNTS_TRUNCATED";
     static final String EVENT_PROJECTION_TRUNCATED = "EVENT_PROJECTION_TRUNCATED";
+    static final String EVENT_PROJECTION_INDEX_MISSING = "INDEX_MISSING";
+    static final String EVENT_PROJECTION_UNKNOWN_TYPE = "EVENT_PROJECTION_UNKNOWN_TYPE";
+    static final String EVENT_PROJECTION_NULL_DELTA = "EVENT_PROJECTION_NULL_DELTA";
     static final String RELATION_SAMPLE_TRUNCATED = "RELATION_SAMPLE_TRUNCATED";
     static final String RELATION_TRUTH_UNAVAILABLE = "RELATION_TRUTH_UNAVAILABLE";
     static final String DB_STATUS_ROW_MISSING = "DB_STATUS_ROW_MISSING";
@@ -100,6 +107,9 @@ public class VideoStatusReconciliationServiceImpl
         boolean incomplete = !db.isRowPresent()
                 || ledger.isTruncated()
                 || eventProjection.isTruncated()
+                || !eventProjection.isIndexAvailable()
+                || eventProjection.getUnknownTypeCount() > 0
+                || eventProjection.getNullDeltaCount() > 0
                 || !relations.isSampled()
                 || relations.isTruncated()
                 || !REDIS_STATUS_SAMPLED.equals(redis.getStatus());
@@ -161,10 +171,14 @@ public class VideoStatusReconciliationServiceImpl
         long status1 = reconciliationMapper.countLedgerByStatus(vid, 1, cap);
         long status2 = reconciliationMapper.countLedgerByStatus(vid, 2, cap);
         long status3 = reconciliationMapper.countLedgerByStatus(vid, 3, cap);
-        boolean truncated = status0 >= cap
-                || status1 >= cap
-                || status2 >= cap
-                || status3 >= cap;
+        boolean status0Capped = status0 >= cap;
+        boolean status1Capped = status1 >= cap;
+        boolean status2Capped = status2 >= cap;
+        boolean status3Capped = status3 >= cap;
+        boolean truncated = status0Capped
+                || status1Capped
+                || status2Capped
+                || status3Capped;
         if (truncated) {
             uncertainties.add(LEDGER_COUNTS_TRUNCATED);
         }
@@ -174,9 +188,13 @@ public class VideoStatusReconciliationServiceImpl
                 status1,
                 status2,
                 status3,
+                status0Capped,
+                status1Capped,
+                status2Capped,
+                status3Capped,
                 truncated,
                 truncated
-                        ? "至少一个状态达到 cap=" + cap + "，数量只是下界；不能相加当作历史 ledger 总量或 DB 真值"
+                        ? "至少一个状态达到 cap=" + cap + "，该状态数量只是下界；不能相加当作历史 ledger 总量或 DB 真值"
                         : "每个状态都低于 cap，数量为本次读取的精确值；仍不是 DB 真值"
         );
     }
@@ -187,24 +205,45 @@ public class VideoStatusReconciliationServiceImpl
             int cap,
             List<String> uncertainties
     ) {
-        List<VideoStatusReconciliationEventRow> rows =
-                reconciliationMapper.selectEventProjection(vid, cap);
-        boolean truncated = rows.size() > limit;
-        if (truncated) {
-            uncertainties.add(EVENT_PROJECTION_TRUNCATED);
-        }
-
         Map<String, BigInteger> deltaByType = new LinkedHashMap<>();
         for (VideoStatusEventType type : VideoStatusEventType.values()) {
             deltaByType.put(type.name(), BigInteger.ZERO);
         }
 
+        if (reconciliationMapper.countEventProjectionIndexPrefix() <= 0) {
+            uncertainties.add(EVENT_PROJECTION_INDEX_MISSING);
+            return new VideoStatusReconciliationVO.EventProjection(
+                    limit,
+                    0,
+                    false,
+                    false,
+                    stableDeltaMap(deltaByType),
+                    0,
+                    0,
+                    BigInteger.ZERO,
+                    null,
+                    null,
+                    "缺少 (vid, id) 有效前缀索引；为避免大表 filesort 已跳过事件投影，"
+                            + "本窗口为空且不完整，不执行昂贵查询也不写数据库"
+            );
+        }
+
+        List<VideoStatusReconciliationEventRow> rows =
+                reconciliationMapper.selectEventProjection(vid, cap);
+        boolean truncated = rows.size() > limit;
+        int rowCount = Math.min(rows.size(), limit);
+        if (truncated) {
+            uncertainties.add(EVENT_PROJECTION_TRUNCATED);
+        }
+
         int unknownTypeCount = 0;
+        int nullDeltaCount = 0;
         BigInteger unknownTypeDelta = BigInteger.ZERO;
         Long minEventId = null;
         Long maxEventId = null;
 
-        for (VideoStatusReconciliationEventRow row : rows) {
+        for (int i = 0; i < rowCount; i++) {
+            VideoStatusReconciliationEventRow row = rows.get(i);
             if (row.getId() != null) {
                 minEventId = minEventId == null
                         ? row.getId()
@@ -215,7 +254,7 @@ public class VideoStatusReconciliationServiceImpl
             }
             Long delta = row.getDelta();
             if (delta == null) {
-                unknownTypeCount++;
+                nullDeltaCount++;
                 continue;
             }
             BigInteger value = BigInteger.valueOf(delta);
@@ -227,20 +266,33 @@ public class VideoStatusReconciliationServiceImpl
                 deltaByType.merge(type.name(), value, BigInteger::add);
             }
         }
+        if (unknownTypeCount > 0) {
+            uncertainties.add(EVENT_PROJECTION_UNKNOWN_TYPE);
+        }
+        if (nullDeltaCount > 0) {
+            uncertainties.add(EVENT_PROJECTION_NULL_DELTA);
+        }
 
         return new VideoStatusReconciliationVO.EventProjection(
                 limit,
-                rows.size(),
+                rowCount,
                 truncated,
-                Map.copyOf(deltaByType),
+                true,
+                stableDeltaMap(deltaByType),
                 unknownTypeCount,
+                nullDeltaCount,
                 unknownTypeDelta,
                 minEventId,
                 maxEventId,
                 truncated
-                        ? "只读取最近 " + cap + " 行事件（超过 limit），窗口不完整；类型 delta 不能代表全部历史"
+                        ? "最多读取 " + cap + " 行用于判断截断，但只汇总最近 " + limit
+                                + " 行；窗口不完整，类型 delta 不能代表全部历史"
                         : "窗口内事件已完整读取；类型 delta 仍只是该 vid 的事件投影，不等于 DB 八项计数真值"
         );
+    }
+
+    private Map<String, BigInteger> stableDeltaMap(Map<String, BigInteger> values) {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(values));
     }
 
     private VideoStatusEventType parseEventType(String eventType) {
