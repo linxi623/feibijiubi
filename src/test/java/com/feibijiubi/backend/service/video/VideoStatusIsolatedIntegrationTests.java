@@ -60,6 +60,7 @@ import static org.mockito.Mockito.*;
 @SpringBootTest(classes = VideoStatusIsolatedIntegrationTests.TestApplication.class,
         properties = {"spring.config.location=classpath:video-status-isolated.properties",
                 "spring.main.web-application-type=none"})
+@org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @ActiveProfiles("video-status-isolated")
 @ContextConfiguration(initializers = VideoStatusIsolatedIntegrationTests.IsolationGuard.class)
 class VideoStatusIsolatedIntegrationTests {
@@ -179,6 +180,7 @@ class VideoStatusIsolatedIntegrationTests {
     @Autowired VideoStatusProperties properties;
     @Autowired TransactionTemplate tx;
     @Autowired RabbitTemplate rabbit;
+    @Autowired org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry listenerRegistry;
     @Autowired ObjectMapper json;
     @Autowired VideoStatusRebuildService rebuild;
     @Autowired VideoStatusConsumedEventMapper consumedMapper;
@@ -205,9 +207,19 @@ class VideoStatusIsolatedIntegrationTests {
         vid = jdbc.queryForObject("SELECT MAX(vid) FROM video WHERE uid=?", Integer.class, uid);
         jdbc.update("INSERT INTO video_status(vid,play_times) VALUES (?,100)", vid);
         // Avoid stale queue messages from a previous interrupted test run.
+        // Stop before purging: purge cannot remove prefetched/unacked messages.
+        // Closing this test context's channels returns them to the isolated queues.
+        listenerRegistry.stop();
         RabbitAdmin admin = new RabbitAdmin(rabbit.getConnectionFactory());
+        // A newer test candidate may have left delayed messages in the isolated broker.
+        // Purge only the two known test-project retry tiers, never DB evidence.
+        for (String queue : List.of("video.status.retry.queue.30s.v1",
+                "video.status.retry.queue.120s.v1")) {
+            if (admin.getQueueProperties(queue) != null) admin.purgeQueue(queue, false);
+        }
         for (String queue : List.of(RabbitConstants.MAIN_QUEUE, RabbitConstants.RETRY_QUEUE,
                 RabbitConstants.DEAD_QUEUE)) admin.purgeQueue(queue, false);
+        listenerRegistry.start();
     }
 
     @Test
