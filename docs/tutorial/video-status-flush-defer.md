@@ -108,8 +108,8 @@ DB 已达 `Long.MAX_VALUE`、两个合法事件（`+1`、`-1`）都是 status 1 
 
 - **位置**：`SPOP` 之后、**取锁与 SQL 之前**判断。退避未到期时只 `SADD` 回 dirty 就跳过，
   不取 vid 锁、不查事件表。
-- **常量**：`DEFER_BACKOFF_MILLIS = 2000`（规范允许 1s..30s）。先固定常量，
-  T04/T05 再决定是否配置化与接入告警指标。
+- **常量**：`DEFER_BACKOFF_MILLIS = 2000`（规范允许 1s..30s）。先固定常量；T05 已接入
+  `FLUSH/DEFERRED` 遥测与积压采样，该常量仍未配置化。
 - **预算**：同一 vid 连续延后 `DEFER_ALERT_BUDGET = 30` 次以内打 WARN；
   超过后每 30 次打一条 ERROR（约每分钟一条）。**超过预算只告警，仍然不隔离、不改写统计。**
 - **成功清理**：正常刷库成功或该 vid 已无待刷事件时移除本地退避状态。
@@ -187,8 +187,8 @@ docker compose -f compose.test.yaml up -d --wait
 
 ## 6. 已知限制与后续任务
 
-- **常量退避未配置化**：`DEFER_BACKOFF_MILLIS` / `DEFER_ALERT_BUDGET` 目前是常量，
-  配置化与指标（最老待刷年龄、延后次数）留给 T04/T05，避免与 `VideoStatusProperties` 的 T04 改动冲突。
+- **常量退避未配置化**：`DEFER_BACKOFF_MILLIS` / `DEFER_ALERT_BUDGET` 目前是常量；T05 已提供
+  `FLUSH/DEFERRED` 计数、最老待处理年龄与积压告警，但常量配置化仍未做，留待后续容量调优。
 - **只告警不升级**：永久无法成立的负增量（例如业务侧真的少记了一次）会一直延后并周期性 ERROR，
   需要 T09/T10 提供受控查询与处置；本任务不自动改写统计、不自动隔离。
   上界侧同理：如果计数真的停在 `Long.MAX_VALUE` 且没有取消事件来抵销，`+1` 也会一直延后并告警；

@@ -1,6 +1,6 @@
 # 互动统计链路改进执行计划与 TODO
 
-> 状态：执行中；T01—T04 已验收并合入，接续 T05 可观测能力。仅表中已完成且有证据的项代表已实现能力；不代表批准生产上线。
+> 状态：执行中；T01—T06 已验收并合入，接续 T07（Outbox 发布/回写/租约）。仅表中已完成且有证据的项代表已实现能力；不代表批准生产上线。
 >
 > 范围：互动入口 → Outbox → RabbitMQ → Redis → 消费事件 → 批量落库 → 重建/补偿。
 > 原则：先验证正确性，再补恢复闭环，再治理稳定性，最后优化吞吐。
@@ -31,8 +31,8 @@
 | [x] | 02 / T02 | P0 | 验证并修正非负 SQL、统一计数类型 | T01 | 已完成 | a9a3ad9；最终87单测通过/62隔离用例0失败1可选跳过；真实计数/事务回滚见下方验收记录 |
 | [x] | 03 / T03 | P0 | 修复负增量落库顺序窗口与错误分类 | T02 | 已完成 | c4d6e99；真实消费者阻塞100轮全部延后后收敛、0误隔离；真实上限LIMIT1拆批收敛 |
 | [x] | 04 / T04 | P0 | 修复失效开关、明确运行角色及开关契约 | T01；按序在 T03 后交付 | 已完成 | fe11d03；配置绑定/启动拒绝6用例，角色13用例，真实维护切换最终DB=Redis=6、4异步2同步 |
-| [ ] | 05 / T05 | P1 | 建立最小链路指标与积压告警 | T03、T04 | 待开始 | — |
-| [ ] | 06 / T06 | P1 | 隔离调度资源、限制单轮任务预算 | T05 | 待开始 | — |
+| [x] | 05 / T05 | P1 | 建立最小链路指标与积压告警 | T03、T04 | 已完成 | 46af28b；父代理 2026-10-22 复验：69 单测 + 8 隔离用例均 0 失败/错误/跳过；四类故障可定位、采样只读、迁移幂等 |
+| [x] | 06 / T06 | P1 | 隔离调度资源、限制单轮任务预算 | T05 | 已完成 | 3e33415；同批 69 + 8；受控阻塞 30.082s 时 flush 62ms、恢复继续心跳；并发落库 baseline=100/flushed=100 |
 | [ ] | 07 / T07 | P1 | 完善 Outbox 发布、回写、租约处理 | T06 | 待开始 | — |
 | [ ] | 08 / T08 | P1 | 消费重试退避、故障限速、ACK 边界 | T05、T07 | 待开始 | — |
 | [ ] | 09 / T09 | P1 | 接通安全窗口内 status0 自动补偿 | T03、T07、T08 | 待开始 | — |
@@ -360,6 +360,18 @@ docker compose -f compose.test.yaml stop
 - 设计：不改DDL；SQL用DECIMAL守卫、计数Long、Lua字符串精确算术；flush BigInteger求净量，边界不足延后2s、4096条本地LRU、超过预算只告警、不误隔离。上限失败最多一次负优先锁定备选；dirty不SREM、vid锁/无TTL token门闩保留。
 - 风险/回滚：先盘点>Long与>Integer（含聚合）再部署；T02/T03配套、旧新不兼容消费者不得混跑。不要删除幂等或门闩；优先暂停并向前修复，不把旧版误隔离当作安全回滚。任意Redis运行时故障/数据丢失、进程崩溃与大规模性能仍不在本阶段保证范围，交T09/T12/T16；持续边界不足需T05指标与T10处置。
 - 文档：`AGENTS.md`/`CLAUDE.md`保持一致，`docs/api.md`及三篇对应教程同步。下一任务T05，P0实现出口已通过，但不批准自动上线。
+
+### T05—T06 最终验收记录（2026-10-22）
+
+- 状态：已完成；实现提交 T05 `46af28b`、T06 `3e33415`，验收基线 `b59b579`。验收由父代理本次独立复跑；本次仅做文档收尾，未修改代码、未提交 git、未自动部署。
+- 环境与数据边界：Windows 本机 + 独立 `compose.test.yaml`（MySQL 13307 / Redis 16379 / RabbitMQ 15673）；未使用正式资源，未读取或输出 `application.yml` 凭证。测试只使用本用例新建数据，不清理历史事件；仍属测试环境验收。
+- 命令1（无基础设施）：`./mvnw '-Dtest=VideoStatusMetricsSamplerTests,VideoStatusMetricsTelemetryTests,VideoStatusMetricsComponentWiringTests,VideoStatusMetricsAuthorizationTests,VideoStatusTelemetryInstrumentationTests,VideoStatusSchedulingConfigTests,VideoStatusSchedulingIsolationTests' test`，结果 69 tests，0 failures/errors/skipped，日志 `/tmp/improvement-t05-t06-unit.log`。
+- 命令2（隔离环境）：`docker compose -f compose.test.yaml up -d --wait` 后执行 `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusMetricsIsolatedTests,VideoStatusSchedulingRealFlowTests' test`，结果 8 tests，0 failures/errors/skipped，日志 `/tmp/improvement-t05-t06-it.log`。两项命令均同时覆盖 T05/T06，不把总数拆成两个任务的虚假细分数。
+- T05证据：真实隔离库制造 OUTBOX FAILED、OUTBOX PENDING(1)>120s、CONSUMED RECEIVED(0)>180s、CONSUMED REPAIR_REQUIRED(3) 四类样本，采样告警和 `/api/admin/video-status/metrics` 缓存路径均可定位；采样前后事件/统计行逐字段相等；迁移连续两遍幂等且 `EXPLAIN` 命中新索引；flush 仅在事务提交后记一次端到端样本，外层回滚为零次；门闩新格式可读停留时间、老格式明确未知且只读。索引迁移必须先于采样上线，缺索引只返回 `DEGRADED`。
+- T06证据：真实业务组件下将 publish 受控阻塞，输出 `blocked publish millis=30082 flushMillis=62 flushRuns=267 recoveryRuns=144`，即阻塞超 30 秒时落库仍在 10 秒测试预算内完成、恢复调度持续心跳；两个独立调度器共享同一 Redis 分布式锁并发处理同一 vid，输出 `baseline=100 flushed=100`，只落库一次。
+- 边界：T06 的“两个实例”是两个独立调度器对象在**同一 JVM**，不是两个 JVM；30 秒故障是**受控阻塞**，不是真实网络断连 30 秒。T05 告警只写日志和 HTTP 快照，**没有外部告警投递**；本实例指标重启后清零，不能与共享 DB backlog 相加。两任务均不等同于生产验收、真实故障演练或容量承诺。
+- 文档：`AGENTS.md`/`CLAUDE.md` 保持一致；`docs/api.md` 补充真实 `/api/admin/video-status/metrics` 与 `/gate` 契约；可观测/调度教程移除“等待验收”和过时“无指标/共享调度线程”描述；`video-status-runtime-roles.md` 与阶段交接同步状态。
+- 剩余风险/下一项：生产阈值、外部告警、真实两 JVM/网络故障和系统容量仍交 T16；调度预算不能强杀阻塞调用，业务 SQL 超时未统一；T07 处理 Outbox 发布/回写/租约细化，T10/T11 处理失败事件与恢复公平性。
 
 ### 计划变更记录
 

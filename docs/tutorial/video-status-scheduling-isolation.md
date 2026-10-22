@@ -1,8 +1,8 @@
 # 视频统计调度隔离与单轮执行预算（T06）
 
-> 状态：T06 实现与单元测试已完成，等待父代理独立验收后才在
-> `video-status-improvement-plan.md` 勾选。本文只描述“调度资源怎么分、一轮最多干多少活”，
-> 不改变任何计数、幂等、门闩或状态迁移语义。
+> 状态：T06 已由父代理独立验收并合入（实现提交 `3e33415`，验收日期 2026-10-22）。
+> 本文只描述“调度资源怎么分、一轮最多干多少活”，不改变任何计数、幂等、门闩或状态迁移语义，
+> 也不代表已批准生产上线。
 >
 > 范围：Outbox 投递、批量落库、dirty 恢复三条调度职责。
 > 不在范围：Outbox 发布/回写/租约细化（T07）、dirty 公平扫描（T11）、
@@ -152,11 +152,28 @@ app:
 验证命令（无需基础设施）：
 
 ```bash
-./mvnw '-Dtest=*Tests,!BackendApplicationTests,!VideoStatusIsolatedIntegrationTests,!VideoStatusSqlBaselineTests,!VideoStatusCounterIsolatedTests,!VideoStatusLuaCounterTests,!VideoStatusCounterTransactionTests' test
+./mvnw '-Dtest=VideoStatusMetricsSamplerTests,VideoStatusMetricsTelemetryTests,VideoStatusMetricsComponentWiringTests,VideoStatusMetricsAuthorizationTests,VideoStatusTelemetryInstrumentationTests,VideoStatusSchedulingConfigTests,VideoStatusSchedulingIsolationTests' test
 ```
 
-本次执行结果：159 tests，0 failures / 0 errors，6 skipped（`VideoStatusMetricsIsolatedTests`
-为需独立基础设施的 opt-in 用例，未运行）。
+父代理 2026-10-22 独立复跑结果：**69 tests，0 failures / 0 errors / 0 skipped**；日志
+`/tmp/improvement-t05-t06-unit.log`。这批同时包含 T05 指标单测，不把 69 拆成 T05/T06 的
+虚假细分。
+
+隔离环境验收（消耗真实 MySQL/Redis/RabbitMQ）：
+
+```bash
+docker compose -f compose.test.yaml up -d --wait
+./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusMetricsIsolatedTests,VideoStatusSchedulingRealFlowTests' test
+```
+
+父代理独立复跑结果：**8 tests，0 failures / 0 errors / 0 skipped**；日志
+`/tmp/improvement-t05-t06-it.log`。T06 真实链路输出：
+`blocked publish millis=30082 flushMillis=62 flushRuns=267 recoveryRuns=144`；
+并发落库输出：`baseline=100 flushed=100`。
+
+> 边界必须说清：这里的“阻塞 30 秒”是测试内**受控阻塞**，不是真实网络断连 30 秒；
+> “两个实例”实际是两个独立调度器对象跑在**同一个 JVM**、共享同一套 Redis 分布式锁，
+> 不是两个 JVM。结论只适用于该隔离测试环境。
 
 ## 7. 验收对照（T06）
 
@@ -165,7 +182,7 @@ app:
 | 发布 confirm 阻塞 30 秒，已消费事件仍能在 10 秒预算内落库 | 投递与落库分属两条线程，互不等待；落库轮预算 5 秒（可配），单 vid 锁等待 100ms |
 | 恢复调度仍有心跳 | 恢复调度独立线程，`RECOVERY_TICK` 心跳不受投递/落库影响 |
 | 阻塞一个视频不应无限阻塞其他视频 | 每 vid 锁等待 100ms，超时只把该 vid 的 dirty 放回，继续下一个 |
-| 两个实例同时工作仍保持单次有效落库 | 协调机制未变：Outbox 租约 token + vid 锁 |
+| 两个实例同时工作仍保持单次有效落库 | 协调机制未变：Outbox 租约 token + vid 锁；验收用同 JVM 内两个独立调度器共享同一 Redis 锁，baseline=100 / flushed=100 |
 | 限定线程数、排队长度、单轮批量、最长处理预算 | 3 条单线程；只提交 3 个固定重复任务（无业务逐条提交）；`outbox-batch-size` / `flush-dirty-batch-size` / `round-budget-ms` |
 | 线程名、拒绝策略、优雅停机、异常隔离 | 固定线程名前缀；`removeOnCancelPolicy`；5 秒有界停机；自定义 `ErrorHandler` |
 
@@ -183,6 +200,8 @@ app:
   也不需要清理 Outbox 或 dirty 标记。
 - **剩余风险**：单轮预算不能强杀阻塞调用；业务 SQL 尚未统一加语句超时；
   dirty 扫描公平性、Outbox 租约/回写细节仍分别由 T11、T07 承担。
+- **验收边界**：受控 30 秒阻塞、同 JVM 双调度器与隔离端点均已验收；未在真实网络断连、
+  两 JVM 部署、正式负载和生产环境演练，不构成生产验收，系统级演练交 T16。
 
 ## 9. 下一任务
 

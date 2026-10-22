@@ -1,7 +1,7 @@
 # 视频统计链路最小可观测能力（T05）
 
-> 状态：T05 实现已提交，父代理复验后才会勾选计划表。本文只描述本实例指标 +
-> 共享数据库积压的观测方式，不代表已批准生产上线。
+> 状态：T05 已由父代理独立验收并合入（实现提交 `46af28b`，验收日期 2026-10-22）。
+> 本文只描述本实例指标 + 共享数据库积压的观测方式，不代表已批准生产上线。
 >
 > 范围：互动事件 → Outbox → RabbitMQ → Redis → 消费事件 → 批量落库 → 重建/恢复。
 > 观测<b>只读</b>：不写 Redis、不改事件状态、不为门闩加 TTL、不降低任何幂等语义。
@@ -166,8 +166,7 @@ consumed 的 `2 (FLUSHED)` 是已完成量而不是积压，当前不采样（�
 ## 6. 门闩（rebuild gate）停留时间
 
 门闩是**无 TTL** 的字符串，本身没有创建时间；为观测加 TTL 会破坏重建安全性，
-因此不允许。观测方案是写者把 token 改成 `<epochMillis>-<uuid>`（由埋点任务执行），
-读侧：
+因此不允许。观测方案是写者把 token 改成 `<epochMillis>-<uuid>`，读侧：
 
 - `GET /api/admin/video-status/gate?vid=123`
 - 新格式 → `tokenFormat=EPOCH_MILLIS_TOKEN`，返回 `tokenAgeMillis`；
@@ -195,7 +194,7 @@ consumed 的 `2 (FLUSHED)` 是已完成量而不是积压，当前不采样（�
 - 响应不含 eventId/vid 维度列表、不含连接串、密钥；异常信息只保留异常类型，
   不带消息正文：SQL 文本、payload、凭证都不会进入 HTTP 响应。
 
-## 9. 埋点接入（由业务埋点任务执行）
+## 9. 埋点接入（已实现）
 
 ```java
 long start = System.nanoTime();
@@ -215,13 +214,26 @@ try {
 
 ## 10. 验证
 
-```bash
-# 只跑 T05 单测（不启动任何基础设施）
-./mvnw -Dtest=VideoStatusMetrics*Tests test
+T05/T06 的聚焦验收命令（不启动任何基础设施的部分）：
 
-# 全量单测（沿用 P0 口径）
-./mvnw test '-Dtest=*Tests,!BackendApplicationTests,!VideoStatusIsolatedIntegrationTests,!VideoStatusSqlBaselineTests,!VideoStatusCounterIsolatedTests,!VideoStatusLuaCounterTests,!VideoStatusCounterTransactionTests'
+```bash
+./mvnw '-Dtest=VideoStatusMetricsSamplerTests,VideoStatusMetricsTelemetryTests,VideoStatusMetricsComponentWiringTests,VideoStatusMetricsAuthorizationTests,VideoStatusTelemetryInstrumentationTests,VideoStatusSchedulingConfigTests,VideoStatusSchedulingIsolationTests' test
 ```
+
+父代理 2026-10-22 独立复跑结果：**69 tests，0 failures / 0 errors / 0 skipped**；日志
+`/tmp/improvement-t05-t06-unit.log`。其中 T06 调度类也在同一批运行，验收记录不把 69 拆成
+T05/T06 的虚假细分。
+
+独立基础设施验收：
+
+```bash
+docker compose -f compose.test.yaml up -d --wait
+./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusMetricsIsolatedTests,VideoStatusSchedulingRealFlowTests' test
+```
+
+父代理独立复跑结果：**8 tests，0 failures / 0 errors / 0 skipped**；日志
+`/tmp/improvement-t05-t06-it.log`。该批同时包含 T05 指标隔离测试与 T06 真实链路测试，
+所以也不能把 8 拆成两项单独数字。
 
 单测覆盖：封顶（`>=10001` 标记）、最老年龄阈值（恰好 120s 不告警、120s+1 告警）、
 采样失败保留上次成功值并 stale、从未成功的 UNKNOWN、缺索引时 DEGRADED 且不计数、
@@ -230,6 +242,17 @@ outbox `SENT(2)` 读数、异常消息不含 SQL/payload/凭证、mapper XML 只
 `@AdminOnly` + `/api/admin/**` 拦截器覆盖、门闩老格式年龄未知、
 `ApplicationContextRunner` 真实 autowire（mock mapper/executor，不启动自动采样与基础设施）、
 以及非 UTC 固定时钟下端到端延迟按正确时区计算。
+
+真实隔离库（MySQL 13307）验收：
+
+- 迁移脚本连续执行两遍都是幂等 no-op，索引列数与数据不变；
+- 实际制造 OUTBOX FAILED、OUTBOX PENDING(1) 超过 120s、CONSUMED RECEIVED(0) 超过 180s、
+  CONSUMED REPAIR_REQUIRED(3) 四类样本后，`sampleOnce()` 给出有限 code/subject 的告警，
+  管理员控制器读取缓存路径也能查到；
+- 采样前后 outbox / consumed / video_status 行逐字段相等，控制器不触发新采样；
+- 两条最老查询的 `EXPLAIN` 命中 T05 新索引；
+- 真实 flush 提交时 spy 到一次 `recordFlushedPayload`，外层事务回滚时零次且样本数不增；
+- 门闩新格式返回停留时间，老格式返回 `LEGACY_UNKNOWN`，只调用一次只读 `getString`。
 
 索引迁移核对（隔离测试库 13307）：
 
@@ -249,6 +272,10 @@ ORDER BY table_name, seq_in_index;
 - **内存计数无持久化**：进程重启后本实例 operation 计数归零，跨重启趋势要靠
   日志/外部采集（不在 T05 范围）；
 - **无自动处置**：FAILED/status3/积压只告警，处置在 T10/T11；
-- **未做**：真实基础设施上的 4 类故障样本端到端演练（Outbox FAILED、status0 超时、
-  status3、pending 积压）与告警窗口实测，留给父代理复验/T16；
+- **日志/HTTP 告警无外部投递**：目前只写应用日志并在管理员 `/metrics` 快照中返回，
+  没有邮件/IM/PagerDuty 等外部通道，也没有自动通知；值守必须主动拉取或采集日志；
+- **验收边界**：四类故障样本已在独立测试库与真实 MyBatis/事务组件上验收，但未在正式环境、
+  正式告警通道和目标负载下演练，交 T16；**索引迁移必须先于采样上线**，否则只会得到
+  `DEGRADED` 诊断而不会计数；
+- **未做**：生产监控平台、外部告警投递、跨重启趋势存储与生产阈值调优；
 - **不做**：不给门闩加 TTL、不清空 Redis、不自动重放、不引入 actuator。

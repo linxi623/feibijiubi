@@ -191,6 +191,17 @@ Authorization: Bearer <token>
 | 审核 | GET | `/api/admin/videos/{vid}` | 管理员 |
 | 审核 | GET | `/api/admin/videos/page` | 管理员 |
 
+### 2.5 管理员视频统计观测（T05）
+
+| 模块 | 方法 | 路径 | 权限 |
+|---|---|---|---|
+| 观测 | GET | `/api/admin/video-status/metrics` | 管理员 |
+| 观测 | GET | `/api/admin/video-status/gate?vid={vid}` | 管理员 |
+
+> 两个接口都只读：`/metrics` 只返回采样缓存，不在请求线程查库；`/gate` 只做一次 Redis GET，
+> 不写、不删、不刷新 TTL。没有新增 actuator 或未鉴权指标端点。详见
+> [可观测能力教程](tutorial/video-status-observability.md)。
+
 ---
 
 # 3. 账号接口
@@ -1646,6 +1657,196 @@ GET /api/admin/videos/page?page={page}&status={status}&quantity={quantity}
 
 ```bash
 curl "http://localhost:8080/api/admin/videos/page?page=1&status=0&quantity=10" \
+  -H "Authorization: Bearer <管理员token>"
+```
+
+---
+
+## 8.4 查询视频统计链路指标与积压告警
+
+```http
+GET /api/admin/video-status/metrics
+```
+
+权限：**管理员**（路径经过登录拦截器 + 管理员拦截器，方法另有 `@AdminOnly`）。
+
+该接口返回**最近一次采样的缓存快照**，不在请求线程查 MySQL，也不写 Redis。响应分为两部分，
+必须分开理解：
+
+- `backlog`：来自共享 MySQL 的**全局**积压采样值，可能 `stale`；
+- `instanceTelemetry`：**当前实例**的 operation 计数与耗时，不是全局值，不能与 backlog 相加，
+  进程重启后归零。
+
+### 采样与状态说明
+
+| 字段 / 状态 | 说明 |
+|---|---|
+| `backlog.state=OK` | 本次采样成功 |
+| `backlog.state=STALE` | 本次失败，或快照超过 45 秒没有新尝试；保留上次成功数值，`stale=true` |
+| `backlog.state=UNKNOWN` | 从未成功采样；计数为 `null`，不是 0 |
+| `backlog.state=DEGRADED` | 缺少 T05 观测索引，主动跳过计数并给诊断；先执行迁移 |
+| `countCapped` | `true` 表示 `count >= 10001`，是封顶值而不是精确值 |
+| `oldestAgeMillis` | 该状态最老一条的年龄（毫秒）；`null` 表示没有待处理行或未知 |
+| `sampledAtEpochMillis` | 最近一次采样（成功、失败或 DEGRADED）的时间 |
+| `lastSuccessAtEpochMillis` | 最近一次成功采样的时间；从未成功时为 `null` |
+
+`backlog.backlog[]` 覆盖 Outbox 状态 `0/1/2/3` 和消费事件状态 `0/1/3`；`outbox SENT(2)` 也会返回，
+但不参与 `PENDING_TOO_OLD`。`schedulerHeartbeats[]` 只覆盖 `RELAY_TICK`、`FLUSH_TICK`、
+`RECOVERY_TICK` 三个关键调度心跳，状态为 `OK / STALLED / UNKNOWN`。
+
+测试告警阈值为：最老待处理（状态 0/1）超过 120 秒、关键调度心跳超过 30 秒；生产阈值由后续
+容量/演练任务确认。告警只出现在日志和本 HTTP 快照中，**没有外部告警投递**。
+
+### 成功响应（节选）
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "scopeNote": "instanceTelemetry 仅代表本实例 operation 计数；backlog 为共享 MySQL 的全局积压采样值。两者不可相加；stale=true 时数字来自上次成功采样。",
+    "backlog": {
+      "state": "OK",
+      "stale": false,
+      "sampledAtEpochMillis": 1761080000000,
+      "lastSuccessAtEpochMillis": 1761080000000,
+      "lastError": null,
+      "diagnostics": [],
+      "backlog": [
+        {
+          "source": "OUTBOX",
+          "status": 0,
+          "statusLabel": "PENDING",
+          "count": 3,
+          "countCapped": false,
+          "oldestAgeMillis": 1500
+        }
+      ],
+      "schedulerHeartbeats": [
+        {
+          "operation": "FLUSH_TICK",
+          "roleEnabledOnThisInstance": true,
+          "lastHeartbeatAtEpochMillis": 1761079999000,
+          "ageMillis": 1000,
+          "state": "OK"
+        }
+      ],
+      "alarms": []
+    },
+    "instanceTelemetry": {
+      "sampledAtEpochMillis": 1761080000100,
+      "operations": [
+        {
+          "operation": "PUBLISH",
+          "outcomes": {"SUCCESS": 12, "FAILURE": 0, "DEFERRED": 0, "TIMEOUT": 0},
+          "recorded": 12,
+          "elapsedNanosTotal": 24000000,
+          "elapsedNanosMax": 5000000,
+          "heartbeatCount": 30,
+          "lastHeartbeatAtEpochMillis": 1761079999500,
+          "lastHeartbeatAgeMillis": 600
+        }
+      ],
+      "endToEnd": {
+        "samples": 10,
+        "unknown": 0,
+        "avgMillis": 850,
+        "maxMillis": 2100,
+        "lastMillis": 700
+      }
+    }
+  }
+}
+```
+
+> 示例只展示一条 `backlog` 和一条 `operations`；实际响应包含全部受跟踪状态与固定 10 个
+> operation，没有样本的耗时/端到端字段为 `null`。
+
+### 常见错误
+
+| 场景 | 结果 |
+|---|---|
+| 未登录 / 非管理员 | 由既有登录、管理员拦截器返回相应业务错误 |
+| 老库未执行 T05 索引迁移 | `backlog.state=DEGRADED`，`diagnostics` 指向迁移脚本，不执行全表扫描 |
+| 采样失败且从未成功 | `backlog.state=UNKNOWN`，计数为 `null` |
+
+### curl
+
+```bash
+curl "http://localhost:8080/api/admin/video-status/metrics" \
+  -H "Authorization: Bearer <管理员token>"
+```
+
+---
+
+## 8.5 查询重建门闩停留时间
+
+```http
+GET /api/admin/video-status/gate?vid={vid}
+```
+
+权限：**管理员**。
+
+### Query 参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `vid` | integer | 是 | 视频 ID，必须大于 0 |
+
+重建门闩是**无 TTL** 的字符串；为观测给门闩加自动过期会破坏重建安全性，因此本接口只读，
+不写、不删、不设置或刷新 TTL。当前写者使用 `<epochMillis>-<uuid>` 格式，读侧据此计算停留时间；
+历史纯 UUID 门闩无法得知创建时间，明确返回“未知”。
+
+| tokenFormat | 含义 | `tokenAgeMillis` |
+|---|---|---|
+| `ABSENT` | 当前没有门闩，`present=false` | `null` |
+| `EPOCH_MILLIS_TOKEN` | 新格式，可计算停留时间 | 毫秒 |
+| `LEGACY_UNKNOWN` | 老格式纯 UUID，年龄未知 | `null` |
+
+### 成功响应（存在新格式门闩）
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "vid": 123,
+    "present": true,
+    "tokenFormat": "EPOCH_MILLIS_TOKEN",
+    "tokenAgeMillis": 4500,
+    "note": "门闩无 TTL；崩溃后由下一位持锁者接管，不做自动过期"
+  }
+}
+```
+
+### 成功响应（无门闩）
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "vid": 123,
+    "present": false,
+    "tokenFormat": "ABSENT",
+    "tokenAgeMillis": null,
+    "note": "当前没有重建门闩"
+  }
+}
+```
+
+### 常见错误
+
+| 场景 | 结果 |
+|---|---|
+| `vid` 缺失或不是合法整数 | Spring 参数绑定错误 |
+| `vid <= 0` | 业务 `code=400`，`message="vid 不合法"` |
+| 未登录 / 非管理员 | 由既有登录、管理员拦截器返回相应业务错误 |
+
+### curl
+
+```bash
+curl "http://localhost:8080/api/admin/video-status/gate?vid=123" \
   -H "Authorization: Bearer <管理员token>"
 ```
 

@@ -3,8 +3,8 @@
 > 适用范围：`app.video-status.*` 配置组、`VideoStatusOutboxRelay`、`VideoStatusBatchFlushScheduler`、
 > `VideoStatusDirtyRecoveryScheduler`、`VideoStatusEventConsumer` 的部署与维护。
 >
-> 本文只描述**已经实现**的能力。指标/告警（T05）、调度隔离与单轮预算（T06）、Outbox 租约细化（T07）、
-> 受控强制重建与失败事件处置（T10/T12）尚未实现，文中明确标注。
+> 本文只描述**已经实现**的能力。指标/告警（T05）与调度隔离/单轮预算（T06）已验收；
+> Outbox 租约细化（T07）、受控强制重建与失败事件处置（T10/T12）尚未实现，文中明确标注。
 >
 > 相关文档：[完整链路设计](video-status-full-flow-design.md)、
 > [批量聚合实现](video-status-batch-aggregation-implementation.md)、
@@ -51,7 +51,7 @@
 | 单机“无人落库”误配 | true | true | true | **false** | WARN：`scheduling-enabled=false` 且无其他落库实例时，Redis 已应用增量、`process_status=1` 不再前进，`video_status` 表停止更新 |
 | 同步基线（回滚态） | **false** | 任意 | false | 任意 | 业务直接同步写统计；WARN 说明 relay/scheduling 不产生效果 |
 
-“单机无人落库”的**诊断方法**（当前没有指标，只能查库/查日志，T05 会补指标）：
+“单机无人落库”的**诊断方法**（T05 已提供管理员只读指标；下列 SQL 仍可用于根因定位）：
 
 ```sql
 -- ① Outbox 是否有待投递积压（relay 关闭时会持续增长）
@@ -111,8 +111,9 @@ SELECT MIN(created_at) FROM video_status_consumed_event WHERE process_status IN 
    不手工改 key。
 6. 验证：一次点赞/播放只产生一条 Outbox 事件、一条消费事件、一次落库；DB 与 Redis 最终一致。
 
-> 当前没有“切换脚本/管理接口”，以上是人工操作步骤。T05 提供指标、T10/T12 提供查询与受控重建后，
-> 应把 4.1/4.2 固化成受审计的操作入口，而不是长期依赖人工 SQL 观察。
+> 当前没有“切换脚本/管理接口”，以上是人工操作步骤。T05 已提供 `/api/admin/video-status/metrics`
+> 只读指标；T10/T12 提供查询与受控重建后，应把 4.1/4.2 固化成受审计的操作入口，而不是长期依赖
+> 人工 SQL 观察。
 
 ### 4.3 维护顺序的受控演练（测试证据，不等于热切换能力）
 
@@ -209,11 +210,15 @@ SELECT MIN(created_at) FROM video_status_consumed_event WHERE process_status IN 
 
 ## 7. 未做与边界
 
-- **没有指标/告警**：本文的“诊断”是查 SQL + 读启动日志，不是监控（T05）。
+- **指标/告警（T05 已实现）**：`GET /api/admin/video-status/metrics` 返回本实例遥测 + 共享 DB
+  积压采样，`GET /api/admin/video-status/gate?vid=...` 只读门闩停留时间；告警只写应用日志和 HTTP
+  快照，**没有外部投递**。本文的 SQL 诊断仍可用于根因定位。
 - **没有强制重建入口**：只有 `ensureInitialized` 慢路径，`process_status=3` / `outbox status=3` 的处置
   入口在 T07/T10。§4.3 的“删 current”只是测试内的维护动作，不是产品能力。
 - **没有维护编排**：仓库没有切换脚本、管理接口或受控重建命令，§4 的步骤仍需人工 SQL 观察 + 重启；
   测试证明的是“按该顺序执行时可以收敛”，不是“可以热切换”。
 - **没有租约预算细化**：整批发布耗时可能超过 `outbox-lease-seconds`，多实例下会触发租约接管（T07）。
-- **没有调度资源隔离**：投递、落库、恢复仍共享调度线程池（T06）。
+- **调度资源隔离（T06 已实现）**：投递、落库、恢复已拆为三条独立单线程调度器，并有
+  `round-budget-ms` 与 100ms 的调度落库锁等待；预算不能强杀已开始的调用，业务 SQL 超时仍未统一，
+  且不等于生产容量验收。
 - **不改业务吞吐**：本次只加开关契约与校验，不调整批量/线程/索引，也不改 SQL、Redis 脚本与 flush 逻辑。

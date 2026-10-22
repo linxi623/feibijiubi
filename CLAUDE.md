@@ -78,6 +78,8 @@ Key `app.video-status.*` flags (see `VideoStatusProperties`):
 - `async-enabled` – publish interaction deltas asynchronously.
 - `outbox-relay-enabled` – enable the outbox → RabbitMQ relay scheduler.
 - `scheduling-enabled` – master switch for the batch-flush / recovery schedulers.
+- `round-budget-ms` – per-round work budget for relay/flush/recovery (default 5000); exhausting it
+  stops claiming new work but does not hard-interrupt an in-flight publish or transaction.
 - plus batch sizes, fixed delays, lease/timeout seconds, and consumer retry limits.
 
 RabbitMQ listeners default to `auto-startup: false` and manual ack — they are opt-in per environment.
@@ -108,6 +110,9 @@ Notable packages:
 - `service/video/` – submit / review state machine / delete / detail / feed (keyset/cursor pagination,
   optional category filter).
 - `service/video/videostatus/` + `mq/` – the video-statistics aggregation pipeline (see below).
+- `metrics/` – process-local finite-enum telemetry (`VideoStatusTelemetry`) and the 15 s read-only
+  shared-DB backlog sampler/alarmer (`VideoStatusBacklogSampler`), surfaced by the admin metrics
+  controller.
 - `utils/redis/` – `RedisUtils`, `RedisKeyUtils`, `RedisConstants`, typed Hash/Set/ZSet operation helpers.
 - `utils/rabbitmq/` – `RabbitConstants` (exchange/queue/routing-key names).
 
@@ -155,8 +160,38 @@ The flow is:
   validation failure causes no writes; arbitrary Redis runtime failures/data loss are NOT covered
   by a generic rollback or exactly-once promise.
 
-Guides: `docs/tutorial/video-status-counter-range.md`, `video-status-flush-defer.md`, and
-`video-status-runtime-roles.md` (all under `docs/tutorial/`). Acceptance progress and remaining
+### Accepted observability and scheduling contracts (T05–T06)
+
+- T05 adds no monitoring stack: only process-local in-memory counters over a fixed
+  `Operation × Outcome` enum plus a 15 s (5 s initial delay) read-only SQL backlog sample.
+  `GET /api/admin/video-status/metrics` returns the cached snapshot; it does not query MySQL or
+  Redis in the request path. `GET /api/admin/video-status/gate?vid=...` performs one read-only Redis
+  GET. Both are under `/api/admin/**` with `@AdminOnly`; there is no actuator or unauthenticated
+  metrics endpoint.
+- Shared-DB backlog covers outbox 0/1/2/3 and consumed 0/1/3, capped at 10001 (`countCapped` means
+  `>= 10001`). Oldest ages use `(status, created_at, id)` / `(process_status, consumed_at, id)` and
+  database `NOW(3)`. Run `database/migrations/t05-video-status-observability-indexes.sql` **before**
+  enabling sampling. Missing indexes produce `DEGRADED` diagnostics and skip counts instead of a full
+  scan; the migration is idempotent. Sampling and both HTTP endpoints never write Redis, change
+  event state, or add TTL to the rebuild gate.
+- Test thresholds are oldest pending >120 s and scheduler heartbeat >30 s; production thresholds are
+  T16 work. Alarms are emitted as logs and in the HTTP snapshot only: there is **no external alert
+  delivery**. Local `instanceTelemetry` resets on restart and must not be added to the global
+  shared-DB backlog. `STALE` after 45 s means the sampler stopped producing fresh attempts.
+- T06 gives relay, flush and recovery three independent single-thread `ThreadPoolTaskScheduler` beans
+  (`videoStatusRelayScheduler` / `videoStatusFlushScheduler` / `videoStatusRecoveryScheduler`), each
+  with a stable thread-name prefix, `fixedDelay`, exception isolation and 5 s bounded shutdown.
+  `fixedDelay` plus one thread prevents overlap; the executors hold only the three fixed recurring
+  tasks, not per-message/per-vid submissions. `round-budget-ms` stops claiming new work; flush uses a
+  100 ms per-vid scheduler lock wait (other paths keep 10 s), requeues dirty work without `SREM`, and
+  recovery leaves unprocessed vids in MySQL for the next round.
+- T06 acceptance used two independent scheduler objects in **one JVM** sharing the same Redis
+  distributed lock, not two JVMs. The publish fault is a controlled in-process block, not a real 30 s
+  network disconnect. These are test-environment acceptance results, not production acceptance.
+
+Guides: `docs/tutorial/video-status-counter-range.md`, `video-status-flush-defer.md`,
+`video-status-runtime-roles.md`, `video-status-observability.md`, and
+`video-status-scheduling-isolation.md` (all under `docs/tutorial/`). Acceptance progress and remaining
 recovery/observability work: `docs/tutorial/video-status-improvement-plan.md`.
 
 Consumer retry/dead-letter behavior is driven by the typed exceptions in `common/`:
@@ -193,10 +228,12 @@ user-account service, and Redis utils under `src/test/java/...`.
 `docker compose -f compose.test.yaml up -d --wait` starts the independent `feibijiubi-test` project
 (MySQL 13307, Redis 16379, RabbitMQ 15673 / management 15674). Never merge it with `compose.yaml`.
 Run `./mvnw -DvideoStatusIT=true -Dtest=VideoStatusIsolatedIntegrationTests test`; add
-`-DvideoStatusBenchmark=true` for an optional diagnostic hot-path comparison. Tests replace
-application.yml, reject non-isolated endpoint overrides before connecting, seed new rows and purge
-only the dedicated test queues. Existing deployment volumes are never used. Normal test runs skip
-this opt-in suite. Stop with `docker compose -f compose.test.yaml stop` to preserve test data.
+`-DvideoStatusBenchmark=true` for an optional diagnostic hot-path comparison. T05/T06 acceptance
+classes are `VideoStatusMetricsIsolatedTests` and `VideoStatusSchedulingRealFlowTests` (the latter
+blocks publish for about 30 s by design). Tests replace application.yml, reject non-isolated endpoint
+overrides before connecting, seed new rows and purge only the dedicated test queues. Existing
+deployment volumes are never used. Normal test runs skip this opt-in suite. Stop with
+`docker compose -f compose.test.yaml stop` to preserve test data.
 
 ## Docker Compose deployment
 
