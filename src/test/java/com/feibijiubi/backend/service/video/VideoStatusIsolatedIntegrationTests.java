@@ -218,6 +218,7 @@ class VideoStatusIsolatedIntegrationTests {
             if (admin.getQueueProperties(queue) != null) admin.purgeQueue(queue, false);
         }
         for (String queue : List.of(RabbitConstants.MAIN_QUEUE, RabbitConstants.RETRY_QUEUE,
+                RabbitConstants.RETRY_QUEUE_30S, RabbitConstants.RETRY_QUEUE_120S,
                 RabbitConstants.DEAD_QUEUE)) admin.purgeQueue(queue, false);
         listenerRegistry.start();
     }
@@ -706,6 +707,7 @@ class VideoStatusIsolatedIntegrationTests {
             assertEquals(200, response.statusCode());
             for (var queue : json.readTree(response.body())) {
                 if (List.of(RabbitConstants.MAIN_QUEUE, RabbitConstants.RETRY_QUEUE,
+                        RabbitConstants.RETRY_QUEUE_30S, RabbitConstants.RETRY_QUEUE_120S,
                         RabbitConstants.DEAD_QUEUE).contains(queue.path("name").asText())) {
                     if (!queue.has("messages") || queue.path("messages").asInt() != 0
                             || queue.path("messages_unacknowledged").asInt() != 0) return false;

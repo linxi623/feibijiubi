@@ -44,7 +44,16 @@ public class VideoStatusEventConsumer {
     @Autowired(required = false)
     private VideoStatusTelemetry telemetry;
 
+    /**
+     * T08：转发失败时登记异步暂停/恢复。允许为 null 以保持纯单元测试和旧隔离上下文的
+     * 构造兼容；生产 component scan 必定装配本 Bean。缺失时仍保留原消息不确认，
+     * 不会退化成立即 requeue 热循环。
+     */
+    @Autowired(required = false)
+    private VideoStatusConsumerRecoveryController recoveryController;
+
     @RabbitListener(
+            id = RabbitConstants.CONSUMER_LISTENER_ID,
             queues = RabbitConstants.MAIN_QUEUE,
             containerFactory = "videoStatusListenerContainerFactory"
     )
@@ -187,11 +196,23 @@ public class VideoStatusEventConsumer {
             } else {
                 forwarder.toDead(message, safeMessage(cause));
             }
-            channel.basicAck(deliveryTag, false);
         } catch (Exception forwardError) {
-            log.error("统计消息重试转发失败，保留原消息未确认", forwardError);
-            channel.basicNack(deliveryTag, false, true);
+            // 转发失败不是业务失败：不 ACK、不 NACK，保留在途消息。
+            // 立即 requeue 会形成热循环；同步 stop 会在 listener 线程等待自己。
+            // 交给恢复控制器在专用线程异步停止容器，channel 关闭后由 broker 重投未确认消息。
+            requestConsumerRecovery(
+                    "retry/dead forward failed: " + safeMessage(forwardError)
+            );
+            log.error(
+                    "统计消息重试/死信转发失败，保留原消息未确认并请求异步暂停消费者",
+                    forwardError
+            );
+            return;
         }
+
+        // 转发成功与 ACK 严格分开：ACK 抛错只向容器传播，不再执行任何转发/NACK，
+        // 更不会把一条已经正常处理成功的消息转进 DLQ。
+        channel.basicAck(deliveryTag, false);
     }
 
     private void forwardDeadThenAck(
@@ -202,11 +223,30 @@ public class VideoStatusEventConsumer {
     ) throws IOException {
         try {
             forwarder.toDead(message, safeMessage(cause));
-            channel.basicAck(deliveryTag, false);
         } catch (Exception forwardError) {
-            log.error("统计消息死信转发失败，保留原消息未确认", forwardError);
-            channel.basicNack(deliveryTag, false, true);
+            requestConsumerRecovery(
+                    "dead forward failed: " + safeMessage(forwardError)
+            );
+            log.error(
+                    "统计消息死信转发失败，保留原消息未确认并请求异步暂停消费者",
+                    forwardError
+            );
+            return;
         }
+
+        channel.basicAck(deliveryTag, false);
+    }
+
+    private void requestConsumerRecovery(String reason) {
+        VideoStatusConsumerRecoveryController controller = recoveryController;
+        if (controller == null) {
+            log.error(
+                    "视频统计消费者恢复控制器未装配，原消息保持未确认，等待进程/容器恢复: {}",
+                    reason
+            );
+            return;
+        }
+        controller.requestRecovery(reason);
     }
 
     private int headerAttempt(Message message) {

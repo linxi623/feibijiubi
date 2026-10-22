@@ -103,6 +103,45 @@ public class VideoStatusRabbitConfig {
     }
 
     /**
+     * T08 第二级重试队列：固定 30 秒 TTL，到期后回主交换机。
+     * 每个队列只使用一种固定 TTL，避免同一队列内任意过期时间造成队头阻塞。
+     */
+    @Bean
+    public Queue videoStatusRetryQueue30s() {
+        return QueueBuilder.durable(RabbitConstants.RETRY_QUEUE_30S)
+                .ttl(30_000)
+                .deadLetterExchange(RabbitConstants.MAIN_EXCHANGE)
+                .deadLetterRoutingKey(RabbitConstants.MAIN_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
+    public Binding videoStatusRetryBinding30s() {
+        return BindingBuilder.bind(videoStatusRetryQueue30s())
+                .to(videoStatusRetryExchange())
+                .with(RabbitConstants.RETRY_ROUTING_KEY_30S);
+    }
+
+    /**
+     * T08 第三级重试队列：固定 120 秒 TTL，到期后回主交换机。
+     */
+    @Bean
+    public Queue videoStatusRetryQueue120s() {
+        return QueueBuilder.durable(RabbitConstants.RETRY_QUEUE_120S)
+                .ttl(120_000)
+                .deadLetterExchange(RabbitConstants.MAIN_EXCHANGE)
+                .deadLetterRoutingKey(RabbitConstants.MAIN_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
+    public Binding videoStatusRetryBinding120s() {
+        return BindingBuilder.bind(videoStatusRetryQueue120s())
+                .to(videoStatusRetryExchange())
+                .with(RabbitConstants.RETRY_ROUTING_KEY_120S);
+    }
+
+    /**
      * 死信交换机
      * 接受在重试队列反复失败的消息
      * @return

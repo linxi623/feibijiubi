@@ -161,6 +161,7 @@ class VideoStatusOutboxReliabilityIsolatedTests {
         // 上一次中断运行可能残留消息；只清自己的三条队列，不碰库里的历史行。
         RabbitAdmin admin = new RabbitAdmin(rabbit.getConnectionFactory());
         for (String queue : List.of(RabbitConstants.MAIN_QUEUE, RabbitConstants.RETRY_QUEUE,
+                RabbitConstants.RETRY_QUEUE_30S, RabbitConstants.RETRY_QUEUE_120S,
                 RabbitConstants.DEAD_QUEUE)) {
             admin.purgeQueue(queue, false);
         }

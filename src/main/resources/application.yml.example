@@ -50,6 +50,8 @@ app:
     outbox-lease-seconds: 60
     publish-confirm-timeout-seconds: 5
     consumer-max-retries: 5
+    # T08：重试/DLQ 转发失败后，异步停止消费者并等待该时长后恢复（毫秒）
+    consumer-recovery-delay-ms: 10000
     consumer-recovery-auto-replay-max-age-seconds: 604800
     flush-fixed-delay-ms: 500
     flush-dirty-batch-size: 100

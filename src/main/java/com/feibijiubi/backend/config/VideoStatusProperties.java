@@ -59,6 +59,9 @@ public class VideoStatusProperties {
     private int publishConfirmTimeoutSeconds = 5;
 
     private int consumerMaxRetries = 5;
+    // T08：重试/DLQ 转发失败后，先异步停止消费者容器，再等待该时长后恢复。
+    // 不能在 listener 线程同步 stop（会等待自己退出而超时/死锁），也不能立即 requeue 热循环。
+    private long consumerRecoveryDelayMs = 10_000;
     // 7天
     private int consumerRecoveryAutoReplayMaxAgeSeconds = 604_800;
     private long flushFixedDelayMs = 500;
@@ -112,6 +115,7 @@ public class VideoStatusProperties {
                 1, MAX_LEASE_OR_CONFIRM_TIMEOUT_SECONDS);
         requireRange("consumerMaxRetries", consumerMaxRetries,
                 1, MAX_CONSUMER_MAX_RETRIES);
+        requirePositiveDelay("consumerRecoveryDelayMs", consumerRecoveryDelayMs);
         requirePositiveDelay("roundBudgetMs", roundBudgetMs);
 
         // T07 跨字段约束：租约必须 >= confirm 超时 + 5s，给状态回写留出余量。

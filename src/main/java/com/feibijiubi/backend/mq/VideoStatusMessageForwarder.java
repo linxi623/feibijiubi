@@ -42,7 +42,7 @@ public class VideoStatusMessageForwarder {
         publishConfirmed(
                 VideoStatusTelemetry.Operation.RETRY_FORWARD,
                 RabbitConstants.RETRY_EXCHANGE,
-                RabbitConstants.RETRY_ROUTING_KEY,
+                retryRoutingKey(nextAttempt),
                 retryMessage
         );
     }
@@ -75,9 +75,26 @@ public class VideoStatusMessageForwarder {
         publishConfirmed(
                 VideoStatusTelemetry.Operation.RETRY_FORWARD,
                 RabbitConstants.RETRY_EXCHANGE,
-                RabbitConstants.RETRY_ROUTING_KEY,
+                retryRoutingKey(nextAttempt),
                 message
         );
+    }
+
+    /**
+     * T08 分级退避：第 1 次重试 10 秒、第 2 次 30 秒、第 3 次及以后 120 秒。
+     *
+     * <p>三个队列各自只有固定 TTL，不把 10/30/120 秒混在同一个队列；否则队头一条
+     * 120 秒的消息会阻塞后面本应 10 秒重投的消息。这里只负责选路，删除任意一级
+     * 队列都不会改变事件体、eventId（messageId）或幂等指纹。</p>
+     */
+    private String retryRoutingKey(int nextAttempt) {
+        if (nextAttempt <= 1) {
+            return RabbitConstants.RETRY_ROUTING_KEY;
+        }
+        if (nextAttempt == 2) {
+            return RabbitConstants.RETRY_ROUTING_KEY_30S;
+        }
+        return RabbitConstants.RETRY_ROUTING_KEY_120S;
     }
 
     public void toDead(

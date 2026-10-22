@@ -188,6 +188,7 @@ class VideoStatusSchedulingRealFlowTests {
         // 上一次中断运行可能残留消息，先清掉自己的三条队列，避免把历史消息算进本用例。
         RabbitAdmin admin = new RabbitAdmin(rabbit.getConnectionFactory());
         for (String queue : List.of(RabbitConstants.MAIN_QUEUE, RabbitConstants.RETRY_QUEUE,
+                RabbitConstants.RETRY_QUEUE_30S, RabbitConstants.RETRY_QUEUE_120S,
                 RabbitConstants.DEAD_QUEUE)) {
             admin.purgeQueue(queue, false);
         }
