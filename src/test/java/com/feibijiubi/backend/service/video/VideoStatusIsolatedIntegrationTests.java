@@ -103,6 +103,7 @@ class VideoStatusIsolatedIntegrationTests {
             VideoStatusRebuildServiceImpl.class, VideoStatusRebuildSnapshotServiceImpl.class,
             VideoStatusBatchFlushServiceImpl.class, VideoStatusVidMutex.class,
             VideoStatusEventFingerprintServiceImpl.class, VideoStatusEventConsumer.class,
+            VideoStatusConsumerRecoveryController.class,
             VideoStatusMessageForwarder.class, VideoStatusEventPublisher.class,
             VideoStatusOutboxClaimService.class, VideoStatusOutboxRelay.class,
             UserVideoServiceImpl.class,

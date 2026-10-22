@@ -101,8 +101,11 @@ public class VideoStatusEventConsumer {
 
         recordConsume(VideoStatusTelemetry.Outcome.SUCCESS, startedAt);
         // 业务处理已经成功。ACK 失败不能再把正常消息转入 Retry/DLQ；
-        // 让 IOException 交给监听容器处理，连接恢复后由 eventId 幂等吸收重投。
-        channel.basicAck(deliveryTag, false);
+        // 也不能把 IOException 直接抛给监听容器：容器默认 requeueRejected=false，
+        // 会对失败消息 basicNack(requeue=false)，导致一条已成功的消息被主队列 DLX
+        // 转进死信队列。这里改为请求受控暂停，channel 关闭后由 broker 重投，
+        // eventId 幂等吸收重复。
+        ackOrRecover(channel, deliveryTag, "success ack failed");
     }
 
     private void recordConsume(
@@ -210,9 +213,9 @@ public class VideoStatusEventConsumer {
             return;
         }
 
-        // 转发成功与 ACK 严格分开：ACK 抛错只向容器传播，不再执行任何转发/NACK，
-        // 更不会把一条已经正常处理成功的消息转进 DLQ。
-        channel.basicAck(deliveryTag, false);
+        // 转发成功与 ACK 严格分开：ACK 抛错不再执行任何转发/NACK，
+        // 也不会让容器把消息 reject 进 DLQ；只请求异步暂停，由 broker 重投。
+        ackOrRecover(channel, deliveryTag, "retry/dead ack failed");
     }
 
     private void forwardDeadThenAck(
@@ -234,7 +237,37 @@ public class VideoStatusEventConsumer {
             return;
         }
 
-        channel.basicAck(deliveryTag, false);
+        ackOrRecover(channel, deliveryTag, "dead ack failed");
+    }
+
+    /**
+     * T08 ACK 边界：ACK 失败不是业务失败，也不是转发失败。
+     *
+     * <p>不能把 {@link IOException} 交给监听容器：MANUAL + defaultRequeueRejected=false
+     * 时容器会 basicNack(requeue=false)，原消息被主队列死信交换机转进 DLQ，
+     * 把“已处理成功”的消息误报成死信。这里保留消息未确认，并请求异步停止消费者；
+     * channel 关闭后 broker 重新投递，消费端用 eventId/指纹幂等吸收。</p>
+     *
+     * <p>恢复控制器未装配时退化为把异常交回容器（旧行为），避免消息永远悬空。</p>
+     */
+    private void ackOrRecover(
+            Channel channel,
+            long deliveryTag,
+            String reason
+    ) throws IOException {
+        try {
+            channel.basicAck(deliveryTag, false);
+            return;
+        } catch (IOException ackError) {
+            if (recoveryController == null) {
+                throw ackError;
+            }
+            log.error(
+                    "视频统计消息 ACK 失败，保留未确认消息并请求异步暂停消费者，等待 broker 重投",
+                    ackError
+            );
+            requestConsumerRecovery(reason + ": " + safeMessage(ackError));
+        }
     }
 
     private void requestConsumerRecovery(String reason) {

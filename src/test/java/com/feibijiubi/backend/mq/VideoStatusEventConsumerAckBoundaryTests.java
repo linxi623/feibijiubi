@@ -68,19 +68,19 @@ class VideoStatusEventConsumerAckBoundaryTests {
     }
 
     @Test
-    void successfulBusinessAckFailurePropagatesWithoutDlqOrRetry() throws Exception {
+    void successfulBusinessAckFailureRequestsRecoveryWithoutDlqOrRetry() throws Exception {
         stubSuccessfulApply();
         Channel channel = mock(Channel.class);
         doThrow(new IOException("ack failed")).when(channel)
                 .basicAck(7L, false);
 
-        assertThrows(IOException.class,
-                () -> consumer.consume(message(7L), channel));
+        consumer.consume(message(7L), channel);
 
         verify(forwarder, never()).toRetry(any(Message.class), anyInt());
         verify(forwarder, never()).toDead(any(Message.class), anyString());
         verify(channel, never()).basicNack(7L, false, true);
-        verify(recoveryController, never()).requestRecovery(anyString());
+        // 已成功的消息不能交给容器 reject 进 DLQ；保留未确认并请求异步暂停。
+        verify(recoveryController).requestRecovery(anyString());
     }
 
     @Test
@@ -91,14 +91,13 @@ class VideoStatusEventConsumerAckBoundaryTests {
         doThrow(new IOException("ack failed")).when(channel)
                 .basicAck(9L, false);
 
-        assertThrows(IOException.class,
-                () -> consumer.consume(message(9L), channel));
+        consumer.consume(message(9L), channel);
 
         verify(forwarder).toRetry(any(Message.class), eq(1));
         verify(forwarder, never()).toDead(any(Message.class), anyString());
         verify(channel, never()).basicNack(9L, false, true);
-        // ACK 故障不是转发故障，不触发暂停。
-        verify(recoveryController, never()).requestRecovery(anyString());
+        // ACK 故障不是转发故障；不重复转发，只请求一次受控恢复。
+        verify(recoveryController).requestRecovery(anyString());
     }
 
     @Test
@@ -111,12 +110,12 @@ class VideoStatusEventConsumerAckBoundaryTests {
         doThrow(new IOException("ack failed")).when(channel)
                 .basicAck(11L, false);
 
-        assertThrows(IOException.class,
-                () -> consumer.consume(message(11L), channel));
+        consumer.consume(message(11L), channel);
 
         verify(forwarder).toDead(any(Message.class), anyString());
         verify(forwarder, never()).toRetry(any(Message.class), anyInt());
         verify(channel, never()).basicNack(11L, false, true);
+        verify(recoveryController).requestRecovery(anyString());
     }
 
     @Test

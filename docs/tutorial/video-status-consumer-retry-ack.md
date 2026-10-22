@@ -77,14 +77,19 @@
 | 场景 | 行为 |
 |---|---|
 | 业务处理成功 + ACK 成功 | 正常完成 |
-| 业务处理成功 + ACK 抛错 | 只把 `IOException` 交给监听容器；**不转发 retry/DLQ、不 NACK** |
-| retry/DLQ 发布成功 + ACK 抛错 | ACK 异常独立传播；**不再发布第二次、不转 DLQ** |
+| 业务处理成功 + ACK 抛错 | 保留消息未确认并请求受控暂停；**不转发 retry/DLQ、不 NACK**；channel 关闭后 broker 重投，eventId 幂等吸收 |
+| retry/DLQ 发布成功 + ACK 抛错 | ACK 异常独立处理；**不再发布第二次、不转 DLQ**；只请求一次受控暂停 |
 | 业务异常 + retry/DLQ 发布成功 + ACK 成功 | 原消息确认，转发消息承担后续重试 |
 | 业务异常 + retry/DLQ 发布失败 | 不 ACK、不 NACK，请求异步暂停，原消息由 broker 重投 |
 | 非法 payload | 走死信转发；ACL/解析错误不会无限重试 |
 
 关键点：**成功消息的 ACK 失败绝不触发 DLQ**。ACK 失败不是业务失败，也不是转发失败；连接恢复后
 重复投递由 eventId 幂等吸收。
+
+补充（T08 第二部分修复）：不能把 ACK 的 `IOException` 直接抛回监听容器。本容器是 MANUAL +
+`defaultRequeueRejected=false`，容器收到监听器异常会执行 `basicNack(requeue=false)`，原消息被主队列
+死信交换机转进 DLQ，等于把“已处理成功”的消息误报成死信。因此 `VideoStatusEventConsumer#ackOrRecover`
+在 ACK 失败时保留未确认消息并请求异步暂停；只有恢复控制器未装配时才退回旧行为，避免消息永远悬空。
 
 ## 6. 配置与生命周期
 
@@ -110,8 +115,9 @@ app:
   三条 binding 的 exchange/routing key 正确。
 - `VideoStatusRetryTierRoutingTests`（3）：第 1/2/3+ 次重试分别路由到 10/30/120 秒队列；转发保留
   eventId、body 和 attempt header；恢复重放使用同一选路。
-- `VideoStatusEventConsumerAckBoundaryTests`（5）：成功 ACK 抛错不转 retry/DLQ、不 NACK；retry/DLQ
-  发布成功但 ACK 抛错不二次转发；转发失败不 ACK/NACK 且请求异步暂停；非法 payload 只进 DLQ 一次。
+- `VideoStatusEventConsumerAckBoundaryTests`（5）：成功 ACK 抛错不转 retry/DLQ、不 NACK 且请求一次受控
+  恢复；retry/DLQ 发布成功但 ACK 抛错不二次转发、不 NACK；转发失败不 ACK/NACK 且请求异步暂停；
+  非法 payload 只进 DLQ 一次。
 - `VideoStatusConsumerRecoveryControllerTests`（6）：gate 合并重复请求；stop 在调度任务中执行；
   有界延迟后 start；stop 失败仍能恢复或释放 gate；start 失败保持 gate 且最多一项下一恢复任务；
   停机后拒绝新请求。
@@ -125,6 +131,32 @@ Tests run: 38, Failures: 0, Errors: 0, Skipped: 0
 未运行、也未宣称通过：真实 RabbitMQ 队列声明/TTL 到期重投、真实 Redis 故障 120 秒恢复、
 真实容器 stop/start、`videoStatusIT=true` 集成套件、完整 `mvnw test`（其中
 `BackendApplicationTests#contextLoads` 需要本机基础设施）。
+
+## 7.1 第二部分：真实隔离集成测试（已添加，本子任务未运行）
+
+新增 `VideoStatusConsumerRetryLifecycleIsolatedTests`，只在 `-DvideoStatusIT=true` 时运行，复用
+`VideoStatusIsolatedIntegrationTests.IsolationGuard` 与隔离 `TestApplication`，固定 MySQL 13307 /
+Redis 16379 / RabbitMQ 15673，不读取 `application.yml`，不触碰正式端口。共 5 个用例：
+
+1. 合法消息重复投递（同 eventId/指纹）最终只计一次，且不进 DLQ；
+2. 真实 listener `stop()` / 延迟 `start()` 后继续消费，停止期间消息留在主队列；
+3. 真实转发失败（删除重试交换机使发布不可路由）触发受控暂停，3 秒窗口内 start 次数有界；
+4. 真实 RabbitMQ 10/30/120 秒固定 TTL 独立队列：先用同参数 declare 校验服务端参数，再实际等待
+   10 秒、30 秒、120 秒验证分别到期且互不提前释放（约 126 秒）；
+5. Redis 服务端 `CLIENT PAUSE 120000` 后恢复：连接/进程始终存活，**不是**断连或进程重启边界；
+   断言事件最终收敛或进入可重放 DLQ，不会静默消失。
+
+精确命令（父代理串行执行，需要先启动 `compose.test.yaml`）：
+
+```bash
+docker compose -f compose.test.yaml up -d --wait
+./mvnw -DvideoStatusIT=true \
+  -Dtest=VideoStatusIsolatedIntegrationTests,VideoStatusConsumerRetryLifecycleIsolatedTests test
+```
+
+本子任务只完成编译与单元测试（286 通过、80 跳过）**未启动基础设施、未运行该 IT**，因此不宣称其通过。
+已知未覆盖：RabbitMQ 进程/网络断连与重连、Redis 进程重启或数据丢失、DLQ 内容对账（T10）、
+status0 自动补偿（T09）、转发持续失败时的告警阈值（T05/T16）。
 
 ## 8. 未完成 / 风险（如实说明）
 
