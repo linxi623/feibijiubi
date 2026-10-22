@@ -164,7 +164,7 @@ Authorization: Bearer <token>
 
 ## 2. 接口总览
 
-当前 Controller 共提供 25 个接口。
+当前 Controller 共提供 31 个接口。
 
 ### 2.1 账号与用户
 
@@ -257,6 +257,16 @@ T08 **不新增或修改任何 HTTP 接口**，请求/响应字段与状态码�
   Redis 数据丢失保证，这些仍归 T16。详见
   [消费重试与 ACK 边界教程](tutorial/video-status-consumer-retry-ack.md)。
 
+---
+
+### 2.8 管理员 status0 补偿只读预览（T09）
+
+| 模块 | 方法 | 路径 | 权限 |
+|---|---|---|---|
+| 观测 | GET | `/api/admin/video-status/status0-compensation/preview` | 管理员 |
+
+> 只有这一个只读 GET；不领取租约、不发送 MQ、不写 Redis/DB，默认关闭时仍可诊断。没有运行期
+> pause/启停写接口。T09 实现已合入 `97c7357`，但主分支完整回归尚未执行，状态为**待最终验收**。
 ---
 
 # 3. 账号接口
@@ -1992,6 +2002,91 @@ curl -X POST "http://localhost:8080/api/admin/video-status/outbox/evt-123/replay
 
 > T10 之前只允许这种单事件、可审计、可拒绝的重放；不要用裸 SQL 改状态，不要新建 eventId。
 
+---
+
+## 8.8 预览 status0 补偿候选（T09，只读）
+
+```http
+GET /api/admin/video-status/status0-compensation/preview?limit={limit}&afterId={afterId}
+```
+
+权限：**管理员**（`/api/admin/**` + 方法级 `@AdminOnly`）。
+
+### Query 参数
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|---|---|---|---|---|
+| `limit` | integer | 否 | `10` | 返回条数，范围 `1`～`100`；越界返回业务 `400` |
+| `afterId` | long | 否 | `0` | keyset 起点，只返回 `id > afterId` 的 RECEIVED 行；必须 `>= 0` |
+
+### 响应字段
+
+`data` 为 `PreviewResult`：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `overSafeWindow` | long | 超过安全窗口的 RECEIVED 数量；受扫描上限约束 |
+| `overSafeWindowLowerBound` | boolean | `true` 表示计数达到上限，只能声称“至少这么多” |
+| `compensationEnabled` | boolean | 当前实例总开关；默认 `false` |
+| `items` | array | 预览行 |
+
+每个 `items[]` 包含：`eventId`、`vid`、`eventType`、`processStatus`、`consumedAgeSeconds`、
+`compensationAttempts`、`lastAttemptAt`、`nextAttemptAt`、`leaseUntil`、`withinGrace`、
+`withinSafeWindow`、`leaseFree`、`cooldownElapsed`、`attemptsRemaining`、`eligible`、
+`evidenceStatus`、`decisionGate`。
+
+- `evidenceStatus` 固定为 `EVIDENCE_UNKNOWN`：preview 不访问 Redis，DB 行本身不能证明 current 是否已应用。
+- `decisionGate` 为 `PREVIEW_ONLY_MASTER_SWITCH_OFF`、`BLOCKED_INTEGRITY_NOT_CONFIRMED`、
+  `PROVEN_PROCESSED_EVIDENCE_ONLY` 或 `ALLOW_UNPROVEN_REPLAY`。
+- 静默期/租约/冷却比较使用同一条 SQL 返回的数据库 `NOW(3)`，不与 JVM 时钟混用。
+
+### 成功响应（节选）
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "overSafeWindow": 0,
+    "overSafeWindowLowerBound": false,
+    "compensationEnabled": false,
+    "items": [
+      {
+        "eventId": "evt-123",
+        "vid": 123,
+        "eventType": "LIKE",
+        "processStatus": 0,
+        "consumedAgeSeconds": 120,
+        "compensationAttempts": 0,
+        "lastAttemptAt": "2026-10-22T10:00:00",
+        "nextAttemptAt": null,
+        "leaseUntil": null,
+        "withinGrace": true,
+        "withinSafeWindow": true,
+        "leaseFree": true,
+        "cooldownElapsed": true,
+        "attemptsRemaining": true,
+        "eligible": true,
+        "evidenceStatus": "EVIDENCE_UNKNOWN",
+        "decisionGate": "PREVIEW_ONLY_MASTER_SWITCH_OFF"
+      }
+    ]
+  }
+}
+```
+
+### 常见错误
+
+| 场景 | 结果 |
+|---|---|
+| `limit < 1` 或 `limit > 100` | 业务 `code=400`，提示 `limit 必须在 1 到 100 之间` |
+| `afterId < 0` | 业务 `code=400`，提示 `afterId 必须 >= 0` |
+| 未登录 / 非管理员 | 由既有登录、管理员拦截器返回相应业务错误 |
+
+```bash
+curl "http://localhost:8080/api/admin/video-status/status0-compensation/preview?limit=10&afterId=0" \
+  -H "Authorization: Bearer <管理员token>"
+```
 ---
 
 # 9. 推荐联调顺序

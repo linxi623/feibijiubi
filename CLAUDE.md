@@ -238,6 +238,42 @@ The flow is:
   alive. It is **not** a Redis process restart, network disconnect, or arbitrary Redis data-loss
   guarantee; those remain T16 work.
 
+### T09 status0 compensation (accepted, test environment)
+
+- T09 first phase is implemented on the main branch at `97c7357` (candidate `aab1c64`) and accepted
+  in the **test environment** on 2026-10-22; this is not production acceptance. The parent ran on
+  the main branch `./mvnw '-Dtest=*Tests,!BackendApplicationTests' test` with **356 tests, 0
+  failures/errors, 108 skipped** (log `/tmp/t09-main-unit.log`) and
+  `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusStatus0CompensationTests,VideoStatusStatus0CompensationAuthorizationTests,VideoStatusStatus0CompensationIsolatedIntegrationTests,VideoStatusIsolatedIntegrationTests,VideoStatusOutboxReliabilityIsolatedTests' test`
+  with **62 tests, 0 failures/errors, 1 skipped** (log `/tmp/t09-main-it.log`). The earlier candidate
+  run was **43 tests, 0 failures/errors/skipped** (8 real isolated IT), log
+  `/tmp/t09-parent-final.log`.
+- Three gates default to false: `status0-compensation-enabled`,
+  `status0-compensation-integrity-confirmed`, `status0-compensation-allow-unproven-replay`.
+  `enabled=true` without integrity confirmation fails startup. Unproven replay requires all three;
+  it is an operator assertion that no Redis data loss/partial-write incident occurred, not automatic
+  detection. Missing `processed` evidence is `EVIDENCE_UNKNOWN`: it may mean never applied, or current
+  applied with only `processed` lost, so it must not be treated as "not applied".
+- The proven path only republishes the original eventId after payload/event/fingerprint/DB-age/
+  `occurredAt` checks and a Redis processed key whose remaining TTL covers the maximum MQ retry
+  backoff plus max(compensation lease, publish confirm). Missing/unknown/insufficient TTL defaults to
+  no send and no status3, only lease release, cooldown and diagnostics. The controlled unproven mode
+  is not a guarantee against arbitrary Redis data loss or `current + processed` loss.
+- Preview is the only new HTTP entry point: read-only admin
+  `GET /api/admin/video-status/status0-compensation/preview?limit=1..100&afterId>=0`. It does not
+  claim a lease, publish MQ, or write Redis/DB. There is no runtime pause/write endpoint.
+- yaml is not hot-reloaded. Incident response must disable `status0-compensation-enabled` on **all**
+  compensation-role instances and restart them, then let in-flight publish/confirm finish or let the
+  lease expire; do not hard-kill an in-flight publish.
+- Claims are one row per short transaction with DB-clock lease CAS and an independent
+  `compensation_attempts` budget; republish writeback does not increment `consumer_retry_count`.
+  Migration `database/migrations/t09-video-status-status0-compensation.sql` is idempotent and only
+  adds compensation columns/index, mirrored in `database/feibijiubi.sql`.
+- Failure history retained: an earlier verification used a wrong switch that skipped the intended
+  tests, and mapper parameter/timezone handling failed before being fixed. Do not copy credentials
+  into docs or logs. T09 remains test-environment evidence only, not production acceptance; the
+  no-evidence (unproven) replay mode stays controlled and default off.
+- Guide: `docs/tutorial/video-status-status0-compensation.md`.
 ### T11 dirty-recovery fairness (accepted, test environment)
 
 - T11 is implemented at candidate `be7d836` and accepted on 2026-10-22. The parent reran
@@ -312,6 +348,14 @@ overrides before connecting, seed new rows and purge only the dedicated test que
 deployment volumes are never used. Normal test runs skip this opt-in suite. Stop with
 `docker compose -f compose.test.yaml stop` to preserve test data.
 
+T09 acceptance classes are `VideoStatusStatus0CompensationTests`,
+`VideoStatusStatus0CompensationAuthorizationTests` and
+`VideoStatusStatus0CompensationIsolatedIntegrationTests`; the main-branch parent run was 62 opt-in
+IT tests (0 failures/errors, 1 skipped, log `/tmp/t09-main-it.log`) plus 356 unit tests (0
+failures/errors, 108 skipped, log `/tmp/t09-main-unit.log`). T09 is accepted in the test
+environment only; the unproven replay mode remains controlled and default off. T10 is in progress
+in an independent tree with a first-stage 15-unit-test candidate that is not merged; no DLQ or
+reconciliation item is complete.
 ## Docker Compose deployment
 
 `compose.yaml` starts MySQL, Redis, RabbitMQ, and the Spring Boot backend together. The backend is

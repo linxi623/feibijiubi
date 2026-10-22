@@ -1,8 +1,11 @@
 # T09 第一阶段：status0 安全窗口原 eventId 补偿
 
-> 状态：第一阶段候选，默认关闭。尚未在独立 `compose.test.yaml` 环境做真实 MQ/Redis/MySQL
-> 组合验收，因此**不宣称 T09 已完成，也不批准生产开启**。本文只说明本阶段的代码边界、
-> 迁移和启用闸门。
+> 状态：**第一阶段实现已合入主分支 `97c7357`（候选 `aab1c64`），并于 2026-10-22 完成测试环境验收，默认关闭。**
+> 父代理在主分支实跑普通回归 356 tests（0 失败/错误，108 skipped，`/tmp/t09-main-unit.log`）与
+> opt-in 隔离回归 62 tests（0 失败/错误，1 skipped，`/tmp/t09-main-it.log`）；候选早前 43 tests
+> （含 8 个真实隔离 IT）0 失败/错误/跳过（`/tmp/t09-parent-final.log`）。
+> 这是**测试环境验收，不是生产验收**；无证据模式保持受控/默认关，不批准生产开启。
+> 本文说明本阶段的代码边界、接口、迁移和启用闸门。
 
 ## 1. 要解决的问题
 
@@ -186,4 +189,11 @@ yaml 配置**不是热更新**：修改 `status0-compensation-*` 后必须重启
   vid/event 行，不删除历史数据，也不做全库清理；
 - 本工作区不重复运行真实 IT，父代理统一执行：
   `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusStatus0CompensationTests,VideoStatusStatus0CompensationIsolatedIntegrationTests' test`；
-- T09 是否勾选完成仍以父代理完整验收为准；T10 未开始。
+- 主分支最终验收（父代理本次实跑）：普通回归 `./mvnw '-Dtest=*Tests,!BackendApplicationTests' test` 为
+  **356 tests，0 失败/错误，108 skipped**（`/tmp/t09-main-unit.log`）；opt-in 隔离回归
+  `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusStatus0CompensationTests,VideoStatusStatus0CompensationAuthorizationTests,VideoStatusStatus0CompensationIsolatedIntegrationTests,VideoStatusIsolatedIntegrationTests,VideoStatusOutboxReliabilityIsolatedTests' test`
+  为 **62 tests，0 失败/错误，1 skipped**（`/tmp/t09-main-it.log`）。候选早前 43 tests，0 失败/错误/跳过，
+  其中 8 个为真实隔离 IT，日志 `/tmp/t09-parent-final.log`。
+- 失败历史（保留）：早前验证曾用错开关导致目标测试被跳过；mapper 参数绑定/时区处理也曾失败，修正后才有上述结果。文档与日志不记录任何凭证。
+- preview 接口与响应字段见 `docs/api.md`；preview 固定返回 `evidenceStatus=EVIDENCE_UNKNOWN`，不访问 Redis。
+- 验收边界：以上为**测试环境验收，不是生产验收**，也不是真实进程崩溃/两 JVM 演练。无证据（unproven）重放模式仍受三闸门控制且默认关闭，不保证任意 Redis 数据丢失或 `current + processed` 同时丢失的安全；生产开关、容量与跨进程恢复仍交 T16。T10 进行中，独立工作树只有第一阶段 15 个单测候选且未合入，DLQ/对账整项未完成。
