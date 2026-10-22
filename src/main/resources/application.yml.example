@@ -57,6 +57,20 @@ app:
     flush-dirty-batch-size: 100
     flush-event-batch-size: 1000
     flush-recovery-fixed-delay-ms: 5000
+    # T09：status0 安全补偿默认关闭；只读 preview 永远可用。
+    # 启用必须同时显式确认 processed 证据与 Redis 丢失边界（事故闸门）。
+    status0-compensation-enabled: false
+    status0-compensation-integrity-confirmed: false
+    # 受控恢复模式，默认 false。仅当操作员明确确认“无 Redis 数据丢失、无部分写事故”时
+    # 才可开启；它不自动检测单独丢 processed，也不把缺失当作未应用。
+    # 事故发生时先关闭 status0-compensation-enabled 总开关。
+    status0-compensation-allow-unproven-replay: false
+    status0-compensation-min-age-seconds: 60
+    status0-compensation-batch-size: 20
+    status0-compensation-fixed-delay-ms: 5000
+    status0-compensation-lease-seconds: 30
+    status0-compensation-cooldown-seconds: 120
+    status0-compensation-max-attempts: 5
 
 
 mybatis:

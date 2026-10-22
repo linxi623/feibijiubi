@@ -304,10 +304,16 @@ CREATE TABLE video_status_consumed_event (
     consumed_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     redis_applied_at DATETIME(3) NULL,
     flushed_at DATETIME(3) NULL,
+    compensation_attempts INT NOT NULL DEFAULT 0,
+    compensation_next_attempt_at DATETIME(3) NULL,
+    compensation_lease_token VARCHAR(64) NULL,
+    compensation_lease_until DATETIME(3) NULL,
+    last_compensation_at DATETIME(3) NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uk_video_status_consumed_event_id (event_id),
     KEY idx_video_status_consumed_pending (process_status, vid, id),
     KEY idx_video_status_consumed_recovery (process_status, last_attempt_at, id),
+    KEY idx_video_status_consumed_compensation (process_status, last_attempt_at, id),
     -- T05：观测采样按 process_status 取真实最老（consumed_at 顺序），见 database/migrations/t05-video-status-observability-indexes.sql
     KEY idx_video_status_consumed_created (process_status, consumed_at, id),
     CONSTRAINT fk_video_status_consumed_vid

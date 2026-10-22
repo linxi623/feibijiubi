@@ -41,6 +41,10 @@ public class VideoStatusProperties {
     public static final int MIN_LEASE_CONFIRM_MARGIN_SECONDS = 5;
     /** 单轮调度预算默认值（毫秒）。 */
     public static final long DEFAULT_ROUND_BUDGET_MS = 5_000L;
+    /** 与 VideoStatusMessageForwarder 的分级重试队列 TTL 保持一致（秒）。 */
+    public static final long RETRY_BACKOFF_FIRST_SECONDS = 10L;
+    public static final long RETRY_BACKOFF_SECOND_SECONDS = 30L;
+    public static final long RETRY_BACKOFF_LATER_SECONDS = 120L;
 
     // 总开关，是否启用异步统计（业务侧写 Outbox、消费者落 Redis、调度器落库都以此为前提）
     private boolean asyncEnabled;
@@ -74,6 +78,32 @@ public class VideoStatusProperties {
     // 它只限制“本轮还要不要继续拿新工作”，不能强杀正在进行的 publish confirm 或数据库事务
     // （那些由 confirm timeout、vid 锁等待和 SQL 超时各自界定）。
     private long roundBudgetMs = DEFAULT_ROUND_BUDGET_MS;
+
+    // ------------------------------------------------------------------ T09
+    // 默认关闭：status0 自动补偿会重新投递原事件，必须先由运维明确确认
+    // “processed 幂等证据与 Redis 数据丢失边界”，否则只允许只读 preview。
+    private boolean status0CompensationEnabled;
+    // 事故闸门/完整性确认。enabled=true 而本项=false 时启动失败，
+    // 避免一次配置误开就自动累计不确定的事件。
+    private boolean status0CompensationIntegrityConfirmed;
+    // 受控恢复模式，默认 false。只有操作员已经明确确认“本次事故没有 Redis 数据丢失、
+    // 没有 current/processed 部分写事故”时才可开启；开启后允许在安全窗口内对
+    // processed 缺失的原 eventId 重放。它不能自动检测“单独丢 processed”，也不把
+    // 缺失推断成“未应用”；事故处置时必须先关闭 status0-compensation-enabled 总开关。
+    private boolean status0CompensationAllowUnprovenReplay;
+    // 新鲜事件不抢救：RECEIVED 至少静默这么久才进入候选。
+    private long status0CompensationMinAgeSeconds = 60;
+    private int status0CompensationBatchSize = 20;
+    private long status0CompensationFixedDelayMs = 5_000;
+    // 领取后给 MQ confirm + 回写留出的租约；到期可被其它实例再次领取。
+    private int status0CompensationLeaseSeconds = 30;
+    // 失败/证据不足后的冷却，避免每轮重复扫描同一条事件。
+    private long status0CompensationCooldownSeconds = 120;
+    // 有界单轮/有界生命周期：达到上限后只诊断，不自动转 status3。
+    private int status0CompensationMaxAttempts = 5;
+    // preview/日志的超龄事件计数上限：只返回 capped count，等于上限时标记为 lower bound，
+    // 避免每次 preview 对全表做无界 COUNT。
+    private int status0CompensationOverSafeWindowCountCap = 1000;
 
 
     /**
@@ -118,6 +148,56 @@ public class VideoStatusProperties {
         requirePositiveDelay("consumerRecoveryDelayMs", consumerRecoveryDelayMs);
         requirePositiveDelay("roundBudgetMs", roundBudgetMs);
 
+        requireRange("status0CompensationBatchSize", status0CompensationBatchSize,
+                1, MAX_BATCH_SIZE);
+        requireRange("status0CompensationLeaseSeconds", status0CompensationLeaseSeconds,
+                1, MAX_LEASE_OR_CONFIRM_TIMEOUT_SECONDS);
+        requireRange("status0CompensationMaxAttempts", status0CompensationMaxAttempts,
+                1, MAX_CONSUMER_MAX_RETRIES);
+        requireRange("status0CompensationOverSafeWindowCountCap",
+                status0CompensationOverSafeWindowCountCap, 1, MAX_BATCH_SIZE);
+        requirePositiveDelay("status0CompensationMinAgeSeconds",
+                status0CompensationMinAgeSeconds);
+        requirePositiveDelay("status0CompensationFixedDelayMs",
+                status0CompensationFixedDelayMs);
+        requirePositiveDelay("status0CompensationCooldownSeconds",
+                status0CompensationCooldownSeconds);
+        // 补偿租约必须覆盖一次 publish confirm 并留回写余量；否则整批领取后
+        // 后面的条目可能在处理前就被其它实例合法接管。
+        int minimumStatus0LeaseSeconds = publishConfirmTimeoutSeconds
+                + MIN_LEASE_CONFIRM_MARGIN_SECONDS;
+        if (status0CompensationLeaseSeconds < minimumStatus0LeaseSeconds) {
+            throw new IllegalStateException(
+                    "app.video-status.status0-compensation-lease-seconds 必须 >= "
+                            + "publish-confirm-timeout-seconds + "
+                            + MIN_LEASE_CONFIRM_MARGIN_SECONDS + " 秒（当前 confirm 超时 = "
+                            + publishConfirmTimeoutSeconds + " 秒，要求租约 >= "
+                            + minimumStatus0LeaseSeconds + " 秒，实际租约 = "
+                            + status0CompensationLeaseSeconds + " 秒）"
+            );
+        }
+        // 安全窗口仍复用 consumerRecoveryAutoReplayMaxAgeSeconds：它已强制小于
+        // Redis processed TTL。补偿只在这个窗口内工作，且必须晚于最小年龄。
+        if (status0CompensationMinAgeSeconds
+                >= consumerRecoveryAutoReplayMaxAgeSeconds) {
+            throw new IllegalStateException(
+                    "app.video-status.status0-compensation-min-age-seconds 必须小于"
+                            + " consumer-recovery-auto-replay-max-age-seconds（安全窗口 = "
+                            + consumerRecoveryAutoReplayMaxAgeSeconds + " 秒，当前最小年龄 = "
+                            + status0CompensationMinAgeSeconds + " 秒）"
+            );
+        }
+        if (status0CompensationEnabled
+                && !status0CompensationIntegrityConfirmed) {
+            throw new IllegalStateException(
+                    "app.video-status.status0-compensation-enabled=true 需要同时设置"
+                            + " status0-compensation-integrity-confirmed=true"
+                            + "（显式确认 processed 证据与 Redis 丢失边界；否则只允许只读 preview）"
+            );
+        }
+        // allow-unproven-replay 不强制依赖 enabled：事故中常用“关闭总开关、保留
+        // 受控恢复配置”的方式停机，不能因此让应用无法启动。三条件只在 runOnce 内合成。
+
         // T07 跨字段约束：租约必须 >= confirm 超时 + 5s，给状态回写留出余量。
         // 只约束这两个字段；不要求 roundBudgetMs >= confirm（单轮预算只决定“还要不要拿下一条”，
         // 不负责强杀进行中的 publish，若强行要求会把已有的 5s 预算配置判成非法）。
@@ -132,6 +212,32 @@ public class VideoStatusProperties {
                             + outboxLeaseSeconds + " 秒）"
             );
         }
+    }
+
+    /**
+     * 重放消息从进入 MQ 到最后一次消费失败所允许的最长重试退避，再加上
+     * confirm/补偿租约余量。processed Key 的剩余 TTL 小于该值时，重试期间
+     * 幂等证据可能先过期，必须拒绝发送而不是仅检查 Key 当前是否存在。
+     */
+    public long getStatus0CompensationRequiredProcessedTtlSeconds() {
+        long retryBackoffSeconds = 0L;
+        for (int attempt = 1; attempt <= consumerMaxRetries; attempt++) {
+            if (attempt <= 1) {
+                retryBackoffSeconds = Math.addExact(
+                        retryBackoffSeconds, RETRY_BACKOFF_FIRST_SECONDS);
+            } else if (attempt == 2) {
+                retryBackoffSeconds = Math.addExact(
+                        retryBackoffSeconds, RETRY_BACKOFF_SECOND_SECONDS);
+            } else {
+                retryBackoffSeconds = Math.addExact(
+                        retryBackoffSeconds, RETRY_BACKOFF_LATER_SECONDS);
+            }
+        }
+        long leaseOrConfirmSeconds = Math.max(
+                status0CompensationLeaseSeconds,
+                publishConfirmTimeoutSeconds
+        );
+        return Math.addExact(retryBackoffSeconds, leaseOrConfirmSeconds);
     }
 
     private void requirePositiveDelay(String name, long value) {

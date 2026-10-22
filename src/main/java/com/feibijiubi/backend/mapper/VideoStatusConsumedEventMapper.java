@@ -93,4 +93,53 @@ public interface VideoStatusConsumedEventMapper {
             @Param("afterVid") Integer afterVid,
             @Param("limit") int limit
     );
+
+    // ------------------------------------------------------------------ T09
+
+    /**
+     * status0 安全补偿候选：只返回仍为 RECEIVED、已过静默期、在安全窗口内、
+     * 冷却已到、租约空闲且未超过补偿次数上限的事件。年龄用 DB 时钟计算。
+     */
+    List<VideoStatusConsumedEvent> selectStatus0CompensationCandidates(
+            @Param("minAgeSeconds") long minAgeSeconds,
+            @Param("maxAgeSeconds") long maxAgeSeconds,
+            @Param("maxAttempts") int maxAttempts,
+            @Param("afterId") Long afterId,
+            @Param("limit") int limit
+    );
+
+    /** 只读 preview：不过滤静默期/安全窗口/冷却，供人工诊断。 */
+    List<VideoStatusConsumedEvent> selectStatus0CompensationPreview(
+            @Param("afterId") Long afterId,
+            @Param("limit") int limit
+    );
+
+    long countStatus0OverSafeWindow(
+            @Param("maxAgeSeconds") long maxAgeSeconds,
+            @Param("cap") int cap
+    );
+
+    /** 领取 CAS：仍未应用、租约空闲、冷却到期且未超尝试上限时才成功。 */
+    int claimStatus0Compensation(
+            @Param("eventId") String eventId,
+            @Param("leaseToken") String leaseToken,
+            @Param("leaseSeconds") int leaseSeconds,
+            @Param("minAgeSeconds") long minAgeSeconds,
+            @Param("maxAgeSeconds") long maxAgeSeconds,
+            @Param("maxAttempts") int maxAttempts
+    );
+
+    /** 发送失败/证据不足：释放租约并设置冷却，绝不改 process_status。 */
+    int releaseStatus0Compensation(
+            @Param("eventId") String eventId,
+            @Param("leaseToken") String leaseToken,
+            @Param("cooldownSeconds") long cooldownSeconds,
+            @Param("lastError") String lastError
+    );
+
+    /** 原 eventId 已重新投递：只回写补偿元数据，process_status 仍由消费者推进。 */
+    int markStatus0CompensationRepublished(
+            @Param("eventId") String eventId,
+            @Param("leaseToken") String leaseToken
+    );
 }

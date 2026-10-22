@@ -20,6 +20,13 @@
         <result property="consumedAt" column="consumed_at"/>
         <result property="redisAppliedAt" column="redis_applied_at"/>
         <result property="flushedAt" column="flushed_at"/>
+        <result property="compensationAttempts" column="compensation_attempts"/>
+        <result property="compensationNextAttemptAt" column="compensation_next_attempt_at"/>
+        <result property="compensationLeaseToken" column="compensation_lease_token"/>
+        <result property="compensationLeaseUntil" column="compensation_lease_until"/>
+        <result property="lastCompensationAt" column="last_compensation_at"/>
+        <result property="consumedAgeSeconds" column="consumed_age_seconds"/>
+        <result property="databaseNow" column="db_now"/>
     </resultMap>
 
     <sql id="ConsumedEventColumns">
@@ -36,7 +43,12 @@
         last_error,
         consumed_at,
         redis_applied_at,
-        flushed_at
+        flushed_at,
+        compensation_attempts,
+        compensation_next_attempt_at,
+        compensation_lease_token,
+        compensation_lease_until,
+        last_compensation_at
     </sql>
 
     <insert id="insertReceived">
@@ -294,5 +306,138 @@
         ORDER BY vid
         LIMIT #{limit}
     </select>
+
+    <!--
+      T09：status0 安全补偿候选。
+      * 只用 DB 时钟判断年龄：TIMESTAMPDIFF(SECOND, consumed_at, NOW(3))；
+      * 0 <= age < maxAgeSeconds，超龄事件不进入候选，由 count 查询单独诊断；
+      * 静默期用 last_attempt_at，冷却用 compensation_next_attempt_at，
+        租约过期或为空才可领取；
+      * 不修改任何状态，领取由后续 CAS 完成。
+    -->
+    <select id="selectStatus0CompensationCandidates"
+            resultMap="VideoStatusConsumedEventResultMap">
+        SELECT
+            id,
+            event_id,
+            vid,
+            event_type,
+            delta,
+            payload_hash,
+            payload,
+            process_status,
+            consumer_retry_count,
+            last_attempt_at,
+            last_error,
+            consumed_at,
+            redis_applied_at,
+            flushed_at,
+            compensation_attempts,
+            compensation_next_attempt_at,
+            compensation_lease_token,
+            compensation_lease_until,
+            last_compensation_at,
+            TIMESTAMPDIFF(SECOND, consumed_at, NOW(3)) AS consumed_age_seconds,
+            NOW(3) AS db_now
+        FROM video_status_consumed_event
+        WHERE process_status = 0
+          AND last_attempt_at &lt; DATE_SUB(NOW(3), INTERVAL #{minAgeSeconds} SECOND)
+          AND TIMESTAMPDIFF(SECOND, consumed_at, NOW(3)) &gt;= 0
+          AND TIMESTAMPDIFF(SECOND, consumed_at, NOW(3)) &lt; #{maxAgeSeconds}
+          AND (compensation_next_attempt_at IS NULL
+               OR compensation_next_attempt_at &lt;= NOW(3))
+          AND (compensation_lease_until IS NULL
+               OR compensation_lease_until &lt;= NOW(3))
+          AND compensation_attempts &lt; #{maxAttempts}
+        <if test="afterId != null">
+            AND id &gt; #{afterId}
+        </if>
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectStatus0CompensationPreview"
+            resultMap="VideoStatusConsumedEventResultMap">
+        SELECT
+            id,
+            event_id,
+            vid,
+            event_type,
+            delta,
+            payload_hash,
+            process_status,
+            consumer_retry_count,
+            last_attempt_at,
+            last_error,
+            consumed_at,
+            compensation_attempts,
+            compensation_next_attempt_at,
+            compensation_lease_token,
+            compensation_lease_until,
+            last_compensation_at,
+            TIMESTAMPDIFF(SECOND, consumed_at, NOW(3)) AS consumed_age_seconds,
+            NOW(3) AS db_now
+        FROM video_status_consumed_event
+        WHERE process_status = 0
+        <if test="afterId != null">
+            AND id &gt; #{afterId}
+        </if>
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <select id="countStatus0OverSafeWindow" resultType="long">
+        SELECT COUNT(*)
+        FROM (
+            SELECT 1
+            FROM video_status_consumed_event
+            WHERE process_status = 0
+              AND TIMESTAMPDIFF(SECOND, consumed_at, NOW(3)) &gt;= #{maxAgeSeconds}
+            LIMIT #{cap}
+        ) bounded
+    </select>
+
+    <update id="claimStatus0Compensation">
+        UPDATE video_status_consumed_event
+        SET compensation_lease_token = #{leaseToken},
+            compensation_lease_until = DATE_ADD(NOW(3), INTERVAL #{leaseSeconds} SECOND),
+            compensation_attempts = compensation_attempts + 1,
+            last_compensation_at = NOW(3),
+            last_attempt_at = NOW(3),
+            last_error = NULL
+        WHERE event_id = #{eventId}
+          AND process_status = 0
+          AND compensation_attempts &lt; #{maxAttempts}
+          AND last_attempt_at &lt; DATE_SUB(NOW(3), INTERVAL #{minAgeSeconds} SECOND)
+          AND TIMESTAMPDIFF(SECOND, consumed_at, NOW(3)) &gt;= 0
+          AND TIMESTAMPDIFF(SECOND, consumed_at, NOW(3)) &lt; #{maxAgeSeconds}
+          AND (compensation_next_attempt_at IS NULL
+               OR compensation_next_attempt_at &lt;= NOW(3))
+          AND (compensation_lease_until IS NULL
+               OR compensation_lease_until &lt;= NOW(3))
+    </update>
+
+    <update id="releaseStatus0Compensation">
+        UPDATE video_status_consumed_event
+        SET compensation_lease_token = NULL,
+            compensation_lease_until = NULL,
+            compensation_next_attempt_at = DATE_ADD(NOW(3), INTERVAL #{cooldownSeconds} SECOND),
+            last_error = #{lastError}
+        WHERE event_id = #{eventId}
+          AND process_status = 0
+          AND compensation_lease_token = #{leaseToken}
+    </update>
+
+    <update id="markStatus0CompensationRepublished">
+        UPDATE video_status_consumed_event
+        SET last_attempt_at = NOW(3),
+            last_error = NULL,
+            compensation_lease_token = NULL,
+            compensation_lease_until = NULL,
+            compensation_next_attempt_at = NULL
+        WHERE event_id = #{eventId}
+          AND process_status = 0
+          AND compensation_lease_token = #{leaseToken}
+    </update>
 
 </mapper>

@@ -38,10 +38,14 @@ public class VideoStatusSchedulingConfig {
     public static final String RELAY_SCHEDULER_BEAN = "videoStatusRelayScheduler";
     public static final String FLUSH_SCHEDULER_BEAN = "videoStatusFlushScheduler";
     public static final String RECOVERY_SCHEDULER_BEAN = "videoStatusRecoveryScheduler";
+    /** T09：status0 补偿独立调度器，不与投递/落库/恢复共享线程。 */
+    public static final String COMPENSATION_SCHEDULER_BEAN =
+            "videoStatusCompensationScheduler";
 
     public static final String RELAY_THREAD_NAME = "video-status-relay";
     public static final String FLUSH_THREAD_NAME = "video-status-flush";
     public static final String RECOVERY_THREAD_NAME = "video-status-recovery";
+    public static final String COMPENSATION_THREAD_NAME = "video-status-compensation";
 
     /** 每条调度器只有 1 条线程：同一职责不重叠，也不做无界并发。 */
     public static final int SCHEDULER_POOL_SIZE = 1;
@@ -62,6 +66,11 @@ public class VideoStatusSchedulingConfig {
     @Bean(name = RECOVERY_SCHEDULER_BEAN)
     public ThreadPoolTaskScheduler videoStatusRecoveryScheduler() {
         return scheduler(RECOVERY_THREAD_NAME);
+    }
+
+    @Bean(name = COMPENSATION_SCHEDULER_BEAN)
+    public ThreadPoolTaskScheduler videoStatusCompensationScheduler() {
+        return scheduler(COMPENSATION_THREAD_NAME);
     }
 
     private ThreadPoolTaskScheduler scheduler(String threadName) {
