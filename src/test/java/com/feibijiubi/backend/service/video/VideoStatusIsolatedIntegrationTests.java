@@ -539,7 +539,10 @@ class VideoStatusIsolatedIntegrationTests {
         applyAndMark(positive);
         await(() -> {
             var row = consumedMapper.selectByEventId(negative.eventId());
-            return row != null && row.getProcessStatus() == 1;
+            // 重投成功后既可能停在 PENDING_FLUSH(1)，也可能已被后台 flush
+            // 推进到 FLUSHED(2)；两者都证明负依赖到达后消息已重新消费。
+            return row != null && (row.getProcessStatus() == 1
+                    || row.getProcessStatus() == 2);
         });
         await(() -> { scheduler.flushDirtyVideos(); return baseline() == 1; });
         assertEquals(1, current());
