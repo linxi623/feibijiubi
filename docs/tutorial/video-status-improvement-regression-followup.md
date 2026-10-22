@@ -5,7 +5,9 @@
 - T11 `f494106` 已合入，父代理真实 MySQL/Redis 3 IT 通过（`/tmp/t11-real-convergence.log`）；250 vid 前100注入SADD故障，后150四轮内获机会，解除后总计数250，未误入status3。
 - 主分支排除 contextLoads 普通回归：`./mvnw '-Dtest=*Tests,!BackendApplicationTests' test`，289 tests，0 failures/errors，95 skipped（opt-in集成），`/tmp/improvement-main-unit.log`。
 
-## 尚未通过的整组回归
+## 整组回归（历史失败，已修复）
+
+> 以下 3 failures 为历史记录，保留不删除；最终修复结果见文末“最终结果（2026-10-22）”。
 
 父运行：
 `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusOutbox*Tests,VideoStatusIsolatedIntegrationTests,VideoStatusMetricsIsolatedTests,VideoStatusSchedulingRealFlowTests,VideoStatusDirtyRecoveryRealConvergenceTests' test`
@@ -18,11 +20,26 @@
 
 子代理尝试在markRedisApplied事务提交前补SADD；父已撤销该未提交改动：提交前SADD仍可能被flush提前取走，并未封闭竞态，而且已有DB反哺恢复契约，不能用未经证明的业务改动修测试。原生产类未变。
 
-## T08 候选保留
+## T08 候选保留（已解决）
 
 工作树 `D:/feibijiubi/backend-improvement-t08`，HEAD `ff8dc57`，有3个未提交文件：恢复控制器isRecoveryInProgress可见性、LifecycleIT清理/等待、旧IT DirtiesContext。
 父首次运行22 tests，2fail1error1skip，`/tmp/t08-real-lifecycle.log`。子代理后续复跑超时退出，无最终报告；最新Lifecycle XML显示5tests0fail，但不能据此宣称整组通过。`/tmp/t08-final-combined.log` 等为PowerShell UTF-16，需正确解码；旧IT XML仍有100轮顺序用例round0未命中spy的超时。
 子代理均已退出，jps确认无残留测试JVM后已停止独立compose环境，数据保留。下次先查git diff、日志及XML时戳，再复验。不要削减100轮或把阻塞钩子移离指定时序来通过测试。
+
+后续已按此约束修正测试清理/等待与观测，父代理最终在独立候选父复验通过；结果见文末最终结果。
+
+## 最终结果（2026-10-22）
+
+- T07：主分支 `95af60d` 全链路回归
+  `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusOutbox*Tests,VideoStatusIsolatedIntegrationTests,VideoStatusMetricsIsolatedTests,VideoStatusSchedulingRealFlowTests,VideoStatusDirtyRecoveryRealConvergenceTests' test`
+  结果 **87 tests，0 failures / 0 errors / 1 skipped**（可选 benchmark），日志
+  `/tmp/improvement-main-regression3.log`。先前 3 failures 已修复，历史保留在上文。
+- T08：已 cherry-pick 到主分支 `0dd98ad`、`b846032`、`92eb8c1`。父代理在独立候选父复验
+  `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusIsolatedIntegrationTests,VideoStatusConsumerRetryLifecycleIsolatedTests' test`
+  结果 **22 tests，0 failures / 0 errors / 1 skipped**，日志 `/tmp/t08-parent-final.log`。
+  验收覆盖真实 10/30/120 秒 TTL、真实容器 stop/start、Redis `CLIENT PAUSE 120000`；
+  **不是** Redis 进程重启、网络断连或任意数据丢失保证。
+- T07/T08 均为测试环境验收，不是生产验收、真实进程崩溃或两 JVM 演练；T09 仍仅有设计，T10 未开始，T11 已验收，T12—T16 未实现。
 
 ## T09 协议设计边界
 

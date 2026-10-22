@@ -99,7 +99,6 @@ import static org.mockito.Mockito.verify;
 @SpringBootTest(classes = VideoStatusIsolatedIntegrationTests.TestApplication.class,
         properties = {"spring.config.location=classpath:video-status-isolated.properties",
                 "spring.main.web-application-type=none"})
-@org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @ActiveProfiles("video-status-isolated")
 @ContextConfiguration(initializers = VideoStatusIsolatedIntegrationTests.IsolationGuard.class)
 // This class reuses the IT application context, which starts the real consumer; close

@@ -1,8 +1,10 @@
-# 视频统计消费重试退避与 ACK 边界（T08 候选第一部分）
+# 视频统计消费重试退避与 ACK 边界（T08）
 
-> 状态：T08 **候选第一部分**的代码与纯单元测试已完成，基于 T07 `eec1e01`，**等待父代理独立审查**。
-> 本文不修改 `video-status-improvement-plan.md`、`AGENTS.md`/`CLAUDE.md` 或 HTTP API，也不宣称
-> 已完成 T08 全部验收，更不宣称通过真实 RabbitMQ/Redis 集成测试。
+> 状态：T08 已在**测试环境验收**（2026-10-22）；实现已 cherry-pick 到主分支 `0dd98ad`、`b846032`、
+> `92eb8c1`（候选 `b796fc8`，基于 T07 `eec1e01`）。候选父复验
+> `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusIsolatedIntegrationTests,VideoStatusConsumerRetryLifecycleIsolatedTests' test`
+> 为 **22 tests，0 失败/错误，1 skipped**，日志 `/tmp/t08-parent-final.log`。
+> 该结果不宣称生产验收、真实进程崩溃/网络断连演练或任意 Redis 数据丢失保证。
 >
 > 本部分范围：三级固定 TTL 重试队列、转发失败后的受控暂停/异步恢复、ACK 异常与业务异常隔离。
 > 不在本部分：status0 自动补偿（T09）、DLQ/FAILED/status3 对账处置（T10）、真实故障演练（T16）。
@@ -132,7 +134,7 @@ Tests run: 38, Failures: 0, Errors: 0, Skipped: 0
 真实容器 stop/start、`videoStatusIT=true` 集成套件、完整 `mvnw test`（其中
 `BackendApplicationTests#contextLoads` 需要本机基础设施）。
 
-## 7.1 第二部分：真实隔离集成测试（已添加，本子任务未运行）
+## 7.1 第二部分：真实隔离集成测试（已验收）
 
 新增 `VideoStatusConsumerRetryLifecycleIsolatedTests`，只在 `-DvideoStatusIT=true` 时运行，复用
 `VideoStatusIsolatedIntegrationTests.IsolationGuard` 与隔离 `TestApplication`，固定 MySQL 13307 /
@@ -154,24 +156,41 @@ docker compose -f compose.test.yaml up -d --wait
   -Dtest=VideoStatusIsolatedIntegrationTests,VideoStatusConsumerRetryLifecycleIsolatedTests test
 ```
 
-本子任务只完成编译与单元测试（286 通过、80 跳过）**未启动基础设施、未运行该 IT**，因此不宣称其通过。
-已知未覆盖：RabbitMQ 进程/网络断连与重连、Redis 进程重启或数据丢失、DLQ 内容对账（T10）、
-status0 自动补偿（T09）、转发持续失败时的告警阈值（T05/T16）。
+候选阶段本子任务只完成编译与单元测试（286 通过、80 跳过），未运行该 IT；后续父代理在独立候选父完成
+上述命令，结果 **22 tests，0 失败/错误，1 skipped**，日志 `/tmp/t08-parent-final.log`。验收覆盖真实
+10/30/120 秒 TTL 到期、真实容器 stop/start、转发失败受控暂停，以及 Redis 服务端 `CLIENT PAUSE 120000`
+后收敛或进入可重放 DLQ。仍**未覆盖**：RabbitMQ 进程/网络断连与重连、Redis 进程重启或任意数据丢失、
+DLQ 内容对账（T10）、status0 自动补偿（T09）、转发持续失败时的告警阈值（T05/T16）。
 
 ## 8. 未完成 / 风险（如实说明）
 
-1. **未做真实集成验证**：30/120 秒队列的 broker 参数兼容、TTL 到期回主队列、容器 stop 后 prefetch
-   未确认消息重投，都需要隔离 RabbitMQ 环境验证。
+1. **真实集成验证已完成但范围有限**：30/120 秒队列 broker 参数、TTL 到期回主队列、容器 stop 后
+   prefetch 未确认消息重投已在隔离环境验收；但 RabbitMQ 进程/网络断连、Redis 进程重启或任意数据
+   丢失仍未验证，交 T16。
 2. **恢复策略只覆盖转发失败**：ACK 失败交给 Spring 容器/连接恢复；未添加专门指标或人工恢复入口。
 3. **恢复任务没有最大次数上限**：启动持续失败时会按固定延迟继续尝试，尝试率有界但不会自动停止，
    需要 T05/T16 的观测与告警确认。
 4. **三级映射目前是固定规则**：未配置化。若后续调整 `consumer-max-retries` 或恢复预算，需要重新
    评估 10/30/120 秒的总等待时间。
 5. **T10 未实现**：DLQ 内容、失败原因与 Outbox FAILED/status3 的对账处置不在本部分。
-6. **未改公共计划/AGENTS/API**：本文只是 T08 教程候选；是否合入及是否勾选计划由父代理决定。
+6. **文档已同步**：T08 已按测试环境验收合入计划并勾选；`AGENTS.md`/`CLAUDE.md` 与 `docs/api.md`
+   已补充 T08 运行契约，HTTP 接口未变。
 
 ## 9. 回滚
 
 - 删除 30/120 秒队列 Bean/binding 后，forwarder 会回到只使用原 10 秒 routing key；原队列参数未变。
 - 回滚恢复控制器和消费者 ACK 改动即可恢复旧行为；未改数据库 schema、Redis key 协议或 eventId/指纹。
 - 队列中已有的 30/120 秒消息需要先排空或人工迁回 10 秒队列；不要直接删除 DLQ 作为通用回滚手段。
+
+## 10. 验收记录（2026-10-22）
+
+- 状态：**已完成（测试环境验收）**；实现主分支 `0dd98ad`、`b846032`、`92eb8c1`（候选 `b796fc8`）。
+- 命令（父代理在独立候选父复验）：`./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusIsolatedIntegrationTests,VideoStatusConsumerRetryLifecycleIsolatedTests' test`；结果 **22 tests，0 failures / 0 errors / 1 skipped**，日志 `/tmp/t08-parent-final.log`。
+- 覆盖：合法消息重复投递只计一次且不进 DLQ；真实 listener `stop()`/延迟 `start()` 后继续消费；
+  真实转发失败触发受控暂停且 start 次数有界；真实 10/30/120 秒 TTL 独立到期；Redis
+  `CLIENT PAUSE 120000` 后事件收敛或进入可重放 DLQ，不静默消失。
+- 边界：Redis 验收中进程与网络连接始终存活，**不是**进程重启、网络断连或任意数据丢失保证；
+  容器 stop/start 也不是进程崩溃/两 JVM 演练。这些仍交 T16。
+- 失败历史（保留）：候选首次父运行 2 failures/1 error/1 skipped（`/tmp/t08-real-lifecycle.log`），
+  后续子代理复跑超时、旧 IT 100 轮顺序用例曾超时；修正测试清理/等待与观测后，本次 22 tests 通过。
+- 验收前的原计划不勾选、等待审查；本次按证据勾选，不把 T09/T10 或生产验收提前标为完成。

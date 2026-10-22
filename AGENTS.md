@@ -189,13 +189,16 @@ The flow is:
   distributed lock, not two JVMs. The publish fault is a controlled in-process block, not a real 30 s
   network disconnect. These are test-environment acceptance results, not production acceptance.
 
-### T07 outbox reliability candidate (pending acceptance)
+### T07 outbox reliability (accepted, test environment)
 
-- T07 is implemented in this branch at `eec1e01` but is **not accepted yet**; the improvement-plan
-  table marks it `待验收`. Do not describe it as production-ready, and do not claim a real process
-  crash/two-JVM drill. Verified fact: parent reran
-  `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusOutbox*Tests' test` on 2026-10-22 with 61 tests,
-  0 failures/errors/skipped (log `/tmp/improvement-t07-verify.log`).
+- T07 is implemented on the main branch at `95af60d` and accepted on 2026-10-22 after the parent
+  reran the full-chain regression
+  `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusOutbox*Tests,VideoStatusIsolatedIntegrationTests,VideoStatusMetricsIsolatedTests,VideoStatusSchedulingRealFlowTests,VideoStatusDirtyRecoveryRealConvergenceTests' test`
+  with **87 tests, 0 failures/errors, 1 skipped** (optional benchmark), log
+  `/tmp/improvement-main-regression3.log`. Earlier T07-only runs were 61 tests, 0
+  failures/errors/skipped (`/tmp/improvement-t07-verify.log`, `/tmp/improvement-t07-main.log`).
+  This is test-environment acceptance, not production acceptance and not a real process-crash or
+  two-JVM drill.
 - Publish/confirm/writeback failures are classified separately. `retry_count` is publish-failure
   budget; `lease_recovery_count` is lease-recovery budget; `confirm_writeback_count` is the budget
   for “confirm ACK succeeded but `markSent` failed”. The three budgets must not consume each other.
@@ -213,6 +216,27 @@ The flow is:
   consumed status3 repair and reconciliation remain T10.
 - Runbook and limits: `docs/tutorial/video-status-outbox-reliability.md`,
   `video-status-outbox-lease-migration.md`, and `video-status-outbox-replay-runbook.md`.
+
+### T08 consumer retry and ACK boundaries (accepted, test environment)
+
+- T08 is implemented on the main branch via `0dd98ad`, `b846032` and `92eb8c1` (candidate base
+  `b796fc8`) and accepted on 2026-10-22. The parent reran
+  `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusIsolatedIntegrationTests,VideoStatusConsumerRetryLifecycleIsolatedTests' test`
+  on the independent candidate parent with **22 tests, 0 failures/errors, 1 skipped**, log
+  `/tmp/t08-parent-final.log`.
+- Retries use three fixed-TTL queues (10 s / 30 s / 120 s; the original 10 s queue name and
+  parameters are unchanged). Attempt 1/2/3+ routes to 10/30/120 s, so one TTL never head-of-line
+  blocks another. Forwarding failure neither ACKs nor NACKs: a single dedicated recovery task
+  asynchronously stops the listener container and restarts it after
+  `consumer-recovery-delay-ms` (default 10000), so the consumer thread never sleeps or requeues hot.
+- ACK errors are handled separately from business and forwarding errors: a successfully handled
+  message whose ACK fails is never forwarded to retry/DLQ and never NACKed; the unacked message is
+  redelivered and absorbed by eventId + fingerprint idempotency. At-least-once is retained; no
+  cross-RabbitMQ/MySQL exactly-once claim.
+- The isolated acceptance exercised real 10/30/120 s TTL expiry, real listener container stop/start,
+  and a server-side Redis `CLIENT PAUSE 120000` where the process and network connection stayed
+  alive. It is **not** a Redis process restart, network disconnect, or arbitrary Redis data-loss
+  guarantee; those remain T16 work.
 
 ### T11 dirty-recovery fairness (accepted, test environment)
 
@@ -237,8 +261,9 @@ The flow is:
 
 Guides: `docs/tutorial/video-status-counter-range.md`, `video-status-flush-defer.md`,
 `video-status-runtime-roles.md`, `video-status-observability.md`,
-`video-status-scheduling-isolation.md`, `video-status-outbox-reliability.md`, and
-`video-status-outbox-lease-migration.md` (all under `docs/tutorial/`). Acceptance progress and
+`video-status-scheduling-isolation.md`, `video-status-outbox-reliability.md`,
+`video-status-outbox-lease-migration.md`, and `video-status-consumer-retry-ack.md` (all under
+`docs/tutorial/`). Acceptance progress and
 remaining recovery/observability work: `docs/tutorial/video-status-improvement-plan.md`.
 
 Consumer retry/dead-letter behavior is driven by the typed exceptions in `common/`:
@@ -280,7 +305,9 @@ classes are `VideoStatusMetricsIsolatedTests` and `VideoStatusSchedulingRealFlow
 blocks publish for about 30 s by design). T11 acceptance classes are
 `VideoStatusDirtyRecoveryRealConvergenceTests` and
 `VideoStatusDirtyRecoveryFairnessIsolatedTests`; the non-IT fairness unit tests live in
-`VideoStatusDirtyRecoveryFairnessTests`. Tests replace application.yml, reject non-isolated endpoint
+`VideoStatusDirtyRecoveryFairnessTests`. The T08 acceptance class is
+`VideoStatusConsumerRetryLifecycleIsolatedTests` (real 10/30/120 s TTL, container stop/start, and
+Redis `CLIENT PAUSE`). Tests replace application.yml, reject non-isolated endpoint
 overrides before connecting, seed new rows and purge only the dedicated test queues. Existing
 deployment volumes are never used. Normal test runs skip this opt-in suite. Stop with
 `docker compose -f compose.test.yaml stop` to preserve test data.

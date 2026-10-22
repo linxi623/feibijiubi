@@ -234,6 +234,28 @@ Authorization: Bearer <token>
 > 不支持批量、DLQ、consumed `process_status=3` 修复或对账。GET 不返回 payload、leaseToken
 > 与 `last_error` 原文；POST 的操作人只能来自登录态。详见
 > [Outbox 重放 Runbook](tutorial/video-status-outbox-replay-runbook.md)。
+>
+> T07 已于 2026-10-22 在测试环境验收（实现主分支 `95af60d`，全链路回归 87 tests，0 失败/错误，
+> 1 skipped，日志 `/tmp/improvement-main-regression3.log`）。该结论不等于生产验收、真实进程崩溃
+> 演练或两 JVM 接管验证，这些仍归 T16。
+
+### 2.7 消费重试队列与 ACK 边界（T08）
+
+T08 **不新增或修改任何 HTTP 接口**，请求/响应字段与状态码均不变。它只改变消费失败后的重试与
+确认行为，因此 HTTP 调用方无需改动；以下为运行契约：
+
+- 重试使用三个固定 TTL 队列：`video.status.retry.queue.v1`（10 秒，名称/参数不变）、
+  `video.status.retry.queue.30s.v1`（30 秒）、`video.status.retry.queue.120s.v1`（120 秒）。
+  第 1/2/3 次及以后重试分别路由到 10/30/120 秒队列，每个队列只有一种 TTL，避免队头阻塞。
+- 转发失败时不 ACK、不 NACK，由专用单线程恢复任务异步 `stop()` 容器并在
+  `app.video-status.consumer-recovery-delay-ms`（默认 10000 毫秒）后 `start()`；消费线程不会
+  无限 sleep 或立即 requeue。未确认消息由 broker 重投。
+- 业务成功但 ACK 抛错时，不转发 retry/DLQ、不 NACK，只请求一次受控暂停；连接恢复后的重复
+  投递由 eventId + 指纹幂等吸收。仍是至少一次投递，不承诺跨 RabbitMQ/MySQL exactly-once。
+- 验收为测试环境结果：真实 10/30/120 秒 TTL 到期、真实容器 stop/start、Redis 服务端
+  `CLIENT PAUSE 120000`（进程与网络连接始终存活）。**不是** Redis 进程重启、网络断连或任意
+  Redis 数据丢失保证，这些仍归 T16。详见
+  [消费重试与 ACK 边界教程](tutorial/video-status-consumer-retry-ack.md)。
 
 ---
 

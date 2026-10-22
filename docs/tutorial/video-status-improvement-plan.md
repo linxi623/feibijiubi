@@ -1,6 +1,6 @@
 # 互动统计链路改进执行计划与 TODO
 
-> 状态：执行中；T01—T06 已验收并合入；T07（Outbox 发布/回写/租约）待验收；T08 实施中；T09 设计中；T11（dirty 恢复公平扫描与失败退避）已验收（按计划允许在 T06 后提前）。仅表中已完成且有证据的项代表已实现能力；不代表批准生产上线。
+> 状态：执行中；T01—T08 已验收并合入；T09 设计中；T11（dirty 恢复公平扫描与失败退避）已验收（按计划允许在 T06 后提前）。T07/T08 为测试环境验收，不等于生产验收。仅表中已完成且有证据的项代表已实现能力；不代表批准生产上线。
 >
 > 范围：互动入口 → Outbox → RabbitMQ → Redis → 消费事件 → 批量落库 → 重建/补偿。
 > 原则：先验证正确性，再补恢复闭环，再治理稳定性，最后优化吞吐。
@@ -33,8 +33,8 @@
 | [x] | 04 / T04 | P0 | 修复失效开关、明确运行角色及开关契约 | T01；按序在 T03 后交付 | 已完成 | fe11d03；配置绑定/启动拒绝6用例，角色13用例，真实维护切换最终DB=Redis=6、4异步2同步 |
 | [x] | 05 / T05 | P1 | 建立最小链路指标与积压告警 | T03、T04 | 已完成 | 46af28b；父代理 2026-10-22 复验：69 单测 + 8 隔离用例均 0 失败/错误/跳过；四类故障可定位、采样只读、迁移幂等 |
 | [x] | 06 / T06 | P1 | 隔离调度资源、限制单轮任务预算 | T05 | 已完成 | 3e33415；同批 69 + 8；受控阻塞 30.082s 时 flush 62ms、恢复继续心跳；并发落库 baseline=100/flushed=100 |
-| [ ] | 07 / T07 | P1 | 完善 Outbox 发布、回写、租约处理 | T06 | 待验收 | eec1e01；父代理 2026-10-22 复跑 `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusOutbox*Tests' test`：61 tests，0 failures/errors/skipped，日志 `/tmp/improvement-t07-verify.log`；等待父代理最终复核 |
-| [ ] | 08 / T08 | P1 | 消费重试退避、故障限速、ACK 边界 | T05、T07 | 进行中 | b796fc8；候选已有三级 10/30/120s TTL 队列、ACK/业务异常隔离单测；待父代理审查和真实容器恢复/TTL/120s Redis 故障验收 |
+| [x] | 07 / T07 | P1 | 完善 Outbox 发布、回写、租约处理 | T06 | 已完成 | 95af60d；父代理 2026-10-22 全链路回归 `VideoStatusOutbox*Tests,VideoStatusIsolatedIntegrationTests,VideoStatusMetricsIsolatedTests,VideoStatusSchedulingRealFlowTests,VideoStatusDirtyRecoveryRealConvergenceTests`：87 tests，0 失败/错误，1 skipped（可选 benchmark），日志 `/tmp/improvement-main-regression3.log`；T07 单组 61 tests 0 失败/错误/跳过；测试环境验收 |
+| [x] | 08 / T08 | P1 | 消费重试退避、故障限速、ACK 边界 | T05、T07 | 已完成 | 0dd98ad/b846032/92eb8c1（候选 b796fc8）；候选父复验 22 tests，0 失败/错误，1 skipped，日志 `/tmp/t08-parent-final.log`；真实 10/30/120s TTL、容器 stop/start、Redis CLIENT PAUSE 120s（非进程/网络断连） |
 | [ ] | 09 / T09 | P1 | 接通安全窗口内 status0 自动补偿 | T03、T07、T08 | 进行中（设计） | —；仅有设计调研，尚无实现或验收证据 |
 | [ ] | 10 / T10 | P1 | DLQ/Outbox FAILED/status3 处置及对账闭环 | T05、T09 | 待开始 | — |
 | [x] | 11 / T11 | P1 | dirty 恢复公平扫描及失败退避 | T03、T05、T06 | 已完成 | be7d836；父代理 2026-10-22 实跑 `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusDirtyRecoveryRealConvergenceTests,VideoStatusDirtyRecoveryFairnessIsolatedTests' test`：3 tests，0 失败/错误/跳过，日志 `/tmp/t11-real-convergence.log`；真实 MySQL/Redis，专用头部 SADD 故障注入，四轮尾部获机会，最终 250 收敛且无 status3 |
@@ -373,13 +373,23 @@ docker compose -f compose.test.yaml stop
 - 文档：`AGENTS.md`/`CLAUDE.md` 保持一致；`docs/api.md` 补充真实 `/api/admin/video-status/metrics` 与 `/gate` 契约；可观测/调度教程移除“等待验收”和过时“无指标/共享调度线程”描述；`video-status-runtime-roles.md` 与阶段交接同步状态。
 - 剩余风险/下一项：生产阈值、外部告警、真实两 JVM/网络故障和系统容量仍交 T16；调度预算不能强杀阻塞调用，业务 SQL 超时未统一；T07 处理 Outbox 发布/回写/租约细化，T10 处理失败事件处置；T11 的恢复公平性已另行验收（见下方 T11 记录）。
 
-### T07 待验收记录（2026-10-22）
+### T07 最终验收记录（2026-10-22）
 
-- 状态：**待验收**；实现提交 `eec1e01`。本次只做文档收尾，未修改代码、未自动部署；计划表不勾选，仍由父代理复核。
-- 验证命令（父代理 2026-10-22 已独立复跑）：`./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusOutbox*Tests' test`；结果 **61 tests，0 failures / 0 errors / 0 skipped**，日志 `/tmp/improvement-t07-verify.log`。
+- 状态：**已完成（测试环境验收）**；实现已合入主分支 `95af60d`（候选 `eec1e01`）。本次只补验收文档，未修改代码、未提交 git、未自动部署。
+- 验收命令（父代理本次实跑）：`./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusOutbox*Tests,VideoStatusIsolatedIntegrationTests,VideoStatusMetricsIsolatedTests,VideoStatusSchedulingRealFlowTests,VideoStatusDirtyRecoveryRealConvergenceTests' test`；结果 **87 tests，0 failures / 0 errors / 1 skipped**（可选 benchmark），日志 `/tmp/improvement-main-regression3.log`。早前 T07 单组命令 `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusOutbox*Tests' test` 为 **61 tests，0 失败/错误/跳过**（`/tmp/improvement-t07-verify.log`、`/tmp/improvement-t07-main.log`）。
+- 失败历史（保留）：先前整组回归曾出现 3 failures（旧 `VideoStatusIsolatedIntegrationTests` 维护排空/真实全链路/负依赖重试，均 30 秒超时），日志 `/tmp/improvement-main-regression.log`；`8e81d55` 修正测试观测错误后由本次最终回归通过，最终失败原因与修复过程见回归续作文档。
 - 已验证事实：发布发送失败、confirm 不确定、confirm 后回写失败、非法事件和租约恢复按独立预算分类；`retry_count`、`lease_recovery_count`、`confirm_writeback_count` 互不挤占，confirm 回写第 10 次形成 `confirm writeback budget exhausted` 终态；租约恢复第 10 次形成 `lease recovery budget exhausted` 终态；CAS 0 行只诊断，单条异常不中断整轮。
 - 管理边界：当前仅提供单个 Outbox FAILED 事件的安全查询与受审计重放（`GET /api/admin/video-status/outbox/{eventId}`、`POST .../replay`），属于 T10 极窄子集；批量处置、DLQ、consumed status3 修复、对账仍归 T10。
 - 文档与环境：`AGENTS.md`/`CLAUDE.md` 保持一致；`docs/api.md` 与 Outbox 可靠性/租约迁移/重放 Runbook/运行角色教程同步。仅使用独立测试环境，未读取或输出 `application.yml` 凭证；**未宣称生产上线、真实进程崩溃演练或真实两 JVM/网络分区验证**，这些仍交 T16。
+
+### T08 最终验收记录（2026-10-22）
+
+- 状态：**已完成（测试环境验收）**；实现已 cherry-pick 到主分支 `0dd98ad`、`b846032`、`92eb8c1`（候选 `b796fc8`）。本次只补验收文档，未修改代码、未提交 git、未自动部署。
+- 验收命令（父代理在独立候选父复验）：`./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusIsolatedIntegrationTests,VideoStatusConsumerRetryLifecycleIsolatedTests' test`；结果 **22 tests，0 failures / 0 errors / 1 skipped**，日志 `/tmp/t08-parent-final.log`。
+- 已验证事实：三级固定 TTL 队列 10/30/120 秒真实到期并各自回到主队列，原 10 秒队列名称与参数不变；真实 listener 容器 `stop()` 后按恢复延迟 `start()` 继续消费；转发失败不 ACK/NACK，由单线程恢复任务受控暂停，窗口内 start 次数有界；业务成功但 ACK 失败不转发 retry/DLQ、不 NACK，重复投递由 eventId+指纹幂等吸收；非法 payload 只进 DLQ 一次。
+- 故障边界：Redis 验收使用服务端 `CLIENT PAUSE 120000`，进程与网络连接始终存活；**不是** Redis 进程重启、网络断连或任意 Redis 数据丢失保证。容器 stop/start 是真实容器生命周期操作，但不是进程崩溃/两 JVM 演练。这些仍交 T16。
+- 失败历史（保留）：候选阶段父代理首次运行曾 2 failures/1 error/1 skipped（`/tmp/t08-real-lifecycle.log`），后续子代理复跑超时、旧 IT 100 轮顺序用例曾超时；修正测试清理/等待与观测后，由本次 22 tests 通过，细节见回归续作文档。
+- 管理/协议边界：T08 不新增或修改 HTTP 接口；DLQ 内容对账、FAILED/status3 处置仍归 T10，status0 自动补偿仍归 T09。
 
 ### T11 验收记录（2026-10-22）
 
@@ -393,10 +403,17 @@ docker compose -f compose.test.yaml stop
 - 边界：故障是**进程内专用 SADD 故障注入**，不是进程崩溃、真实 Redis/MySQL 宕机或两 JVM 演练；结果属于测试环境验收，**不能称为生产验收**。生产容量、真实基础设施故障和跨进程恢复仍交 T16。
 - 文档：`AGENTS.md`/`CLAUDE.md` 保持一致；`docs/api.md` 增加 T11 无 HTTP 变更说明与运行命令；公平性教程补充验收证据、`be7d836` 游标修复和边界。
 
+### T08 合入后父代理复验（2026-10-22）
+
+- 主分支普通回归：`./mvnw '-Dtest=*Tests,!BackendApplicationTests' test`，313 tests，0 failures/errors，100 skipped（opt-in隔离测试）；日志 `/tmp/improvement-t08-main-unit.log`。
+- 主分支真实复验：`./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusIsolatedIntegrationTests,VideoStatusConsumerRetryLifecycleIsolatedTests' test`，22 tests，0 failures/errors，1 skipped（可选benchmark）；日志 `/tmp/improvement-t08-main-it.log`。与候选复验独立运行，不仅依赖子代理报告。
+- 测试隔离修复：purge 不会移除已预取的 unacked，先停止本测试监听器使其归队再清理专用队列，类结束关闭上下文；不删除数据库历史事件，不降低100轮及计数断言。
+
 ### 计划变更记录
 
 - 初版：仅生成执行计划和 TODO；所有实施项均为待开始。没有执行代码修改、配置修改、迁移、测试、基础设施启动或部署。
-- 2026-10-22：T11 按计划允许的“T06 后提前交付”完成验收；T07 保持待验收，T08 标记实施中，T09 标记设计中，均不提前勾选。
+- 2026-10-22：T11 按计划允许的“T06 后提前交付”完成验收；当时 T07 保持待验收、T08 实施中、T09 设计中，均未提前勾选（保留该历史状态）。
+- 2026-10-22：T07（主分支 `95af60d`）全链路回归 87 tests、T08（主分支 `0dd98ad`/`b846032`/`92eb8c1`）候选父复验 22 tests 均通过，按测试环境验收勾选完成；T09 仍仅为设计，T10 未开始，不宣称全计划或生产验收完成。
 
 ## 9. 暂不纳入本轮
 
