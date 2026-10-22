@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  T10 只读事件对账 SQL。
+
+  安全约束：
+    * 本文件只有 SELECT，禁止加入 insert/update/delete；
+    * 每条语句都带 timeout（秒），并且结果行数有 LIMIT 上界；
+    * 不使用无界 SUM/COUNT；账本计数用派生表 LIMIT cap 封顶；
+    * 业务关系真值先 LIMIT cap 行再聚合，截断由 Java 侧标记；
+    * 不选择 payload / last_error / 租约 token，避免把敏感明细带出接口。
+
+  索引前提：
+    * video_status 使用主键 vid；
+    * video_status_consumed_event 账本计数使用 (process_status, vid, id)；
+    * 事件投影按 (vid, id) 倒序，需要
+      database/migrations/t10-video-status-reconciliation-indexes.sql；
+    * user_video 使用现有 idx_user_video_vid。
+-->
+<mapper namespace="com.feibijiubi.backend.mapper.VideoStatusReconciliationMapper">
+
+    <resultMap id="DbCountsResultMap"
+               type="com.feibijiubi.backend.entity.VideoStatus">
+        <id property="vid" column="vid"/>
+        <result property="playTimes" column="play_times"/>
+        <result property="likeTimes" column="like_times"/>
+        <result property="unlikeTimes" column="unlike_times"/>
+        <result property="commentTimes" column="comment_times"/>
+        <result property="coinTimes" column="coin_times"/>
+        <result property="shareTimes" column="share_times"/>
+        <result property="collectTimes" column="collect_times"/>
+        <result property="danmuTimes" column="danmu_times"/>
+    </resultMap>
+
+    <resultMap id="EventProjectionResultMap"
+               type="com.feibijiubi.backend.entity.VideoStatusReconciliationEventRow">
+        <id property="id" column="id"/>
+        <result property="processStatus" column="process_status"/>
+        <result property="eventType" column="event_type"/>
+        <result property="delta" column="delta"/>
+    </resultMap>
+
+    <resultMap id="RelationAggregateResultMap"
+               type="com.feibijiubi.backend.entity.VideoStatusReconciliationRelationAggregate">
+        <result property="sampledRows" column="sampled_rows"/>
+        <result property="likedRows" column="liked_rows"/>
+        <result property="unlikedRows" column="unliked_rows"/>
+        <result property="coinSum" column="coin_sum"/>
+        <result property="collectRows" column="collect_rows"/>
+    </resultMap>
+
+    <select id="selectDbCounts"
+            resultMap="DbCountsResultMap"
+            timeout="3">
+        SELECT
+            vid,
+            play_times,
+            like_times,
+            unlike_times,
+            comment_times,
+            coin_times,
+            share_times,
+            collect_times,
+            danmu_times
+        FROM video_status
+        WHERE vid = #{vid}
+    </select>
+
+    <!--
+      封顶计数：最多扫描 cap 行索引项。返回值等于 cap 时只代表“至少 cap 条”，
+      Java 侧必须标记 truncated，不能当作精确账本总量。
+      使用 idx_video_status_consumed_pending (process_status, vid, id)。
+    -->
+    <select id="countLedgerByStatus"
+            resultType="long"
+            timeout="3">
+        SELECT COUNT(*)
+        FROM (
+            SELECT 1
+            FROM video_status_consumed_event
+            WHERE vid = #{vid}
+              AND process_status = #{processStatus}
+            LIMIT #{cap}
+        ) bounded
+    </select>
+
+    <!--
+      安全投影：只取 id / process_status / event_type / delta。
+      按 (vid, id) 索引倒序扫描，最多 limit 行；不读取 payload 或错误原文。
+    -->
+    <select id="selectEventProjection"
+            resultMap="EventProjectionResultMap"
+            timeout="3">
+        SELECT
+            id,
+            process_status,
+            event_type,
+            delta
+        FROM video_status_consumed_event
+        WHERE vid = #{vid}
+        ORDER BY id DESC
+        LIMIT #{limit}
+    </select>
+
+    <!--
+      业务关系真值：先对单个 vid 取最多 cap 行，再在派生表上聚合。
+      没有 ORDER BY，避免为了取窗口而排序；vid 使用 idx_user_video_vid。
+      liked/unliked/collect 为 TINYINT(1)，coin 为 0..2。
+    -->
+    <select id="selectRelationAggregate"
+            resultMap="RelationAggregateResultMap"
+            timeout="3">
+        SELECT
+            COUNT(*) AS sampled_rows,
+            COALESCE(SUM(liked = 1), 0) AS liked_rows,
+            COALESCE(SUM(unliked = 1), 0) AS unliked_rows,
+            COALESCE(SUM(coin), 0) AS coin_sum,
+            COALESCE(SUM(collect = 1), 0) AS collect_rows
+        FROM (
+            SELECT
+                liked,
+                unliked,
+                coin,
+                collect
+            FROM user_video
+            WHERE vid = #{vid}
+            LIMIT #{cap}
+        ) bounded
+    </select>
+
+</mapper>
