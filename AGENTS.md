@@ -189,10 +189,36 @@ The flow is:
   distributed lock, not two JVMs. The publish fault is a controlled in-process block, not a real 30 s
   network disconnect. These are test-environment acceptance results, not production acceptance.
 
+### T07 outbox reliability candidate (pending acceptance)
+
+- T07 is implemented in this branch at `eec1e01` but is **not accepted yet**; the improvement-plan
+  table marks it `待验收`. Do not describe it as production-ready, and do not claim a real process
+  crash/two-JVM drill. Verified fact: parent reran
+  `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusOutbox*Tests' test` on 2026-10-22 with 61 tests,
+  0 failures/errors/skipped (log `/tmp/improvement-t07-verify.log`).
+- Publish/confirm/writeback failures are classified separately. `retry_count` is publish-failure
+  budget; `lease_recovery_count` is lease-recovery budget; `confirm_writeback_count` is the budget
+  for “confirm ACK succeeded but `markSent` failed”. The three budgets must not consume each other.
+  The 10th lease recovery fails with `lease recovery budget exhausted`; the 10th confirmed-writeback
+  failure fails with `confirm writeback budget exhausted` instead of requeueing forever.
+- Schema/mapper changes are part of this branch: `database/migrations/t07-video-status-outbox-lease-recovery.sql`
+  and `t07-video-status-outbox-confirm-writeback.sql`, mirrored in `database/feibijiubi.sql`.
+  Migrations are idempotent, add columns without backfilling/zeroing history, and MySQL UPDATE
+  assignment order keeps the increment after all `CASE` expressions.
+- The only T07 admin entry points are the T10 narrow subset:
+  `GET /api/admin/video-status/outbox/{eventId}` (safe read-only status) and
+  `POST /api/admin/video-status/outbox/{eventId}/replay` (single FAILED event, audited, same
+  transaction, operator from login state). They never return payload/leaseToken/raw `last_error`,
+  never create a new eventId, and reject existing consumed rows or unsafe windows. Batch/DLQ/
+  consumed status3 repair and reconciliation remain T10.
+- Runbook and limits: `docs/tutorial/video-status-outbox-reliability.md`,
+  `video-status-outbox-lease-migration.md`, and `video-status-outbox-replay-runbook.md`.
+
 Guides: `docs/tutorial/video-status-counter-range.md`, `video-status-flush-defer.md`,
-`video-status-runtime-roles.md`, `video-status-observability.md`, and
-`video-status-scheduling-isolation.md` (all under `docs/tutorial/`). Acceptance progress and remaining
-recovery/observability work: `docs/tutorial/video-status-improvement-plan.md`.
+`video-status-runtime-roles.md`, `video-status-observability.md`,
+`video-status-scheduling-isolation.md`, `video-status-outbox-reliability.md`, and
+`video-status-outbox-lease-migration.md` (all under `docs/tutorial/`). Acceptance progress and
+remaining recovery/observability work: `docs/tutorial/video-status-improvement-plan.md`.
 
 Consumer retry/dead-letter behavior is driven by the typed exceptions in `common/`:
 `RetryableMessageException`, `NonRetryableMessageException`, `RepairRequiredMessageException`.

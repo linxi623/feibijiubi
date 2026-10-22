@@ -202,6 +202,18 @@ Authorization: Bearer <token>
 > 不写、不删、不刷新 TTL。没有新增 actuator 或未鉴权指标端点。详见
 > [可观测能力教程](tutorial/video-status-observability.md)。
 
+### 2.6 管理员 Outbox FAILED 查询与重放（T07 临时运维 / T10 极窄子集）
+
+| 模块 | 方法 | 路径 | 权限 |
+|---|---|---|---|
+| 运维 | GET | `/api/admin/video-status/outbox/{eventId}` | 管理员 |
+| 运维 | POST | `/api/admin/video-status/outbox/{eventId}/replay` | 管理员 |
+
+> 仅供单个 `status=3 (FAILED)` 事件的只读定位与受审计重放，不是完整 T10：
+> 不支持批量、DLQ、consumed `process_status=3` 修复或对账。GET 不返回 payload、leaseToken
+> 与 `last_error` 原文；POST 的操作人只能来自登录态。详见
+> [Outbox 重放 Runbook](tutorial/video-status-outbox-replay-runbook.md)。
+
 ---
 
 # 3. 账号接口
@@ -1849,6 +1861,93 @@ GET /api/admin/video-status/gate?vid={vid}
 curl "http://localhost:8080/api/admin/video-status/gate?vid=123" \
   -H "Authorization: Bearer <管理员token>"
 ```
+
+---
+
+## 8.6 查询单个 Outbox 事件的安全状态
+
+```http
+GET /api/admin/video-status/outbox/{eventId}
+```
+
+权限：**管理员**（`/api/admin/**` + 方法级 `@AdminOnly`）。
+
+该接口只读，返回安全状态：`status/statusName`、`retryCount`、`leaseRecoveryCount`、
+`confirmWritebackCount`、`createdAt/nextRetryAt/sendingAt/sentAt`、
+`lastErrorPresent`/`lastErrorHint`、`consumedProcessStatus`、`replayEligible` 与
+`replayBlockedReason`。
+
+**不返回** `payload`、`leaseToken`、`last_error` 原文。历史 `last_error` 可能混入 payload
+片段或凭据，定位只能给布尔值和固定提示；需要原文时由管理员走受控查库。
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "eventId": "evt-123",
+    "vid": 123,
+    "eventType": "LIKE",
+    "status": 3,
+    "statusName": "FAILED",
+    "retryCount": 10,
+    "leaseRecoveryCount": 0,
+    "confirmWritebackCount": 0,
+    "lastErrorPresent": true,
+    "lastErrorHint": "失败原因原文需受控查库，不在 HTTP 返回",
+    "consumedProcessStatus": null,
+    "replayEligible": false,
+    "replayBlockedReason": "status 不是 FAILED…"
+  }
+}
+```
+
+常见错误：`404` eventId 不存在；`400` eventId 不合法；未登录/非管理员由既有拦截器处理。
+
+---
+
+## 8.7 受审计重放单个 Outbox FAILED 事件
+
+```http
+POST /api/admin/video-status/outbox/{eventId}/replay
+Content-Type: application/json
+```
+
+权限：**管理员**。请求体只有幂等键与原因，**没有 operator 字段**：
+
+```json
+{
+  "operationId": "OPS-2026-000123",
+  "reason": "publish confirm 超时耗尽预算，根因已修复，需重投原事件"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `operationId` | string | 是 | 工单/幂等键，≤64；同 operationId 的 eventId/action/operator/reason 全部相同才返回 duplicate |
+| `reason` | string | 是 | 操作原因，≤1000；换 reason 复用旧 operationId 会被 409 拒绝 |
+
+执行条件（全部满足）：`status=3 (FAILED)`；payload 可解析且 `event.validate()` 通过；
+payload 的 eventId/vid/type 与数据库行一致；没有任何消费账本行（0/1/2/3 都拒绝）；
+`created_at` 与 payload `occurredAt` 都在安全窗口内；operationId 未被冲突占用。
+
+成功时在同一 MySQL 事务内把状态重置为 PENDING、三份预算归零，并写 `COMPLETED` 审计；
+before/after 元数据（含 `confirmWritebackCountBefore/After`）持久化在审计记录中。
+响应关键字段：`replayApplied`、`duplicate`、`retryCountBefore/After`、
+`leaseRecoveryCountBefore/After`、`confirmWritebackCountBefore/After`、
+`statusNameBefore/After`，以及查询时的 `current*` 实时状态。
+
+常见错误：`400` 参数不合法；`401` 缺少登录操作人；`404` eventId 不存在；
+`409` 状态/并发/幂等冲突；`422` payload 非法或与行不一致。
+
+```bash
+curl -X POST "http://localhost:8080/api/admin/video-status/outbox/evt-123/replay" \
+  -H "Authorization: Bearer <管理员token>" \
+  -H "Content-Type: application/json" \
+  -d '{"operationId":"OPS-2026-000123","reason":"根因已修复，重投原事件"}'
+```
+
+> T10 之前只允许这种单事件、可审计、可拒绝的重放；不要用裸 SQL 改状态，不要新建 eventId。
 
 ---
 

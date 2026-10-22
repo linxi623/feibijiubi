@@ -225,7 +225,7 @@ class VideoStatusTelemetryInstrumentationTests {
     }
 
     @Test
-    void relayPublishFailureIsRecordedAsFailureAndKeepsRetryClassification()
+    void relayInvalidPayloadIsRecordedAsFailureAndMarkedInvalidFailed()
             throws Exception {
         VideoStatusTelemetry telemetry = mock(VideoStatusTelemetry.class);
         VideoStatusOutboxClaimService claimService =
@@ -251,8 +251,10 @@ class VideoStatusTelemetryInstrumentationTests {
         );
         relay.relay();
 
+        // T07：非法 payload 不消耗发布重试次数，直接进入 FAILED 等 T10 处置
         verify(telemetry).record(eq(Operation.PUBLISH), eq(Outcome.FAILURE), anyLong());
-        verify(outboxMapper).markFailed(eq("e-1"), eq("lease-1"), anyString());
+        verify(outboxMapper).markInvalidFailed(eq("e-1"), eq("lease-1"), anyString());
+        verify(outboxMapper, never()).markFailed(anyString(), anyString(), anyString());
         verify(outboxMapper, never()).markSent(anyString(), anyString(), any());
         verify(publisher, never()).publish(any(), anyString());
     }
@@ -793,6 +795,8 @@ class VideoStatusTelemetryInstrumentationTests {
         VideoStatusOutbox outbox = new VideoStatusOutbox();
         outbox.setEventId("e-1");
         outbox.setAggregateId(VID);
+        // 真实落库时 event_type 一定来自 event.type().name()；T07 relay 会做语义一致性校验
+        outbox.setEventType("PLAY");
         outbox.setPayload("{}");
         outbox.setRetryCount(0);
         outbox.setLeaseToken("lease-1");

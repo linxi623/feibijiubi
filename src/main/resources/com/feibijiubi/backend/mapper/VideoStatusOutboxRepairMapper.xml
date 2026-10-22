@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  T07：临时运维（T10 极窄子集）专用语句。
+  与 VideoStatusOutboxMapper.xml 完全独立：不改既有 relay 语句，回滚本工具不影响投递。
+  语义边界：
+    * 只处理 status = 3 (FAILED) 的行；
+    * 不修改 event_id / payload / aggregate_id / event_type，不新增 eventId；
+    * 不修改 video_status_consumed_event / video_status / Redis；
+    * 不把 payload / lease_token / last_error 原文交给管理员 HTTP 层。
+  所有语句加 timeout=3（秒），慢 SQL 由 MyBatis 打断。
+-->
+<mapper namespace="com.feibijiubi.backend.mapper.VideoStatusOutboxRepairMapper">
+
+    <!--
+      安全只读：不返回 payload / lease_token / last_error 原文。
+      last_error 历史值可能含 payload 片段或凭证（旧代码会截断异常信息写入），
+      HTTP 只通过 selectLastErrorPresent 得到布尔。
+    -->
+    <select id="selectSafeByEventId" resultType="com.feibijiubi.backend.entity.VideoStatusOutbox"
+            timeout="3">
+        SELECT id,
+               event_id,
+               aggregate_id,
+               event_type,
+               status,
+               retry_count,
+               lease_recovery_count,
+               confirm_writeback_count,
+               next_retry_at,
+               sending_at,
+               created_at,
+               sent_at
+        FROM video_status_outbox
+        WHERE event_id = #{eventId}
+    </select>
+
+    <!-- 只回答“是否存在失败详情”，不把原文带回应用层。 -->
+    <select id="selectLastErrorPresent" resultType="java.lang.Boolean" timeout="3">
+        SELECT CASE WHEN last_error IS NULL OR last_error = '' THEN 0 ELSE 1 END
+        FROM video_status_outbox
+        WHERE event_id = #{eventId}
+    </select>
+
+    <!-- 重放路径：唯一键 + 行锁，让同一 eventId 的重放请求在数据库层串行。 -->
+    <select id="selectByEventIdForUpdate" resultType="com.feibijiubi.backend.entity.VideoStatusOutbox"
+            timeout="3">
+        SELECT id,
+               event_id,
+               aggregate_id,
+               event_type,
+               payload,
+               status,
+               retry_count,
+               lease_recovery_count,
+               confirm_writeback_count,
+               next_retry_at,
+               sending_at,
+               lease_token,
+               last_error,
+               created_at,
+               sent_at
+        FROM video_status_outbox
+        WHERE event_id = #{eventId}
+            FOR UPDATE
+    </select>
+
+    <select id="selectConsumedProcessStatus" resultType="java.lang.Integer" timeout="3">
+        SELECT process_status
+        FROM video_status_consumed_event
+        WHERE event_id = #{eventId}
+    </select>
+
+    <!--
+      created_at 年龄用 DB 时钟算：JVM(+8) 与 DB(UTC) 的墙钟差异不影响窗口边界。
+    -->
+    <select id="selectCreatedAgeSeconds" resultType="java.lang.Long" timeout="3">
+        SELECT TIMESTAMPDIFF(SECOND, created_at, NOW(3))
+        FROM video_status_outbox
+        WHERE event_id = #{eventId}
+    </select>
+
+    <select id="selectRepairLogByOperationId"
+            resultType="com.feibijiubi.backend.entity.VideoStatusConsumptionRepairLog"
+            timeout="3">
+        SELECT id,
+               operation_id,
+               event_id,
+               action,
+               operation_status,
+               reason,
+               operator,
+               last_error,
+               created_at,
+               completed_at
+        FROM video_status_consumption_repair_log
+        WHERE operation_id = #{operationId}
+    </select>
+
+    <!--
+      CAS 重置：只有 status = 3 命中，影响行数必须为 1。
+        * retry_count / lease_recovery_count / confirm_writeback_count 归零 = 管理员重放开启的新预算
+          （前后值进审计元数据与响应）；
+        * last_error 保留：原失败原因仍是诊断证据，成功 publish 后由 markSent 清空；
+        * next_retry_at = NULL：立即可被 relay 领取，不再等退避窗口；
+        * lease_token / sending_at 清空：旧租约持有者的回写 CAS 全部要求 token 相等，清空后必然 0 行。
+    -->
+    <update id="resetFailedToPending" timeout="3">
+        UPDATE video_status_outbox
+        SET status = 0,
+            retry_count = 0,
+            lease_recovery_count = 0,
+            confirm_writeback_count = 0,
+            next_retry_at = NULL,
+            sending_at = NULL,
+            lease_token = NULL
+        WHERE event_id = #{eventId}
+          AND status = 3
+    </update>
+
+    <!--
+      审计行直接写 COMPLETED：与状态重置在同一 MySQL 事务内，二者要么都生效要么都回滚。
+      last_error 存 T07_REPLAY_META_V1 JSON（status/retry/lease before-after），
+      供 duplicate 请求重放原始 before/after。
+    -->
+    <insert id="insertCompletedRepairLog" useGeneratedKeys="true" keyProperty="id" timeout="3">
+        INSERT INTO video_status_consumption_repair_log(
+            operation_id,
+            event_id,
+            action,
+            operation_status,
+            reason,
+            operator,
+            last_error,
+            created_at,
+            completed_at
+        ) VALUES (
+            #{operationId},
+            #{eventId},
+            #{action},
+            1,
+            #{reason},
+            #{operator},
+            #{lastError},
+            NOW(3),
+            NOW(3)
+        )
+    </insert>
+</mapper>

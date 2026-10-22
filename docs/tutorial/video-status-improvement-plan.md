@@ -1,6 +1,6 @@
 # 互动统计链路改进执行计划与 TODO
 
-> 状态：执行中；T01—T06 已验收并合入，接续 T07（Outbox 发布/回写/租约）。仅表中已完成且有证据的项代表已实现能力；不代表批准生产上线。
+> 状态：执行中；T01—T06 已验收并合入；T07（Outbox 发布/回写/租约）实现与测试已完成，暂标“待验收”。仅表中已完成且有证据的项代表已实现能力；不代表批准生产上线。
 >
 > 范围：互动入口 → Outbox → RabbitMQ → Redis → 消费事件 → 批量落库 → 重建/补偿。
 > 原则：先验证正确性，再补恢复闭环，再治理稳定性，最后优化吞吐。
@@ -33,7 +33,7 @@
 | [x] | 04 / T04 | P0 | 修复失效开关、明确运行角色及开关契约 | T01；按序在 T03 后交付 | 已完成 | fe11d03；配置绑定/启动拒绝6用例，角色13用例，真实维护切换最终DB=Redis=6、4异步2同步 |
 | [x] | 05 / T05 | P1 | 建立最小链路指标与积压告警 | T03、T04 | 已完成 | 46af28b；父代理 2026-10-22 复验：69 单测 + 8 隔离用例均 0 失败/错误/跳过；四类故障可定位、采样只读、迁移幂等 |
 | [x] | 06 / T06 | P1 | 隔离调度资源、限制单轮任务预算 | T05 | 已完成 | 3e33415；同批 69 + 8；受控阻塞 30.082s 时 flush 62ms、恢复继续心跳；并发落库 baseline=100/flushed=100 |
-| [ ] | 07 / T07 | P1 | 完善 Outbox 发布、回写、租约处理 | T06 | 待开始 | — |
+| [ ] | 07 / T07 | P1 | 完善 Outbox 发布、回写、租约处理 | T06 | 待验收 | eec1e01；父代理 2026-10-22 复跑 `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusOutbox*Tests' test`：61 tests，0 failures/errors/skipped，日志 `/tmp/improvement-t07-verify.log`；等待父代理最终复核 |
 | [ ] | 08 / T08 | P1 | 消费重试退避、故障限速、ACK 边界 | T05、T07 | 待开始 | — |
 | [ ] | 09 / T09 | P1 | 接通安全窗口内 status0 自动补偿 | T03、T07、T08 | 待开始 | — |
 | [ ] | 10 / T10 | P1 | DLQ/Outbox FAILED/status3 处置及对账闭环 | T05、T09 | 待开始 | — |
@@ -372,6 +372,14 @@ docker compose -f compose.test.yaml stop
 - 边界：T06 的“两个实例”是两个独立调度器对象在**同一 JVM**，不是两个 JVM；30 秒故障是**受控阻塞**，不是真实网络断连 30 秒。T05 告警只写日志和 HTTP 快照，**没有外部告警投递**；本实例指标重启后清零，不能与共享 DB backlog 相加。两任务均不等同于生产验收、真实故障演练或容量承诺。
 - 文档：`AGENTS.md`/`CLAUDE.md` 保持一致；`docs/api.md` 补充真实 `/api/admin/video-status/metrics` 与 `/gate` 契约；可观测/调度教程移除“等待验收”和过时“无指标/共享调度线程”描述；`video-status-runtime-roles.md` 与阶段交接同步状态。
 - 剩余风险/下一项：生产阈值、外部告警、真实两 JVM/网络故障和系统容量仍交 T16；调度预算不能强杀阻塞调用，业务 SQL 超时未统一；T07 处理 Outbox 发布/回写/租约细化，T10/T11 处理失败事件与恢复公平性。
+
+### T07 待验收记录（2026-10-22）
+
+- 状态：**待验收**；实现提交 `eec1e01`。本次只做文档收尾，未修改代码、未自动部署；计划表不勾选，仍由父代理复核。
+- 验证命令（父代理 2026-10-22 已独立复跑）：`./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusOutbox*Tests' test`；结果 **61 tests，0 failures / 0 errors / 0 skipped**，日志 `/tmp/improvement-t07-verify.log`。
+- 已验证事实：发布发送失败、confirm 不确定、confirm 后回写失败、非法事件和租约恢复按独立预算分类；`retry_count`、`lease_recovery_count`、`confirm_writeback_count` 互不挤占，confirm 回写第 10 次形成 `confirm writeback budget exhausted` 终态；租约恢复第 10 次形成 `lease recovery budget exhausted` 终态；CAS 0 行只诊断，单条异常不中断整轮。
+- 管理边界：当前仅提供单个 Outbox FAILED 事件的安全查询与受审计重放（`GET /api/admin/video-status/outbox/{eventId}`、`POST .../replay`），属于 T10 极窄子集；批量处置、DLQ、consumed status3 修复、对账仍归 T10。
+- 文档与环境：`AGENTS.md`/`CLAUDE.md` 保持一致；`docs/api.md` 与 Outbox 可靠性/租约迁移/重放 Runbook/运行角色教程同步。仅使用独立测试环境，未读取或输出 `application.yml` 凭证；**未宣称生产上线、真实进程崩溃演练或真实两 JVM/网络分区验证**，这些仍交 T16。
 
 ### 计划变更记录
 

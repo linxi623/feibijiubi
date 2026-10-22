@@ -265,7 +265,13 @@ CREATE TABLE video_status_outbox (
     event_type VARCHAR(32) NOT NULL,
     payload JSON NOT NULL,
     status TINYINT NOT NULL DEFAULT 0 COMMENT '0=PENDING,1=SENDING,2=SENT,3=FAILED',
-    retry_count INT NOT NULL DEFAULT 0,
+    retry_count INT NOT NULL DEFAULT 0 COMMENT '发布失败次数（T07 起不含租约恢复；历史值无法拆分，不得归零）',
+    -- T07：租约过期恢复的独立预算，第 10 次过期直接 FAILED（lease recovery budget exhausted）
+    -- 迁移：database/migrations/t07-video-status-outbox-lease-recovery.sql
+    lease_recovery_count INT NOT NULL DEFAULT 0 COMMENT '租约过期恢复次数，独立于 retry_count',
+    -- T07：confirm 已成功但 markSent 回写失败的独立预算，第 10 次直接 FAILED
+    -- 迁移：database/migrations/t07-video-status-outbox-confirm-writeback.sql
+    confirm_writeback_count INT NOT NULL DEFAULT 0 COMMENT 'confirm 成功后 markSent 回写失败次数，独立预算',
     next_retry_at DATETIME(3) NULL,
     sending_at DATETIME(3) NULL,
     lease_token VARCHAR(64) NULL,

@@ -4,7 +4,8 @@
 > `VideoStatusDirtyRecoveryScheduler`、`VideoStatusEventConsumer` 的部署与维护。
 >
 > 本文只描述**已经实现**的能力。指标/告警（T05）与调度隔离/单轮预算（T06）已验收；
-> Outbox 租约细化（T07）、受控强制重建与失败事件处置（T10/T12）尚未实现，文中明确标注。
+> Outbox 发布/回写/租约细化（T07）实现与测试已完成，**待父代理验收**；受控强制重建与
+> 批量失败事件处置/对账（T10/T12）尚未实现，文中明确标注。
 >
 > 相关文档：[完整链路设计](video-status-full-flow-design.md)、
 > [批量聚合实现](video-status-batch-aggregation-implementation.md)、
@@ -145,7 +146,8 @@ SELECT MIN(created_at) FROM video_status_consumed_event WHERE process_status IN 
 - 演练覆盖单实例、单个 vid 的角色组合；多实例下“其他实例仍在投递/消费/落库”不被该用例覆盖，
   仍需按 §3/§4 逐实例停角色并观察全局 SQL 计数。
 - 演练前后都要求队列 ready/unacked 为 0；有 Outbox `status=3` 或 `process_status=3` 残留时必须先按
-  T07/T10 处置，不能靠切 sync 掩盖（T07/T10 尚未实现）。
+  T07/T10 处置，不能靠切 sync 掩盖。T07 只提供单个 Outbox FAILED 事件的安全查询与受审计重放，
+  批量/consumed status3/对账仍待 T10。
 - 演练没有验证“新旧消费者混跑”：旧 Lua 不识别重建门闩，切换期间必须保证所有实例运行同一版本。
 
 ## 5. 启动期参数校验（`VideoStatusProperties#validate`）
@@ -213,11 +215,17 @@ SELECT MIN(created_at) FROM video_status_consumed_event WHERE process_status IN 
 - **指标/告警（T05 已实现）**：`GET /api/admin/video-status/metrics` 返回本实例遥测 + 共享 DB
   积压采样，`GET /api/admin/video-status/gate?vid=...` 只读门闩停留时间；告警只写应用日志和 HTTP
   快照，**没有外部投递**。本文的 SQL 诊断仍可用于根因定位。
-- **没有强制重建入口**：只有 `ensureInitialized` 慢路径，`process_status=3` / `outbox status=3` 的处置
-  入口在 T07/T10。§4.3 的“删 current”只是测试内的维护动作，不是产品能力。
+- **没有强制重建入口**：只有 `ensureInitialized` 慢路径；`outbox status=3` 已有 T07 单事件查询/重放入口（待验收），
+  `process_status=3` 与批量处置/对账仍在 T10。§4.3 的“删 current”只是测试内的维护动作，不是产品能力。
+- **T07 单事件运维入口（待验收）**：`GET /api/admin/video-status/outbox/{eventId}` 只返回安全状态；
+  `POST /api/admin/video-status/outbox/{eventId}/replay` 仅对通过 payload/窗口/消费账本校验的单个
+  FAILED 事件做受审计重放。不会返回 payload/leaseToken/`last_error` 原文，也不新建 eventId。
 - **没有维护编排**：仓库没有切换脚本、管理接口或受控重建命令，§4 的步骤仍需人工 SQL 观察 + 重启；
   测试证明的是“按该顺序执行时可以收敛”，不是“可以热切换”。
-- **没有租约预算细化**：整批发布耗时可能超过 `outbox-lease-seconds`，多实例下会触发租约接管（T07）。
+- **Outbox 预算细化（T07 实现，待验收）**：`retry_count` 只记发布失败，`lease_recovery_count` 只记
+  租约过期恢复，`confirm_writeback_count` 只记 confirm 成功后 `markSent` 回写失败；第 10 次分别形成
+  `lease recovery budget exhausted` / `confirm writeback budget exhausted` 终态，三份预算互不挤占。
+  单批发布仍可能超过 `outbox-lease-seconds`，多实例接管仍靠 `lease_token` CAS；未做真实进程崩溃/两 JVM 演练。
 - **调度资源隔离（T06 已实现）**：投递、落库、恢复已拆为三条独立单线程调度器，并有
   `round-budget-ms` 与 100ms 的调度落库锁等待；预算不能强杀已开始的调用，业务 SQL 超时仍未统一，
   且不等于生产容量验收。

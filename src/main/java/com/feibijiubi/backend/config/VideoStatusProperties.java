@@ -30,6 +30,15 @@ public class VideoStatusProperties {
     public static final int MAX_REDIS_EVENT_TTL_DAYS = 3_650;
     public static final int MAX_CONSUMER_MAX_RETRIES = 100;
     public static final int MAX_LEASE_OR_CONFIRM_TIMEOUT_SECONDS = 3_600;
+    /**
+     * T07：投递租约必须比 publish confirm 超时多出的安全余量（秒）。
+     *
+     * <p>confirm 只是“等 MQ 回执”的上限；拿到回执之后还要做 markSent / markConfirmedPending /
+     * markInvalidFailed 的状态回写。若 {@code outbox-lease-seconds} 紧贴 confirm 超时，
+     * 回写就可能落在别的实例已经合法接管之后，让旧 owner 的 CAS 全部落空。
+     * 固定留 5 秒给回写与时钟误差；默认 60 / 5 自然满足。</p>
+     */
+    public static final int MIN_LEASE_CONFIRM_MARGIN_SECONDS = 5;
     /** 单轮调度预算默认值（毫秒）。 */
     public static final long DEFAULT_ROUND_BUDGET_MS = 5_000L;
 
@@ -104,6 +113,21 @@ public class VideoStatusProperties {
         requireRange("consumerMaxRetries", consumerMaxRetries,
                 1, MAX_CONSUMER_MAX_RETRIES);
         requirePositiveDelay("roundBudgetMs", roundBudgetMs);
+
+        // T07 跨字段约束：租约必须 >= confirm 超时 + 5s，给状态回写留出余量。
+        // 只约束这两个字段；不要求 roundBudgetMs >= confirm（单轮预算只决定“还要不要拿下一条”，
+        // 不负责强杀进行中的 publish，若强行要求会把已有的 5s 预算配置判成非法）。
+        int minimumLeaseSeconds = publishConfirmTimeoutSeconds
+                + MIN_LEASE_CONFIRM_MARGIN_SECONDS;
+        if (outboxLeaseSeconds < minimumLeaseSeconds) {
+            throw new IllegalStateException(
+                    "app.video-status.outbox-lease-seconds 必须 >= publish-confirm-timeout-seconds + "
+                            + MIN_LEASE_CONFIRM_MARGIN_SECONDS + " 秒（当前 confirm 超时 = "
+                            + publishConfirmTimeoutSeconds + " 秒，要求租约 >= "
+                            + minimumLeaseSeconds + " 秒，实际租约 = "
+                            + outboxLeaseSeconds + " 秒）"
+            );
+        }
     }
 
     private void requirePositiveDelay(String name, long value) {

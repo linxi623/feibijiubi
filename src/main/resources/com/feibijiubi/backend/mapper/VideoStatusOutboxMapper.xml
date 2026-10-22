@@ -2,8 +2,19 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  T07：列语义
+    retry_count            只统计“发布失败”次数（markPending / markFailed 各 +1）。
+                           历史行里的 retry_count 混有租约恢复次数，无法事后拆分；
+                           因此不做任何数据回填，也不允许把它归零（会抹掉真实发布失败证据）。
+    lease_recovery_count   租约过期被恢复的次数，独立预算：第 10 次过期直接 FAILED。
+    confirm_writeback_count confirm 已成功、markSent 回写失败的次数，独立预算：
+                           第 10 次仍无法回写直接 FAILED（confirm writeback budget exhausted），
+                           避免“每秒永久重投”同时不挤占发布/租约预算。
+  T07：所有语句加 timeout=3（秒），慢 SQL 由 MyBatis 打断，不把调度线程挂在数据库上。
+-->
 <mapper namespace="com.feibijiubi.backend.mapper.VideoStatusOutboxMapper">
-    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" timeout="3">
         INSERT INTO video_status_outbox(
             event_id,
             aggregate_id,
@@ -24,7 +35,8 @@
     </insert>
 
     <select id="selectPendingForUpdate"
-            resultType="com.feibijiubi.backend.entity.VideoStatusOutbox">
+            resultType="com.feibijiubi.backend.entity.VideoStatusOutbox"
+            timeout="3">
         SELECT id,
                event_id,
                aggregate_id,
@@ -32,6 +44,8 @@
                payload,
                status,
                retry_count,
+               lease_recovery_count,
+               confirm_writeback_count,
                next_retry_at,
                sending_at,
                lease_token,
@@ -46,7 +60,7 @@
             FOR UPDATE SKIP LOCKED
     </select>
 
-    <update id="markSending">
+    <update id="markSending" timeout="3">
         UPDATE video_status_outbox
         SET status = 1,
             sending_at = #{sendingAt},
@@ -55,7 +69,7 @@
           AND status = 0
     </update>
 
-    <update id="markSent">
+    <update id="markSent" timeout="3">
         UPDATE video_status_outbox
         SET status = 2,
             sent_at = #{sentAt},
@@ -67,7 +81,7 @@
           AND lease_token = #{leaseToken}
     </update>
 
-    <update id="markPending">
+    <update id="markPending" timeout="3">
         UPDATE video_status_outbox
         SET status = 0,
             retry_count = retry_count + 1,
@@ -80,7 +94,7 @@
           AND lease_token = #{leaseToken}
     </update>
 
-    <update id="markFailed">
+    <update id="markFailed" timeout="3">
         UPDATE video_status_outbox
         SET status = 3,
             retry_count = retry_count + 1,
@@ -92,15 +106,104 @@
           AND lease_token = #{leaseToken}
     </update>
 
-    <update id="recoverExpiredSending">
+    <!--
+      T07：confirm 已成功、但“成功后回写 DB（markSent）”失败时，把行放回 PENDING 重投。
+        * 语义纠偏：这个分支不是“确认超时”。真正的 confirm 超时走 handlePublishFailure
+          → markPending/markFailed，会照常递增 retry_count（发布失败预算）。
+          本语句只在 ACK 成功后回写失败时使用，结果已确定送达，不算一次发布失败，
+          所以不增加 retry_count；重复投递由消费端 eventId 幂等吸收。
+        * 独立预算 confirm_writeback_count：每次回写失败 +1。即使 markSent 永远失败、
+          本语句永远成功，也只允许 9 次回 PENDING；第 10 次直接 FAILED，
+          原因固定为 confirm writeback budget exhausted，形成可诊断终态而不是每秒永久重投。
+        * retry_count / lease_recovery_count 都不归零、不递增：三份预算互不挤占。
+          只有人工审计重放（VideoStatusOutboxReplayService，repair_log 保留 before/after 元数据）
+          才能为这次重放开启一份新的三预算，并在审计里保留改动前的 before 值。
+        * 状态/租约语义与其它回写一致：只有 status = 1 且 lease_token 相等才命中。
+        * 赋值顺序：MySQL 单表 UPDATE 的后续表达式会读到前面已赋的新值，
+          所以 confirm_writeback_count 的自增必须放在所有 CASE 之后。
+    -->
+    <update id="markConfirmedPending" timeout="3">
         UPDATE video_status_outbox
-        SET status = 0,
-            retry_count = retry_count + 1,
-            next_retry_at = NOW(3),
+        SET status = CASE
+                         WHEN confirm_writeback_count + 1 &gt;= 10 THEN 3
+                         ELSE 0
+                     END,
+            next_retry_at = CASE
+                                WHEN confirm_writeback_count + 1 &gt;= 10 THEN NULL
+                                ELSE #{nextRetryAt}
+                            END,
             sending_at = NULL,
             lease_token = NULL,
-            last_error = '发送租约超时，已自动恢复'
+            last_error = CASE
+                             WHEN confirm_writeback_count + 1 &gt;= 10
+                                 THEN 'confirm writeback budget exhausted'
+                             ELSE #{lastError}
+                         END,
+            confirm_writeback_count = confirm_writeback_count + 1
+        WHERE event_id = #{eventId}
+          AND status = 1
+          AND lease_token = #{leaseToken}
+    </update>
+
+    <!-- T07：confirm 回写预算耗尽，显式落 FAILED（不碰 retry_count / lease_recovery_count）。 -->
+    <update id="markConfirmWritebackExhausted" timeout="3">
+        UPDATE video_status_outbox
+        SET status = 3,
+            next_retry_at = NULL,
+            sending_at = NULL,
+            lease_token = NULL,
+            last_error = 'confirm writeback budget exhausted',
+            confirm_writeback_count = confirm_writeback_count + 1
+        WHERE event_id = #{eventId}
+          AND status = 1
+          AND lease_token = #{leaseToken}
+    </update>
+
+    <!-- T07：消息非法，直接 FAILED，同样不增加 retry_count（不是发布失败，是永久拒绝）。 -->
+    <update id="markInvalidFailed" timeout="3">
+        UPDATE video_status_outbox
+        SET status = 3,
+            sending_at = NULL,
+            lease_token = NULL,
+            last_error = #{lastError}
+        WHERE event_id = #{eventId}
+          AND status = 1
+          AND lease_token = #{leaseToken}
+    </update>
+
+    <!--
+      T07：租约过期恢复（方法签名与 T06 相同，语义收敛为“只走租约预算”）。
+        * CAS：status = 1 且 sending_at < expiredBefore；已恢复/已接管/已终结的行不会再次命中；
+        * lease_recovery_count 独立计数，不碰 retry_count（发布失败预算）；
+        * 第 10 次过期（+1 后 >= 10）直接 FAILED，原因固定为 lease recovery budget exhausted；
+        * 未耗尽时回 PENDING，next_retry_at = NOW(3) + 1s；
+        * 清空 lease_token / sending_at：旧 owner 的 markSent/markPending/markFailed/
+          markConfirmedPending/markInvalidFailed 都要求 lease_token 相等，token 清空后必然 0 行；
+        * 每轮最多 1000 行，按 sending_at, id 排序，先处理最老的租约，避免一条 SQL 无限 UPDATE。
+        * 注意赋值顺序：MySQL 单表 UPDATE 的后续表达式会读到前面已赋的新值，
+          所以 lease_recovery_count 的自增必须放在所有 CASE 之后，否则第 9/10 次判定会错位。
+    -->
+    <update id="recoverExpiredSending" timeout="3">
+        UPDATE video_status_outbox
+        SET status = CASE
+                         WHEN lease_recovery_count + 1 &gt;= 10 THEN 3
+                         ELSE 0
+                     END,
+            next_retry_at = CASE
+                                WHEN lease_recovery_count + 1 &gt;= 10 THEN NULL
+                                ELSE TIMESTAMPADD(SECOND, 1, NOW(3))
+                            END,
+            sending_at = NULL,
+            lease_token = NULL,
+            last_error = CASE
+                             WHEN lease_recovery_count + 1 &gt;= 10
+                                 THEN 'lease recovery budget exhausted'
+                             ELSE '发送租约超时，已自动恢复（不计入发布重试）'
+                         END,
+            lease_recovery_count = lease_recovery_count + 1
         WHERE status = 1
           AND sending_at &lt; #{expiredBefore}
+        ORDER BY sending_at, id
+        LIMIT 1000
     </update>
 </mapper>
