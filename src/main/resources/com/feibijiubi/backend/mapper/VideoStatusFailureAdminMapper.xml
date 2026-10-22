@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  T10 第一阶段：失败事件只读分页/详情/预检查与受审计“确认已阅（ACKNOWLEDGE）”。
+  只 SELECT 安全列，不查 payload / lease_token / last_error 原文；
+  没有 UPDATE/DELETE 目标事件的语句，确认只写 repair_log 审计。
+-->
+<mapper namespace="com.feibijiubi.backend.mapper.VideoStatusFailureAdminMapper">
+
+    <select id="selectFailedOutbox"
+            resultType="com.feibijiubi.backend.service.admin.VideoStatusFailureAdminRow$OutboxRow"
+            timeout="3">
+        SELECT id, event_id, aggregate_id AS vid, event_type, status,
+               retry_count, lease_recovery_count, confirm_writeback_count,
+               created_at, next_retry_at, sending_at, sent_at,
+               CASE WHEN last_error IS NULL OR last_error = '' THEN 0 ELSE 1 END
+                   AS last_error_present
+        FROM video_status_outbox
+        WHERE status = 3
+          AND id &gt; #{afterId}
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectFailedOutboxByEventId"
+            resultType="com.feibijiubi.backend.service.admin.VideoStatusFailureAdminRow$OutboxRow"
+            timeout="3">
+        SELECT id, event_id, aggregate_id AS vid, event_type, status,
+               retry_count, lease_recovery_count, confirm_writeback_count,
+               created_at, next_retry_at, sending_at, sent_at,
+               CASE WHEN last_error IS NULL OR last_error = '' THEN 0 ELSE 1 END
+                   AS last_error_present
+        FROM video_status_outbox
+        WHERE event_id = #{eventId}
+          AND status = 3
+    </select>
+
+    <select id="selectFailedOutboxByEventIdForUpdate"
+            resultType="com.feibijiubi.backend.service.admin.VideoStatusFailureAdminRow$OutboxRow"
+            timeout="3">
+        SELECT id, event_id, aggregate_id AS vid, event_type, status,
+               retry_count, lease_recovery_count, confirm_writeback_count,
+               created_at, next_retry_at, sending_at, sent_at,
+               CASE WHEN last_error IS NULL OR last_error = '' THEN 0 ELSE 1 END
+                   AS last_error_present
+        FROM video_status_outbox
+        WHERE event_id = #{eventId}
+          AND status = 3
+            FOR UPDATE
+    </select>
+
+    <select id="selectConsumedProcessStatus" resultType="java.lang.Integer" timeout="3">
+        SELECT process_status
+        FROM video_status_consumed_event
+        WHERE event_id = #{eventId}
+    </select>
+
+    <!-- process_status=3 是 REPAIR_REQUIRED；status0 也纳入只读诊断，但不能确认。 -->
+    <select id="selectDiagnosableConsumed"
+            resultType="com.feibijiubi.backend.service.admin.VideoStatusFailureAdminRow$ConsumedRow"
+            timeout="3">
+        SELECT id, event_id, vid, event_type, process_status, consumer_retry_count,
+               consumed_at, last_attempt_at, redis_applied_at, flushed_at,
+               CASE WHEN last_error IS NULL OR last_error = '' THEN 0 ELSE 1 END
+                   AS last_error_present,
+               TIMESTAMPDIFF(SECOND, consumed_at, NOW(3)) AS consumed_age_seconds
+        FROM video_status_consumed_event
+        WHERE process_status IN (0, 3)
+          AND id &gt; #{afterId}
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectDiagnosableConsumedByEventId"
+            resultType="com.feibijiubi.backend.service.admin.VideoStatusFailureAdminRow$ConsumedRow"
+            timeout="3">
+        SELECT id, event_id, vid, event_type, process_status, consumer_retry_count,
+               consumed_at, last_attempt_at, redis_applied_at, flushed_at,
+               CASE WHEN last_error IS NULL OR last_error = '' THEN 0 ELSE 1 END
+                   AS last_error_present,
+               TIMESTAMPDIFF(SECOND, consumed_at, NOW(3)) AS consumed_age_seconds
+        FROM video_status_consumed_event
+        WHERE event_id = #{eventId}
+          AND process_status IN (0, 3)
+    </select>
+
+    <!-- 确认路径专用：先锁住整行，再由 service 只允许 process_status=3。 -->
+    <select id="selectConsumedByEventIdForUpdate"
+            resultType="com.feibijiubi.backend.service.admin.VideoStatusFailureAdminRow$ConsumedRow"
+            timeout="3">
+        SELECT id, event_id, vid, event_type, process_status, consumer_retry_count,
+               consumed_at, last_attempt_at, redis_applied_at, flushed_at,
+               CASE WHEN last_error IS NULL OR last_error = '' THEN 0 ELSE 1 END
+                   AS last_error_present,
+               TIMESTAMPDIFF(SECOND, consumed_at, NOW(3)) AS consumed_age_seconds
+        FROM video_status_consumed_event
+        WHERE event_id = #{eventId}
+            FOR UPDATE
+    </select>
+
+    <select id="selectRepairLogByOperationId"
+            resultType="com.feibijiubi.backend.entity.VideoStatusConsumptionRepairLog"
+            timeout="3">
+        SELECT id, operation_id, event_id, action, operation_status, reason,
+               operator, last_error, created_at, completed_at
+        FROM video_status_consumption_repair_log
+        WHERE operation_id = #{operationId}
+    </select>
+
+    <insert id="insertCompletedRepairLog" useGeneratedKeys="true" keyProperty="id" timeout="3">
+        INSERT INTO video_status_consumption_repair_log(
+            operation_id, event_id, action, operation_status, reason, operator,
+            last_error, created_at, completed_at
+        ) VALUES (
+            #{operationId}, #{eventId}, #{action}, 1, #{reason}, #{operator},
+            #{lastError}, NOW(3), NOW(3)
+        )
+    </insert>
+</mapper>

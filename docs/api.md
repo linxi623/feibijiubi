@@ -2154,3 +2154,22 @@ curl "http://localhost:8080/api/admin/video-status/status0-compensation/preview?
 9. 管理员分页接口的 `page` 当前为必填参数，`status` 的 Controller 默认值为 `1`。
 10. 全局异常处理器会把未单独处理的异常包装为 `code = 500`，具体提示以当前实现为准。
 11. 登录失败限流与上传凭证限流基于 Redis 固定窗口实现，触发时返回 `429`。
+
+## T10 第一阶段：失败事件诊断与确认已阅（候选）
+
+仅实现管理员只读分页/详情/预检查和受审计 `acknowledge`，**不包含 DLQ 处置、status3 重放或对账**。
+
+- `GET /api/admin/video-status/failures?source=OUTBOX|CONSUMED&afterId=0&limit=20`
+- `GET /api/admin/video-status/failures/{eventId}?source=OUTBOX|CONSUMED`
+- `GET /api/admin/video-status/failures/{eventId}/precheck?source=OUTBOX|CONSUMED`
+- `POST /api/admin/video-status/failures/{eventId}/acknowledge?source=OUTBOX|CONSUMED`
+
+所有接口都在 `/api/admin/**` 下并标注 `@AdminOnly`。响应只返回安全字段，不返回 payload、
+leaseToken 或 last_error 原文。status3 预检查固定为 `REQUIRES_CONTROLLED_REPAIR`：
+`redis_applied_at` 为空不证明未应用，超龄也不伪造成 SAFE。`acknowledge` 必须提供 operationId、
+reason 和登录态 currentUserId；同一 operationId 不同目标/来源/动作/理由会拒绝。
+
+只有 Outbox FAILED（status=3）和 consumed status3（REPAIR_REQUIRED）可确认；consumed status0
+只读，`canAcknowledge=false`，调用确认返回 409。该动作只写
+`video_status_consumption_repair_log`（action=`ACKNOWLEDGE_FAILURE`），审计元数据记录
+before/after 且两者相同；不改变事件状态、计数或 Redis，不删除证据，也不是重放或对账。
