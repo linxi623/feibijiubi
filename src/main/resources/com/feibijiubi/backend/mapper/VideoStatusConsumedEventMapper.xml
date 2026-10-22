@@ -284,4 +284,15 @@
         LIMIT #{limit}
     </select>
 
+    <select id="selectPendingVidsAfter" resultType="int">
+        SELECT DISTINCT vid
+        FROM video_status_consumed_event
+        WHERE process_status = 1
+        <if test="afterVid != null">
+            AND vid &gt; #{afterVid}
+        </if>
+        ORDER BY vid
+        LIMIT #{limit}
+    </select>
+
 </mapper>

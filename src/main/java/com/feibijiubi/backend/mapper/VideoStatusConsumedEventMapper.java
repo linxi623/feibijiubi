@@ -83,4 +83,14 @@ public interface VideoStatusConsumedEventMapper {
     int countPendingByVid(@Param("vid") Integer vid);
 
     List<Integer> selectPendingVids(@Param("limit") int limit);
+
+    /**
+     * T11 公平恢复的 keyset 查询：只取 {@code vid > afterVid} 的待刷视频，
+     * 按 vid 升序。{@code afterVid == null} 表示从头开始；游标只影响效率，
+     * 不改变待刷事件的 status 1 语义，也不删除任何 dirty 标记。
+     */
+    List<Integer> selectPendingVidsAfter(
+            @Param("afterVid") Integer afterVid,
+            @Param("limit") int limit
+    );
 }

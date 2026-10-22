@@ -70,6 +70,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -465,7 +466,7 @@ class VideoStatusTelemetryInstrumentationTests {
         properties.setSchedulingEnabled(true);
         VideoStatusConsumedEventMapper consumedMapper =
                 mock(VideoStatusConsumedEventMapper.class);
-        when(consumedMapper.selectPendingVids(anyInt())).thenReturn(List.of(VID));
+        when(consumedMapper.selectPendingVidsAfter(isNull(), anyInt())).thenReturn(List.of(VID));
 
         VideoStatusDirtyRecoveryScheduler scheduler =
                 new VideoStatusDirtyRecoveryScheduler(

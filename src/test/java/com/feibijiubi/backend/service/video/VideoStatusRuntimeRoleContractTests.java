@@ -19,6 +19,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -230,7 +231,7 @@ class VideoStatusRuntimeRoleContractTests {
         var properties = validProperties();
         properties.setOutboxRelayEnabled(false);
         var mapper = mock(VideoStatusConsumedEventMapper.class);
-        when(mapper.selectPendingVids(anyInt())).thenReturn(List.of());
+        when(mapper.selectPendingVidsAfter(isNull(), anyInt())).thenReturn(List.of());
 
         new VideoStatusDirtyRecoveryScheduler(
                 properties,
@@ -238,7 +239,7 @@ class VideoStatusRuntimeRoleContractTests {
                 mock(RedisSetOperations.class)
         ).recoverDirtyVids();
 
-        verify(mapper).selectPendingVids(100);
+        verify(mapper).selectPendingVidsAfter(isNull(), eq(100));
     }
 
     @Test

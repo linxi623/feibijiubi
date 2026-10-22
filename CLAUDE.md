@@ -214,6 +214,27 @@ The flow is:
 - Runbook and limits: `docs/tutorial/video-status-outbox-reliability.md`,
   `video-status-outbox-lease-migration.md`, and `video-status-outbox-replay-runbook.md`.
 
+### T11 dirty-recovery fairness (accepted, test environment)
+
+- T11 is implemented at candidate `be7d836` and accepted on 2026-10-22. The parent reran
+  `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusDirtyRecoveryRealConvergenceTests,VideoStatusDirtyRecoveryFairnessIsolatedTests' test`
+  with **3 tests, 0 failures/errors/skipped** (log `/tmp/t11-real-convergence.log`). The run printed
+  `T11 real convergence vids=250 head=100 tail=150 flushRounds=1 oracleTotal=250`.
+- The acceptance used real MySQL and Redis in the isolated `compose.test.yaml` environment, with a
+  dedicated SADD fault injected only for the 100 head vids. The 150 healthy tail vids all got a
+  recovery opportunity within four rounds, and the final 250 vids converged with no `process_status=3`.
+  The oracle comes from independently seeded expected values and is also checked against
+  `SUM(delta)` over the consumed-event table.
+- The recovery scheduler now uses a keyset cursor (`vid > cursor`) with wrap-around and a bounded
+  local failure backoff (2 s, 4096-entry LRU). It only `SADD`s dirty markers and never adds `SREM`;
+  cursor/backoff are process-local and losing them only affects efficiency. `be7d836` fixes the
+  candidate defect where exhausting the round budget before the first vid ran could roll the cursor
+  back instead of leaving the previous keyset progress intact; the cursor now advances only to an
+  actually processed vid.
+- This is not a process-crash drill and not production acceptance: the fault is an in-process SADD
+  injection on dedicated test vids, not a real Redis/MySQL outage or a two-JVM drill. Capacity and
+  real infrastructure failures remain T16 work.
+
 Guides: `docs/tutorial/video-status-counter-range.md`, `video-status-flush-defer.md`,
 `video-status-runtime-roles.md`, `video-status-observability.md`,
 `video-status-scheduling-isolation.md`, `video-status-outbox-reliability.md`, and
@@ -256,7 +277,10 @@ user-account service, and Redis utils under `src/test/java/...`.
 Run `./mvnw -DvideoStatusIT=true -Dtest=VideoStatusIsolatedIntegrationTests test`; add
 `-DvideoStatusBenchmark=true` for an optional diagnostic hot-path comparison. T05/T06 acceptance
 classes are `VideoStatusMetricsIsolatedTests` and `VideoStatusSchedulingRealFlowTests` (the latter
-blocks publish for about 30 s by design). Tests replace application.yml, reject non-isolated endpoint
+blocks publish for about 30 s by design). T11 acceptance classes are
+`VideoStatusDirtyRecoveryRealConvergenceTests` and
+`VideoStatusDirtyRecoveryFairnessIsolatedTests`; the non-IT fairness unit tests live in
+`VideoStatusDirtyRecoveryFairnessTests`. Tests replace application.yml, reject non-isolated endpoint
 overrides before connecting, seed new rows and purge only the dedicated test queues. Existing
 deployment volumes are never used. Normal test runs skip this opt-in suite. Stop with
 `docker compose -f compose.test.yaml stop` to preserve test data.

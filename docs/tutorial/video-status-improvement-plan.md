@@ -1,6 +1,6 @@
 # 互动统计链路改进执行计划与 TODO
 
-> 状态：执行中；T01—T06 已验收并合入；T07（Outbox 发布/回写/租约）实现与测试已完成，暂标“待验收”。仅表中已完成且有证据的项代表已实现能力；不代表批准生产上线。
+> 状态：执行中；T01—T06 已验收并合入；T07（Outbox 发布/回写/租约）待验收；T08 实施中；T09 设计中；T11（dirty 恢复公平扫描与失败退避）已验收（按计划允许在 T06 后提前）。仅表中已完成且有证据的项代表已实现能力；不代表批准生产上线。
 >
 > 范围：互动入口 → Outbox → RabbitMQ → Redis → 消费事件 → 批量落库 → 重建/补偿。
 > 原则：先验证正确性，再补恢复闭环，再治理稳定性，最后优化吞吐。
@@ -34,10 +34,10 @@
 | [x] | 05 / T05 | P1 | 建立最小链路指标与积压告警 | T03、T04 | 已完成 | 46af28b；父代理 2026-10-22 复验：69 单测 + 8 隔离用例均 0 失败/错误/跳过；四类故障可定位、采样只读、迁移幂等 |
 | [x] | 06 / T06 | P1 | 隔离调度资源、限制单轮任务预算 | T05 | 已完成 | 3e33415；同批 69 + 8；受控阻塞 30.082s 时 flush 62ms、恢复继续心跳；并发落库 baseline=100/flushed=100 |
 | [ ] | 07 / T07 | P1 | 完善 Outbox 发布、回写、租约处理 | T06 | 待验收 | eec1e01；父代理 2026-10-22 复跑 `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusOutbox*Tests' test`：61 tests，0 failures/errors/skipped，日志 `/tmp/improvement-t07-verify.log`；等待父代理最终复核 |
-| [ ] | 08 / T08 | P1 | 消费重试退避、故障限速、ACK 边界 | T05、T07 | 待开始 | — |
-| [ ] | 09 / T09 | P1 | 接通安全窗口内 status0 自动补偿 | T03、T07、T08 | 待开始 | — |
+| [ ] | 08 / T08 | P1 | 消费重试退避、故障限速、ACK 边界 | T05、T07 | 进行中 | b796fc8；候选已有三级 10/30/120s TTL 队列、ACK/业务异常隔离单测；待父代理审查和真实容器恢复/TTL/120s Redis 故障验收 |
+| [ ] | 09 / T09 | P1 | 接通安全窗口内 status0 自动补偿 | T03、T07、T08 | 进行中（设计） | —；仅有设计调研，尚无实现或验收证据 |
 | [ ] | 10 / T10 | P1 | DLQ/Outbox FAILED/status3 处置及对账闭环 | T05、T09 | 待开始 | — |
-| [ ] | 11 / T11 | P1 | dirty 恢复公平扫描及失败退避 | T03、T05、T06 | 待开始 | — |
+| [x] | 11 / T11 | P1 | dirty 恢复公平扫描及失败退避 | T03、T05、T06 | 已完成 | be7d836；父代理 2026-10-22 实跑 `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusDirtyRecoveryRealConvergenceTests,VideoStatusDirtyRecoveryFairnessIsolatedTests' test`：3 tests，0 失败/错误/跳过，日志 `/tmp/t11-real-convergence.log`；真实 MySQL/Redis，专用头部 SADD 故障注入，四轮尾部获机会，最终 250 收敛且无 status3 |
 | [ ] | 12 / T12 | P2 | 有界重建、批量查询及受控强制修复 | T09、T10、T11 | 待开始 | — |
 | [ ] | 13 / T13 | P2 | 明确查询一致性、接实时读或保留 DB 读 | T02、T05、T12 | 待开始 | — |
 | [ ] | 14 / T14 | P2 | 事件归档、幂等保留与 Redis 容量治理 | T09、T10、T12 | 待开始 | — |
@@ -371,7 +371,7 @@ docker compose -f compose.test.yaml stop
 - T06证据：真实业务组件下将 publish 受控阻塞，输出 `blocked publish millis=30082 flushMillis=62 flushRuns=267 recoveryRuns=144`，即阻塞超 30 秒时落库仍在 10 秒测试预算内完成、恢复调度持续心跳；两个独立调度器共享同一 Redis 分布式锁并发处理同一 vid，输出 `baseline=100 flushed=100`，只落库一次。
 - 边界：T06 的“两个实例”是两个独立调度器对象在**同一 JVM**，不是两个 JVM；30 秒故障是**受控阻塞**，不是真实网络断连 30 秒。T05 告警只写日志和 HTTP 快照，**没有外部告警投递**；本实例指标重启后清零，不能与共享 DB backlog 相加。两任务均不等同于生产验收、真实故障演练或容量承诺。
 - 文档：`AGENTS.md`/`CLAUDE.md` 保持一致；`docs/api.md` 补充真实 `/api/admin/video-status/metrics` 与 `/gate` 契约；可观测/调度教程移除“等待验收”和过时“无指标/共享调度线程”描述；`video-status-runtime-roles.md` 与阶段交接同步状态。
-- 剩余风险/下一项：生产阈值、外部告警、真实两 JVM/网络故障和系统容量仍交 T16；调度预算不能强杀阻塞调用，业务 SQL 超时未统一；T07 处理 Outbox 发布/回写/租约细化，T10/T11 处理失败事件与恢复公平性。
+- 剩余风险/下一项：生产阈值、外部告警、真实两 JVM/网络故障和系统容量仍交 T16；调度预算不能强杀阻塞调用，业务 SQL 超时未统一；T07 处理 Outbox 发布/回写/租约细化，T10 处理失败事件处置；T11 的恢复公平性已另行验收（见下方 T11 记录）。
 
 ### T07 待验收记录（2026-10-22）
 
@@ -381,9 +381,22 @@ docker compose -f compose.test.yaml stop
 - 管理边界：当前仅提供单个 Outbox FAILED 事件的安全查询与受审计重放（`GET /api/admin/video-status/outbox/{eventId}`、`POST .../replay`），属于 T10 极窄子集；批量处置、DLQ、consumed status3 修复、对账仍归 T10。
 - 文档与环境：`AGENTS.md`/`CLAUDE.md` 保持一致；`docs/api.md` 与 Outbox 可靠性/租约迁移/重放 Runbook/运行角色教程同步。仅使用独立测试环境，未读取或输出 `application.yml` 凭证；**未宣称生产上线、真实进程崩溃演练或真实两 JVM/网络分区验证**，这些仍交 T16。
 
+### T11 验收记录（2026-10-22）
+
+- 状态：**已完成**；实现候选 `be7d836`，在主仓库基线 `dc41477` 上以 `git merge --squash be7d836` 暂存。本次只补验收文档，未修改代码、未提交 git、未取消暂存。
+- 提前执行理由：T11 是独立的 dirty 恢复公平性与失败退避改进，只依赖 T03/T05/T06 的恢复、观测和调度预算契约，不依赖 T07—T10 的 Outbox 处置与消费重试。计划已明确允许 T11 在 T06 后提前交付；因此在 T07 仍待验收、T08 实施中、T09 设计中的阶段先验收 T11，属于按计划调整而非跳过依赖，后续顺序不变。
+- 验收命令（父代理本次实跑）：`./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusDirtyRecoveryRealConvergenceTests,VideoStatusDirtyRecoveryFairnessIsolatedTests' test`；结果 **3 tests，0 failures / 0 errors / 0 skipped**，日志 `/tmp/t11-real-convergence.log`。
+- 关键输出：`T11 real convergence vids=250 head=100 tail=150 flushRounds=1 oracleTotal=250`。
+- 环境与证据：真实 MySQL、Redis（独立 `compose.test.yaml`），只新增本用例专属 250 个视频和事件；对专用头部 100 个 vid 注入 SADD 故障，四轮恢复内 150 个健康尾部全部获得真实 dirty 机会，释放故障并越过退避后 250 个视频全部落库收敛，全程无 `process_status=3`。测试 oracle 来自独立 seed 的预期值，并同时核对事件表 `SUM(delta)`，不是用被测代码自身结果反推。
+- 候选修复：`be7d836` 修复候选实现中“预算在首个 vid 尚未执行时耗尽会回退/丢失游标”的缺陷；现在预算耗尽只把游标推进到**已经处理过**的最后一条，首条未执行时保留上一轮 keyset 进度，避免极端预算下反复卡住头部。
+- 单测：`VideoStatusDirtyRecoveryFairnessTests` 的 5 个公平性用例及既有 27 个相关测试由子代理运行通过；父代理本次只复跑上述真实 IT，未复跑该批单测。
+- 边界：故障是**进程内专用 SADD 故障注入**，不是进程崩溃、真实 Redis/MySQL 宕机或两 JVM 演练；结果属于测试环境验收，**不能称为生产验收**。生产容量、真实基础设施故障和跨进程恢复仍交 T16。
+- 文档：`AGENTS.md`/`CLAUDE.md` 保持一致；`docs/api.md` 增加 T11 无 HTTP 变更说明与运行命令；公平性教程补充验收证据、`be7d836` 游标修复和边界。
+
 ### 计划变更记录
 
 - 初版：仅生成执行计划和 TODO；所有实施项均为待开始。没有执行代码修改、配置修改、迁移、测试、基础设施启动或部署。
+- 2026-10-22：T11 按计划允许的“T06 后提前交付”完成验收；T07 保持待验收，T08 标记实施中，T09 标记设计中，均不提前勾选。
 
 ## 9. 暂不纳入本轮
 

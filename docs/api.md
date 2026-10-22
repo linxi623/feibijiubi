@@ -70,6 +70,27 @@ http://localhost:8080
 - `outbox-relay-enabled=false` 仅停止本实例 Outbox 领取/投递，不停止消费和落库。运行角色合法性、启动校验和同步/异步维护切换见 [角色契约](tutorial/video-status-runtime-roles.md)；没有新增切换或强制重建 HTTP 接口。
 - 部署/回滚范围盘点见 [计数范围](tutorial/video-status-counter-range.md)，时序与退避见 [刷库延后](tutorial/video-status-flush-defer.md)。T02/T03 必须配套部署，不能混跑不兼容写入者。
 
+#### 视频统计 dirty 恢复公平性（T11）
+
+T11 只改恢复调度器的扫描顺序和失败退避，**不新增或修改任何 HTTP 接口**，响应字段与状态码均不变。
+它使用 keyset 游标（`vid > cursor`）轮转并在末尾回绕，失败 vid 进入进程内 2 秒/4096 条 LRU 退避；
+恢复路径仍然只 `SADD` dirty，不引入 `SREM`。游标和退避都是单实例内存状态，重启丢失只影响效率。
+
+运行说明（不连接隔离环境时只跑公平性单测）：
+
+```powershell
+.\mvnw.cmd "-Dtest=VideoStatusDirtyRecoveryFairnessTests" test
+```
+
+真实 MySQL/Redis 验收（需先启动独立 `compose.test.yaml`）：
+
+```powershell
+.\mvnw.cmd -DvideoStatusIT=true "-Dtest=VideoStatusDirtyRecoveryRealConvergenceTests,VideoStatusDirtyRecoveryFairnessIsolatedTests" test
+```
+
+验收证据见 [dirty 恢复公平性教程](tutorial/video-status-dirty-recovery-fairness.md)；该结果是测试环境
+（专用 SADD 故障注入）验收，不是进程崩溃或生产环境验收。
+
 ### 1.5 常见业务状态码
 
 | code | 说明 |

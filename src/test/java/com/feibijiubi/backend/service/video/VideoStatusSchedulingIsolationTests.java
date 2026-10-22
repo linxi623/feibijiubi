@@ -36,6 +36,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -298,7 +299,7 @@ class VideoStatusSchedulingIsolationTests {
         properties.setRoundBudgetMs(1);
 
         VideoStatusConsumedEventMapper mapper = mock(VideoStatusConsumedEventMapper.class);
-        when(mapper.selectPendingVids(anyInt())).thenReturn(List.of(11, 12, 13));
+        when(mapper.selectPendingVidsAfter(isNull(), anyInt())).thenReturn(List.of(11, 12, 13));
 
         RedisSetOperations sets = mock(RedisSetOperations.class);
         doAnswer(call -> {
