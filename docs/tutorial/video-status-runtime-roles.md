@@ -3,9 +3,10 @@
 > 适用范围：`app.video-status.*` 配置组、`VideoStatusOutboxRelay`、`VideoStatusBatchFlushScheduler`、
 > `VideoStatusDirtyRecoveryScheduler`、`VideoStatusEventConsumer` 的部署与维护。
 >
-> 本文只描述**已经实现**的能力。指标/告警（T05）与调度隔离/单轮预算（T06）已验收；
-> Outbox 发布/回写/租约细化（T07）实现与测试已完成，**待父代理验收**；受控强制重建与
-> 批量失败事件处置/对账（T10/T12）尚未实现，文中明确标注。
+> 本文只描述**已经实现**的能力。指标/告警（T05）、调度隔离/单轮预算（T06）、Outbox 发布/回写/
+> 租约细化（T07）、消费重试/ACK 边界（T08）、status0 补偿（T09）均已在测试环境验收；
+> T10 第一阶段失败诊断/确认已阅与只读对账已合入，但批量处置、DLQ、consumed status3 受控重放和
+> 自动修复仍未实现；受控强制重建（T12）尚未实现，文中明确标注。
 >
 > 相关文档：[完整链路设计](video-status-full-flow-design.md)、
 > [批量聚合实现](video-status-batch-aggregation-implementation.md)、
@@ -147,7 +148,7 @@ SELECT MIN(created_at) FROM video_status_consumed_event WHERE process_status IN 
   仍需按 §3/§4 逐实例停角色并观察全局 SQL 计数。
 - 演练前后都要求队列 ready/unacked 为 0；有 Outbox `status=3` 或 `process_status=3` 残留时必须先按
   T07/T10 处置，不能靠切 sync 掩盖。T07 只提供单个 Outbox FAILED 事件的安全查询与受审计重放，
-  批量/consumed status3/对账仍待 T10。
+  T10 第一阶段提供失败分页/确认已阅与只读对账；批量处置和 consumed status3 受控重放仍未完成。
 - 演练没有验证“新旧消费者混跑”：旧 Lua 不识别重建门闩，切换期间必须保证所有实例运行同一版本。
 
 ## 5. 启动期参数校验（`VideoStatusProperties#validate`）
@@ -216,7 +217,8 @@ SELECT MIN(created_at) FROM video_status_consumed_event WHERE process_status IN 
   积压采样，`GET /api/admin/video-status/gate?vid=...` 只读门闩停留时间；告警只写应用日志和 HTTP
   快照，**没有外部投递**。本文的 SQL 诊断仍可用于根因定位。
 - **没有强制重建入口**：只有 `ensureInitialized` 慢路径；`outbox status=3` 已有 T07 单事件查询/重放入口（测试环境已验收），
-  `process_status=3` 与批量处置/对账仍在 T10。§4.3 的“删 current”只是测试内的维护动作，不是产品能力。
+  `process_status=3`、批量处置与自动修复仍在 T10；只读对账不改变状态、不证明收敛。
+  §4.3 的“删 current”只是测试内的维护动作，不是产品能力。
 - **T07 单事件运维入口（测试环境已验收）**：`GET /api/admin/video-status/outbox/{eventId}` 只返回安全状态；
   `POST /api/admin/video-status/outbox/{eventId}/replay` 仅对通过 payload/窗口/消费账本校验的单个
   FAILED 事件做受审计重放。不会返回 payload/leaseToken/`last_error` 原文，也不新建 eventId。

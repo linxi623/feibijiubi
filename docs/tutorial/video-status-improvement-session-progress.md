@@ -1,6 +1,6 @@
 # Improvement 续作记录（2026-10-22）
 
-目标仍是完成 T09—T16 全部任务（T07/T08/T09 已验收，T10 进行中）；本记录不替代主计划验收表，不代表生产上线许可。
+目标仍是完成 T09—T16 全部任务（T07/T08/T09 已验收，T10 进行中且第一阶段已合入）；本记录不替代主计划验收表，不代表生产上线许可。
 
 ## 本轮落地
 
@@ -11,12 +11,13 @@
 - T11 已在主仓库基线 `dc41477` 上 `git merge --squash be7d836` 暂存，并于 2026-10-22 完成测试环境验收。父代理实跑 `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusDirtyRecoveryRealConvergenceTests,VideoStatusDirtyRecoveryFairnessIsolatedTests' test`：3 tests，0 failures/errors/skipped，日志 `/tmp/t11-real-convergence.log`；输出 `T11 real convergence vids=250 head=100 tail=150 flushRounds=1 oracleTotal=250`。真实 MySQL/Redis，专用头部 SADD 故障注入，四轮尾部获机会，最终 250 收敛且无 status3。候选 `be7d836` 修复了预算在首个 vid 未执行时回退/丢失游标的缺陷。该故障不是进程崩溃，结果不是生产验收。
 
 - T09 第一阶段已合入主分支 `97c7357`（候选 `aab1c64`），并于 2026-10-22 完成**测试环境最终验收**。父代理在主分支实跑普通回归 `./mvnw '-Dtest=*Tests,!BackendApplicationTests' test`：356 tests，0 失败/错误，108 skipped，日志 `/tmp/t09-main-unit.log`；opt-in 隔离回归 `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusStatus0CompensationTests,VideoStatusStatus0CompensationAuthorizationTests,VideoStatusStatus0CompensationIsolatedIntegrationTests,VideoStatusIsolatedIntegrationTests,VideoStatusOutboxReliabilityIsolatedTests' test`：62 tests，0 失败/错误，1 skipped，日志 `/tmp/t09-main-it.log`。候选早前 43 tests，0 失败/错误/跳过（含 8 真实 IT，`/tmp/t09-parent-final.log`）。默认关闭 enabled/integrity/allow-unproven 三闸门；processed 缺失是 `EVIDENCE_UNKNOWN`，不能判未应用；无证据模式仍受控/默认关，不保证任意 Redis 数据丢失；yaml 非热更新，事故需停全部补偿角色并等待 inflight/租约，不强杀 confirm。早前错开关跳过测试、mapper 参数/时区失败历史已保留，未记录凭证。
+- T10 第一阶段已合入主分支 `6fc5e7f`：失败事件分页/详情/预检查/受审计确认已阅，以及单视频只读对账。父代理 2026-10-22 实跑 opt-in IT：121 tests，0 失败/错误/跳过（`/tmp/improvement-t10-main-it.log`，含 T07 replay/T09 compensation）；普通单测 416 tests，0 失败/错误，130 skipped（`/tmp/improvement-t10-main-final-unit.log`）。失败列表缺精确索引返回 503 且不扫描；确认只允许 Outbox FAILED/consumed status3，只写 before==after 审计，status0 只读且 409；对账各来源非原子，账本每状态独立 `cap=limit+1` 截断，缺 `(vid,id)` 索引只跳过事件投影，Redis 异常显式 `READ_FAILED` 不当 0，不自动修复/不证明收敛。**T10 整项仍未完成**：DLQ、status3 受控重放、批量处置未实现，不能勾选。
 ## 保留候选与下步
 
 1. T07：**已完成（测试环境验收）**。主分支 `95af60d`，全链路回归 87 tests，0 失败/错误，1 skipped（`/tmp/improvement-main-regression3.log`）；T07 单组 61 tests 0 失败/错误/跳过。非生产验收、非真实进程崩溃/两 JVM 演练。
 2. T08：**已完成（测试环境验收）**。已 cherry-pick 到主分支 `0dd98ad`、`b846032`、`92eb8c1`（候选 `b796fc8`）。父代理在独立候选父复验 `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusIsolatedIntegrationTests,VideoStatusConsumerRetryLifecycleIsolatedTests' test`：22 tests，0 失败/错误，1 skipped，日志 `/tmp/t08-parent-final.log`；真实 10/30/120s TTL、容器 stop/start、Redis `CLIENT PAUSE 120000`（非进程/网络断连）。
 3. T09：**已完成（测试环境验收）**。主分支 `97c7357`（候选 `aab1c64`）；普通回归 356 tests，0 失败/错误，108 skipped（`/tmp/t09-main-unit.log`）；opt-in 隔离回归 62 tests，0 失败/错误，1 skipped（`/tmp/t09-main-it.log`）。无证据模式保持受控/默认关，不能盲目重放超龄或丢失幂等证据的事件，也不保证任意 Redis 数据丢失。非生产验收。
-4. T10：**进行中**。独立工作树已有第一阶段 15 个单测候选，**未合入**主分支；DLQ/Outbox FAILED/status3 对账整项尚无完成证据，不能勾选或宣称闭环完成。
+4. T10：**进行中**。第一阶段失败诊断/确认已阅与只读对账已合入主分支 `6fc5e7f`，父代理 opt-in IT 121 tests（0 失败/错误/跳过）与普通单测 416 tests（0 失败/错误，130 skipped）通过；但 DLQ、consumed status3 受控重放、批量处置/自动修复整项仍未实现，不能勾选或宣称闭环完成，也不是生产验收。
 5. T11：**已完成（测试环境验收）**，按计划允许在 T06 后提前交付，原因是独立的 dirty 恢复公平性/失败退避改进，不依赖 T07—T10。验收后主计划已勾选，详细证据见 `video-status-improvement-plan.md` 的 T11 验收记录。
 6. T12—T16 设计调研只有建议，不是实现或验收；读路径选择、归档保留、防刷产品语义、压测目标必须在实施前固定并记录理由。尤其删除消费账本不能仅靠 processed TTL 判安全。
 

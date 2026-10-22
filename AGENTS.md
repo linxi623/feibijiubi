@@ -213,7 +213,8 @@ The flow is:
   `POST /api/admin/video-status/outbox/{eventId}/replay` (single FAILED event, audited, same
   transaction, operator from login state). They never return payload/leaseToken/raw `last_error`,
   never create a new eventId, and reject existing consumed rows or unsafe windows. Batch/DLQ/
-  consumed status3 repair and reconciliation remain T10.
+  consumed status3 repair remain T10; the T10 first-phase failure diagnostics and read-only
+  reconciliation are now merged (see the T10 section below).
 - Runbook and limits: `docs/tutorial/video-status-outbox-reliability.md`,
   `video-status-outbox-lease-migration.md`, and `video-status-outbox-replay-runbook.md`.
 
@@ -274,6 +275,52 @@ The flow is:
   into docs or logs. T09 remains test-environment evidence only, not production acceptance; the
   no-evidence (unproven) replay mode stays controlled and default off.
 - Guide: `docs/tutorial/video-status-status0-compensation.md`.
+
+### T10 failure diagnostics and read-only reconciliation (first phase merged, task in progress)
+
+- The T10 first phase is merged on main at `6fc5e7f` (preceding `d21ebd7`, `66f9bb0`,
+  `6a46fd0`, `2641897`, `e2c6ea6`). The earlier description of an unmerged 15-unit-test
+  candidate is obsolete. **T10 itself is still in progress**: DLQ ingestion/processing,
+  consumed status3 controlled replay, batch actions and automatic repair/convergence are
+  not implemented.
+- Parent verification on 2026-10-22: opt-in IT **121 tests, 0 failures/errors/skipped**
+  (`/tmp/improvement-t10-main-it.log`), covering T10 failure/reconciliation plus T07 replay
+  and T09 compensation; normal unit run **416 tests, 0 failures/errors, 130 skipped**
+  (`/tmp/improvement-t10-main-final-unit.log`). These are test-environment results, not
+  production acceptance.
+- Failure admin endpoints: `GET /api/admin/video-status/failures` (keyset `source=OUTBOX`
+  default or `CONSUMED`, `afterId>=0`, `limit=1..100`), `GET .../{eventId}`,
+  `GET .../{eventId}/precheck`, and `POST .../{eventId}/acknowledge`. OUTBOX lists only
+  status3; CONSUMED lists status0 (diagnostic only) and status3. The list queries require
+  the exact `(status,id)` / `(process_status,id)` index key order and return HTTP 503 with
+  no scan when it is missing or wrong. Responses never expose payload, lease tokens or raw
+  `last_error`; safe reason codes are returned instead.
+- `acknowledge` is not “ignore”: it only writes an `ACKNOWLEDGE_FAILURE` audit row, only
+  for OUTBOX FAILED or consumed status3, and records `before == after` to prove it did not
+  change the target. Consumed status0 is read-only and ack returns 409. A repeated
+  operationId with the same target/source/action/operator/reason returns a duplicate result;
+  concurrent duplicates for the same target are absorbed after the target row lock, while
+  reuse on a different target or with a different shape is 409. Historical
+  `retry_count`/budget counters only guide diagnosis; they do not prove the current failure
+  cause.
+- Read-only reconciliation: `GET /api/admin/video-status/reconciliation?vid=<positive>&limit=1..1000`
+  (default 100). It separately samples DB eight counters, bounded ledger counts, a bounded
+  event window, bounded `user_video` relation truth and Redis current counters. Ledger counts
+  are capped independently per status (`cap = limit + 1`, per-status `Capped`, aggregate
+  `truncated`); event and relation windows are also lower bounds when truncated. Results are
+  explicitly `CONCURRENT_OBSERVATION_NOT_ATOMIC`, `incomplete` is set on truncation/unknown
+  data, and the verdict is always `NO_SAFE_CONCLUSION_AUTOMATIC_REPAIR_DISABLED`; the
+  endpoint never writes or proves convergence.
+- If the `(vid,id)` consumed-event index is missing, reconciliation skips only the expensive
+  event projection (`indexAvailable=false`, empty window, `INDEX_MISSING`, `incomplete=true`)
+  and still runs the other bounded reads. DB exceptions use the standard global 500; Redis
+  read failures are caught as an explicit `READ_FAILED` Redis status with null counters,
+  never fabricated zeroes.
+- Required migrations: `database/migrations/t10-video-status-failure-admin-indexes.sql` and
+  `t10-video-status-reconciliation-indexes.sql`; both indexes are already mirrored in
+  `database/feibijiubi.sql`. Guides: `docs/tutorial/video-status-failure-admin.md`,
+  `docs/tutorial/video-status-reconciliation.md`.
+
 ### T11 dirty-recovery fairness (accepted, test environment)
 
 - T11 is implemented at candidate `be7d836` and accepted on 2026-10-22. The parent reran
@@ -353,9 +400,10 @@ T09 acceptance classes are `VideoStatusStatus0CompensationTests`,
 `VideoStatusStatus0CompensationIsolatedIntegrationTests`; the main-branch parent run was 62 opt-in
 IT tests (0 failures/errors, 1 skipped, log `/tmp/t09-main-it.log`) plus 356 unit tests (0
 failures/errors, 108 skipped, log `/tmp/t09-main-unit.log`). T09 is accepted in the test
-environment only; the unproven replay mode remains controlled and default off. T10 is in progress
-in an independent tree with a first-stage 15-unit-test candidate that is not merged; no DLQ or
-reconciliation item is complete.
+environment only; the unproven replay mode remains controlled and default off. T10 is still in
+progress: its first phase (failure diagnostics/acknowledge and read-only reconciliation) is merged
+on main at `6fc5e7f`, with the opt-in IT and unit evidence recorded in the T10 section above, but
+DLQ handling and consumed status3 controlled repair are not implemented.
 ## Docker Compose deployment
 
 `compose.yaml` starts MySQL, Redis, RabbitMQ, and the Spring Boot backend together. The backend is

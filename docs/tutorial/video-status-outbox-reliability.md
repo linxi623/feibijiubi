@@ -175,7 +175,9 @@ confirm writeback budget exhausted
 非 FAILED 状态或并发冲突都会被拒绝并给出原因；不会新建 eventId，也不会改 payload/vid/type。
 完整操作步骤见 [Outbox FAILED 重放 Runbook](video-status-outbox-replay-runbook.md)。
 
-仍属 T10：DLQ/FAILED 分页与批量处置、`process_status=3` 修复、对账、人工确认忽略和批量限速。
+T10 第一阶段已合入失败分页/详情/预检查/确认已阅和单视频只读对账；仍属 T10 未完成部分：
+DLQ 摄入与处置、`process_status=3` 受控重放、批量处置/限速和自动修复。只读对账不返回 SAFE，
+“确认已阅”也不是忽略或修复。
 
 ## 9. 测试与验收证据
 
@@ -200,8 +202,7 @@ CAS 行数、单条异常隔离、租约恢复预算、confirm 回写预算、ma
    真实两 JVM、网络分区和系统容量仍交 T16。
 3. **未验证 exactly-once**：本设计明确是至少一次 + 幂等，不宣称 exactly-once；
    重复投递窗口依赖消费端 eventId 去重。
-4. **T10 未实现**：本工具只覆盖单个 Outbox FAILED 事件的安全查询与重放，
-   不覆盖批量处置、DLQ、consumed status3 或对账。
+4. **T10 整项未完成**：第一阶段失败诊断/确认已阅与只读对账已合入主分支 `6fc5e7f`，但本工具仍只覆盖单个 Outbox FAILED 事件的安全查询与重放，不覆盖批量处置、DLQ 摄入或 consumed status3 受控重放。
 5. **未改既有配置键**：T07 没有新增 `app.video-status.*` 键；`round-budget-ms` 等沿用 T06。
 
 ## 11. 回滚

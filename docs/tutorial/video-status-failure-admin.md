@@ -1,7 +1,8 @@
-# T10 第一阶段：失败事件只读诊断与受审计确认已阅（候选）
+# T10 第一阶段：失败事件只读诊断与受审计确认已阅（已合入，T10 未完成）
 
-> 状态：**仅第一阶段候选，不是 T10 完成**。DLQ 摄入/处置、consumed status3 安全重放、
-> 批量处置、业务/事件账本/DB/Redis 对账仍待后续任务。本文不宣称生产验收。
+> 状态：**第一阶段已合入主分支 `6fc5e7f`，T10 整项仍未完成**。DLQ 摄入/处置、
+> consumed status3 安全重放、批量处置仍待后续任务；只读对账已作为同一阶段的另一入口合入，
+> 见 `video-status-reconciliation.md`。本文不宣称生产验收。
 
 ## 1. 为什么先做“只读 + 审计确认”
 
@@ -28,8 +29,18 @@
 | GET | `/api/admin/video-status/failures/{eventId}/precheck?source=CONSUMED` | 处置预检查 |
 | POST | `/api/admin/video-status/failures/{eventId}/acknowledge?source=CONSUMED` | 受审计确认已阅 |
 
-`afterId` 是上一页最后一条的 `id`；`limit` 为 1..100。响应不包含 payload、lease token 或
-`last_error` 原文，只给 `lastErrorPresent` 固定提示与安全原因码。
+`source` 默认 `OUTBOX`、大小写不敏感；`afterId` 是上一页最后一条的 `id`（`>=0`）；
+`limit` 为 1..100、默认 20。服务端最多读 `limit+1` 行判断 `hasMore`，`nextAfterId` 仅在
+`hasMore=true` 时给出。响应不包含 payload、lease token 或 `last_error` 原文，只给
+`lastErrorPresent` 固定提示与安全原因码。
+
+列表查询要求索引 key 顺序精确匹配：OUTBOX 为 `(status,id)`，CONSUMED 为
+`(process_status,id)`。缺索引或顺序不符时返回 **HTTP 503（code=503）且不扫描**，并提示执行
+`database/migrations/t10-video-status-failure-admin-indexes.sql`。其它未处理数据库异常按全局规则
+返回 HTTP 500。
+
+Outbox 的 `retry_count`、`lease_recovery_count`、`confirm_writeback_count` 只用于生成安全原因码
+并辅助诊断；历史累计值不代表当前失败的真实原因。
 
 POST 请求体只有：
 
@@ -69,7 +80,8 @@ consumed status0 表示事件已收到但还没有足够证据判断是否已应
 - `CONSUMED_REDIS_EVIDENCE_MISSING_AND_OVER_SAFE_WINDOW`
 - `CONSUMED_REQUIRES_CONTROLLED_REPAIR`
 
-status0 只返回 `DIAGNOSTIC_ONLY_EVIDENCE_UNKNOWN`，且 `canAcknowledge=false`。
+status0 只返回 `DIAGNOSTIC_ONLY_EVIDENCE_UNKNOWN`，且 `canAcknowledge=false`。Outbox 预检查同样
+永远返回 `REQUIRES_CONTROLLED_REPAIR`，不会因为计数未达预算或时间窗看起来正常就认证 SAFE。
 
 ## 5. 确认已阅的幂等与事务
 
@@ -81,21 +93,33 @@ status0 只返回 `DIAGNOSTIC_ONLY_EVIDENCE_UNKNOWN`，且 `canAcknowledge=false
   **before 与 after 必须相同**，证明该动作没有修改目标；
 - 不写 payload、令牌或 last_error 原文；
 - 整个 acknowledge 在事务中，审计写失败/唯一键冲突整体回滚；
-- 目标状态、计数、Redis 完全不变，失败证据不删除。
+- 目标状态、计数、Redis 完全不变，失败证据不删除；
+- 相同 operationId、相同目标/来源/动作/操作人/原因重复提交时返回 `duplicate=true`、
+  `acknowledgedApplied=false`；同目标并发请求在目标行锁后再次读取审计，可被吸收为 duplicate；
+  不同目标，或来源/动作/操作人/原因不一致的 operationId 复用返回 409；
+- 唯一键冲突或审计写入异常整体回滚，审计写失败不会留下半条确认。
 
 响应同时返回 `statusBefore/statusAfter` 与 `processStatusBefore/processStatusAfter`，调用方可以
-直接核对 before == after；重复请求返回 `duplicate=true` 且 `acknowledgedApplied=false`。
+直接核对 before == after。`acknowledge` 不是“忽略”：它不会把事件标记为已修复，也不会删除证据；
+失败事件仍需后续 DLQ/status3 受控处置。
 
 ## 6. 验证边界
 
-本阶段单测只验证服务与接口边界，不连接 MySQL/Redis/MQ，也不运行 `contextLoads`。
-真实分页 SQL、事务回滚和跨进程并发仍应在独立 `compose.test.yaml` 环境做后续验证。
-这些单测通过不代表 T10 整体完成或生产验收。
+父代理 2026-10-22 在独立测试环境实跑一组 T10/T07/T09 用例（日志
+`/tmp/improvement-t10-main-it.log`）：**121 tests，0 failures / 0 errors / 0 skipped**，其中包含
+`VideoStatusFailureAdminAuthorizationTests`、`VideoStatusFailureAdminIsolatedTests`、
+`VideoStatusFailureAdminServiceTests`，以及 T07 replay 和 T09 compensation 用例；普通单测日志
+`/tmp/improvement-t10-main-final-unit.log` 为 **416 tests，0 failures / 0 errors，130 skipped**
+（skipped 为 opt-in 隔离开关关闭的用例）。
+
+隔离测试已覆盖真实分页 SQL 使用索引、分页/详情不泄露敏感字段、status0 拒绝确认、同 operationId
+并发只产生一条完成审计、审计写入失败回滚且目标不变。以上是**测试环境证据，不是生产验收**，
+也不代表 T10 整体完成；跨进程/真实 DLQ/任意数据库故障仍不在本阶段保证范围。
 
 ## 7. 仍未完成
 
 - RabbitMQ DLQ 摄入、分页、处置、重放；
-- consumed status3 受控重放与安全证明；
+- consumed status3 受控重放与安全证明（本阶段只允许确认已阅，不重放/不改状态）；
 - 批量操作与工单系统对接；
-- 业务关系真值 / 事件账本 / DB 基线 / Redis 派生值对账；
-- 需要强制重建时的维护流程。
+- 自动修复与收敛证明（只读对账入口只展示非原子观测，不给出 SAFE）；
+- 需要强制重建时的维护流程（T12）。

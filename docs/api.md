@@ -2155,21 +2155,116 @@ curl "http://localhost:8080/api/admin/video-status/status0-compensation/preview?
 10. 全局异常处理器会把未单独处理的异常包装为 `code = 500`，具体提示以当前实现为准。
 11. 登录失败限流与上传凭证限流基于 Redis 固定窗口实现，触发时返回 `429`。
 
-## T10 第一阶段：失败事件诊断与确认已阅（候选）
+## T10 第一阶段：失败事件诊断、确认已阅与只读对账（已合入，T10 未完成）
 
-仅实现管理员只读分页/详情/预检查和受审计 `acknowledge`，**不包含 DLQ 处置、status3 重放或对账**。
+> 实现已合入主分支 `6fc5e7f`。本阶段仅提供管理员失败事件只读分页/详情/预检查、受审计
+> `acknowledge` 和单视频只读对账；**不包含 DLQ 摄入/处置、consumed status3 受控重放、批量
+> 操作或自动修复/收敛**。T10 整项仍未完成，以下也不构成生产验收。
+>
+> 使用失败列表前必须先执行 `database/migrations/t10-video-status-failure-admin-indexes.sql`；
+> 使用单视频对账前必须先执行 `t10-video-status-reconciliation-indexes.sql`。两个迁移的索引都已
+> 镜像到 `database/feibijiubi.sql`。
 
-- `GET /api/admin/video-status/failures?source=OUTBOX|CONSUMED&afterId=0&limit=20`
-- `GET /api/admin/video-status/failures/{eventId}?source=OUTBOX|CONSUMED`
-- `GET /api/admin/video-status/failures/{eventId}/precheck?source=OUTBOX|CONSUMED`
-- `POST /api/admin/video-status/failures/{eventId}/acknowledge?source=OUTBOX|CONSUMED`
+所有接口都在 `/api/admin/**` 下并标注 `@AdminOnly`，未登录/非管理员由既有拦截器拒绝。
+响应只返回安全字段，不返回 payload、leaseToken 或 `last_error` 原文。
 
-所有接口都在 `/api/admin/**` 下并标注 `@AdminOnly`。响应只返回安全字段，不返回 payload、
-leaseToken 或 last_error 原文。status3 预检查固定为 `REQUIRES_CONTROLLED_REPAIR`：
-`redis_applied_at` 为空不证明未应用，超龄也不伪造成 SAFE。`acknowledge` 必须提供 operationId、
-reason 和登录态 currentUserId；同一 operationId 不同目标/来源/动作/理由会拒绝。
+### 10.1 失败事件分页
 
-只有 Outbox FAILED（status=3）和 consumed status3（REPAIR_REQUIRED）可确认；consumed status0
-只读，`canAcknowledge=false`，调用确认返回 409。该动作只写
-`video_status_consumption_repair_log`（action=`ACKNOWLEDGE_FAILURE`），审计元数据记录
-before/after 且两者相同；不改变事件状态、计数或 Redis，不删除证据，也不是重放或对账。
+`GET /api/admin/video-status/failures?source=OUTBOX|CONSUMED&afterId=0&limit=20`
+
+- `source`：默认 `OUTBOX`，大小写不敏感，只接受 `OUTBOX` / `CONSUMED`。
+  `OUTBOX` 只列 `status=3 (FAILED)`；`CONSUMED` 只列 `process_status=0 (RECEIVED)` 和
+  `process_status=3 (REPAIR_REQUIRED)`，其中 status0 仅用于诊断。
+- `afterId`：键集分页游标，取上一页最后一条 `id`，必须 `>= 0`，默认 `0`。
+- `limit`：`1..100`，默认 `20`。服务端最多读取 `limit+1` 行判断 `hasMore`，返回最多 `limit` 条。
+- 响应 `Page`：`source`、`afterId`、`limit`、`hasMore`、`nextAfterId`、`items`。
+  `nextAfterId` 仅在 `hasMore=true` 时为最后一条的 `id`，否则为 `null`。
+- `FailureItem` 安全字段：`source`、`id`、`eventId`、`vid`、`eventType`、`status`、
+  `statusName`、`reasonCode`、`lastErrorPresent`、`lastErrorHint`、`retryCount`、
+  `consumerRetryCount`、`leaseRecoveryCount`、`confirmWritebackCount`、`createdAt`、
+  `consumedAt`、`lastAttemptAt`、`redisAppliedAt`、`flushedAt`。
+- 缺少精确 `(status,id)`（OUTBOX）或 `(process_status,id)`（CONSUMED）索引时返回 HTTP 503、
+  `code=503`，并明确提示迁移文件；此时**不执行列表扫描**。索引存在但顺序不符同样拒绝。
+- `reasonCode` 只是安全原因码；Outbox 的预算计数（如 `retry_count`）可能是历史累计，只能作为
+  诊断参考，不能证明本次失败的真实原因。
+
+### 10.2 失败详情与预检查
+
+- `GET /api/admin/video-status/failures/{eventId}?source=OUTBOX|CONSUMED`：返回安全 `item`、
+  `precheck` 与说明。
+- `GET /api/admin/video-status/failures/{eventId}/precheck?source=OUTBOX|CONSUMED`：只返回预检查。
+- `eventId` 必填、长度 `<=64`；目标不是可诊断状态时返回 404。
+- OUTBOX 预检查固定返回 `decision=REQUIRES_CONTROLLED_REPAIR`，原因码为
+  `OUTBOX_CONSUMED_LEDGER_EXISTS` 或 `OUTBOX_REQUIRES_CONTROLLED_REPAIR`，`canAcknowledge=true`。
+- CONSUMED status3 固定返回 `REQUIRES_CONTROLLED_REPAIR`；`redis_applied_at` 为空不证明未应用，
+  超龄也不等于安全，原因码为 `CONSUMED_REDIS_APPLIED_EVIDENCE_MISSING`、
+  `CONSUMED_OVER_SAFE_WINDOW`、二者组合或 `CONSUMED_REQUIRES_CONTROLLED_REPAIR`。
+- CONSUMED status0 返回 `DIAGNOSTIC_ONLY_EVIDENCE_UNKNOWN`，`canAcknowledge=false`，
+  不能领取、重发或转 status3。
+- 预检查字段：`source`、`eventId`、`decision`、`reasonCode`、
+  `redisAppliedEvidencePresent`、`withinSafeWindow`、`consumedAgeSeconds`、
+  `canAcknowledge`、`note`。预检查永远不会返回 `SAFE`。
+
+### 10.3 受审计确认已阅（acknowledge）
+
+`POST /api/admin/video-status/failures/{eventId}/acknowledge?source=OUTBOX|CONSUMED`
+
+```json
+{
+  "operationId": "ticket-20261022-001",
+  "reason": "已核对业务事实，保留证据并确认已阅"
+}
+```
+
+- `operationId` 必填、`<=64`；`reason` 必填、`<=1000`；操作人只取登录态 `currentUserId`，
+  请求体不能伪造。
+- `acknowledge` **不是忽略或修复**：只允许 OUTBOX FAILED（status3）与 consumed status3
+  （REPAIR_REQUIRED）。consumed status0/1/2 或其它目标返回 409，且不写审计。
+- 只写 `video_status_consumption_repair_log`：`action=ACKNOWLEDGE_FAILURE`、
+  `operation_status=1`，审计元数据 `T10_ACKNOWLEDGE_META_V1` 记录 source 与 before/after；
+  **before 必须等于 after**，证明未修改目标状态。不修改计数/Redis，不删除 payload 或失败证据，
+  不创建新 eventId，也不是重放或对账。
+- 整个确认在一个事务中；审计写入失败或唯一键冲突整体回滚。
+- 相同 operationId、相同目标/来源/动作/操作人/原因重复提交返回成功且
+  `duplicate=true`、`acknowledgedApplied=false`。同目标并发请求在目标行锁后再次读取审计，
+  可被吸收为 duplicate；不同目标，或来源/动作/操作人/原因不一致的 operationId 复用返回 409。
+- 响应字段：`operationId`、`action`、`source`、`eventId`、`operator`、`operationStatus`、
+  `completedAt`、`duplicate`、`acknowledgedApplied`、`statusBefore`、`statusAfter`、
+  `processStatusBefore`、`processStatusAfter`、`message`。调用方应核对 before==after。
+
+### 10.4 单视频只读对账
+
+`GET /api/admin/video-status/reconciliation?vid=<正整数>&limit=100`
+
+- `vid` 必填且必须为正整数；非法返回 400。
+- `limit` 为 `1..1000`，默认 `100`，非法返回 400。所有账本/事件/关系查询最多读取
+  `limit+1` 行。
+- 响应顶层字段：`vid`、`limit`、`mode`（固定 `READ_ONLY_DIAGNOSTIC`）、`readOnly=true`、
+  `writePerformed=false`、`automaticRepair=false`、`observationBoundary`
+  （固定 `CONCURRENT_OBSERVATION_NOT_ATOMIC`）、`incomplete`、`uncertainties`、`verdict`
+  （固定 `NO_SAFE_CONCLUSION_AUTOMATIC_REPAIR_DISABLED`）、`db`、`ledger`、`eventProjection`、
+  `relations`、`redis`、`note`。
+- `db`：`video_status` 的 `rowPresent` 与八项 `Long` 计数。统计行不存在时计数为 `null` 并加入
+  `DB_STATUS_ROW_MISSING`，**不按 0 处理**。
+- `ledger`：`cap=limit+1`；status0/1/2/3 四个状态分别独立封顶计数，并有独立
+  `status0Capped`…`status3Capped`；任一状态达到 cap 时该状态只是下界，汇总 `truncated=true`。
+  不能把四个状态相加当作历史账本总量或 DB 真值。
+- `eventProjection`：`requestedLimit`、`rowCount`、`truncated`、`indexAvailable`、
+  `deltaByType`（BigInteger 汇总，包含全部安全事件类型键）、`unknownTypeCount`、
+  `nullDeltaCount`、`unknownTypeDelta`、`minEventId`、`maxEventId`。最多读取 `limit+1` 行，
+  第 `limit+1` 行只用于判断截断，不进入汇总；截断时只是窗口下界。
+  缺 `(vid,id)` 索引时只跳过该昂贵投影：`indexAvailable=false`、窗口为空、
+  `uncertainties` 含 `INDEX_MISSING`、`incomplete=true`；其它有界 SQL 仍执行。
+- `relations`：`sampled`、`truncated`、`lowerBound`、`usableForConclusion`、`sampledRows`、
+  `likedRows`、`unlikedRows`、`coinSum`、`collectRows`。达到 cap 即截断，数值只是下界且
+  `usableForConclusion=false`。
+- `redis`：`status` 为 `SAMPLED`、`NOT_SAMPLED_OR_MISSING`、`INCOMPLETE_FIELDS`、
+  `INVALID_COUNTER` 或 `READ_FAILED`，并返回八项计数与 `invalidFields`。只有 `SAMPLED` 时计数
+  非空；字段缺失、非 canonical 非负十进制 Long、溢出或读取异常时计数统一为 `null`，
+  **绝不伪造 0**。Redis 读取异常被捕获为 `READ_FAILED` + `REDIS_READ_FAILED` 不确定项，
+  接口仍返回诊断结果。
+- `incomplete=true` 的常见原因：DB 统计行缺失、任一面截断、索引缺失、未知事件类型/null delta、
+  关系不可用或 Redis 非 `SAMPLED`。
+- 成功响应不代表对账通过或已收敛：DB、账本、事件窗口、关系真值和 Redis 是分别读取的
+  非原子观测；本接口不写 MySQL/Redis、不自动修复、不创建/重放事件。未处理的数据库异常按
+  全局规则包装为 HTTP 500；不存在的索引不是 500，而是上述 incomplete 诊断。

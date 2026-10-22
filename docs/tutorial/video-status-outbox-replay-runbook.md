@@ -5,10 +5,12 @@
 >
 > 适用范围：**单个** `video_status_outbox` 事件、`status = 3 (FAILED)`、且能证明安全重放的情况。
 >
-> **这不是完整 T10。** 已实现：单个 FAILED 事件的安全只读查询 + 受审计重放到 PENDING。
+> **这不是完整 T10。** 本工具提供：单个 FAILED 事件的安全只读查询 + 受审计重放到 PENDING。
+> T10 第一阶段另已合入失败分页/详情/预检查、受审计确认已阅和只读对账（非本 runbook，见
+> `video-status-failure-admin.md` / `video-status-reconciliation.md`）。
 > 明确**未实现**（仍属 T10）：DLQ 分页查询/重放、`video_status_consumed_event.process_status = 3`
-> （REPAIR_REQUIRED）修复、对账（业务真值 / 事件账本 / DB 基线 / Redis 派生值）、人工确认忽略、
-> 批量处置、`status 0/1` 的人工干预。遇到这些情况本工具会**拒绝**并给出原因，不会偷偷改状态。
+> （REPAIR_REQUIRED）受控重放、批量处置/自动修复、`status 0/1` 的人工干预。遇到这些情况本工具会
+> **拒绝**并给出原因，不会偷偷改状态；确认已阅不是忽略，也不改变目标。
 >
 > 本工具**不会**新建 eventId、不会改 payload/vid/type、不会写 `video_status` 或消费账本、不碰 Redis。
 
@@ -183,8 +185,8 @@ T07 聚焦验收（父代理 2026-10-22 独立复跑）：
 | Outbox FAILED 单个受审计重放 | ✅（本 runbook） |
 | FAILED / DLQ 分页查询与批量处置 | ❌ T10 |
 | 任何 consumed 记录（含 `process_status = 3`）修复 | ❌ T09/T10（本工具遇到任何 consumed 行直接拒绝） |
-| 对账与人工确认忽略 | ❌ T10 |
+| 对账与人工确认忽略 | ❌ 本工具；T10 第一阶段已提供只读对账与确认已阅，但完整处置/自动修复未完成 |
 | status 0/1 的人工干预 | ❌ 仍由自动投递/租约恢复负责 |
 
 因此：**不要**用本工具宣布 T10 完成；T07 的验收要点是“FAILED 在 T10 之前已有可执行、可审计的临时运维入口”，
-而不是“失败事件处置已闭环”。
+而不是“失败事件处置已闭环”。T10 整项仍未完成，DLQ 与 status3 受控重放尚未实现。

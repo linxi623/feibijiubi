@@ -196,4 +196,4 @@ yaml 配置**不是热更新**：修改 `status0-compensation-*` 后必须重启
   其中 8 个为真实隔离 IT，日志 `/tmp/t09-parent-final.log`。
 - 失败历史（保留）：早前验证曾用错开关导致目标测试被跳过；mapper 参数绑定/时区处理也曾失败，修正后才有上述结果。文档与日志不记录任何凭证。
 - preview 接口与响应字段见 `docs/api.md`；preview 固定返回 `evidenceStatus=EVIDENCE_UNKNOWN`，不访问 Redis。
-- 验收边界：以上为**测试环境验收，不是生产验收**，也不是真实进程崩溃/两 JVM 演练。无证据（unproven）重放模式仍受三闸门控制且默认关闭，不保证任意 Redis 数据丢失或 `current + processed` 同时丢失的安全；生产开关、容量与跨进程恢复仍交 T16。T10 进行中，独立工作树只有第一阶段 15 个单测候选且未合入，DLQ/对账整项未完成。
+- 验收边界：以上为**测试环境验收，不是生产验收**，也不是真实进程崩溃/两 JVM 演练。无证据（unproven）重放模式仍受三闸门控制且默认关闭，不保证任意 Redis 数据丢失或 `current + processed` 同时丢失的安全；生产开关、容量与跨进程恢复仍交 T16。T10 进行中：第一阶段失败诊断/确认已阅与只读对账已合入主分支 `6fc5e7f`（父代理 opt-in IT 121 tests、普通单测 416 tests 均通过），但 DLQ、consumed status3 受控重放和自动修复仍未实现，整项不勾选，也不是生产验收。
