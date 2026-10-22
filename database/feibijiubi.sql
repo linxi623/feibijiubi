@@ -281,6 +281,8 @@ CREATE TABLE video_status_outbox (
     PRIMARY KEY (id),
     UNIQUE KEY uk_video_status_outbox_event_id (event_id),
     KEY idx_video_status_outbox_poll (status, next_retry_at, sending_at, id),
+    -- T10：失败列表按 status + id 做有界 keyset 分页，见 database/migrations/t10-video-status-failure-admin-indexes.sql
+    KEY idx_video_status_outbox_status_id (status, id),
     -- T05：观测采样按 status 取真实最老（created_at 顺序），见 database/migrations/t05-video-status-observability-indexes.sql
     KEY idx_video_status_outbox_created (status, created_at, id),
     CONSTRAINT fk_video_status_outbox_vid
@@ -312,6 +314,10 @@ CREATE TABLE video_status_consumed_event (
     PRIMARY KEY (id),
     UNIQUE KEY uk_video_status_consumed_event_id (event_id),
     KEY idx_video_status_consumed_pending (process_status, vid, id),
+    -- T10：失败/诊断列表的单状态有界分页索引，见 database/migrations/t10-video-status-failure-admin-indexes.sql
+    KEY idx_video_status_consumed_status_id (process_status, id),
+    -- T10：单视频对账事件窗口，见 database/migrations/t10-video-status-reconciliation-indexes.sql
+    KEY idx_video_status_consumed_vid_id (vid, id),
     KEY idx_video_status_consumed_recovery (process_status, last_attempt_at, id),
     KEY idx_video_status_consumed_compensation (process_status, last_attempt_at, id),
     -- T05：观测采样按 process_status 取真实最老（consumed_at 顺序），见 database/migrations/t05-video-status-observability-indexes.sql

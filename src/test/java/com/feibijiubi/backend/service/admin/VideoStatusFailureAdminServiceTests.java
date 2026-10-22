@@ -44,6 +44,16 @@ class VideoStatusFailureAdminServiceTests {
         VideoStatusProperties properties = new VideoStatusProperties();
         properties.setConsumerRecoveryAutoReplayMaxAgeSeconds(600);
         service = new VideoStatusFailureAdminServiceImpl(mapper, properties, objectMapper);
+        when(mapper.selectIndexColumns(anyString(), anyString())).thenAnswer(invocation -> {
+            String index = invocation.getArgument(1);
+            if (VideoStatusFailureAdminServiceImpl.OUTBOX_FAILURE_LIST_INDEX.equals(index)) {
+                return List.of("status", "id");
+            }
+            if (VideoStatusFailureAdminServiceImpl.CONSUMED_FAILURE_LIST_INDEX.equals(index)) {
+                return List.of("process_status", "id");
+            }
+            return List.of();
+        });
     }
 
     @Test
@@ -165,7 +175,10 @@ class VideoStatusFailureAdminServiceTests {
 
     @Test
     void outboxAcknowledgeWritesOnlyCompletedAuditWithSameBeforeAndAfter() {
-        when(mapper.selectRepairLogByOperationId("op-1")).thenReturn(null);
+        when(mapper.selectRepairLogByOperationId("op-1")).thenReturn(null, completedAudit(
+                "op-1", "e12", "确认已阅并留待对账", "42", "OUTBOX", 3, 3, null, null,
+                LocalDateTime.of(2026, 1, 2, 3, 4, 5)));
+        when(mapper.selectRepairLogByOperationIdForUpdate("op-1")).thenReturn(null);
         when(mapper.selectFailedOutboxByEventIdForUpdate("e12"))
                 .thenReturn(outboxRow(12L, "e12", 10, 0, 0));
         when(mapper.insertCompletedRepairLog(any())).thenReturn(1);
@@ -175,6 +188,8 @@ class VideoStatusFailureAdminServiceTests {
 
         assertTrue(result.acknowledgedApplied());
         assertFalse(result.duplicate());
+        assertEquals(LocalDateTime.of(2026, 1, 2, 3, 4, 5), result.completedAt(),
+                "首次 completedAt 必须来自 DB 写入后回读，而不是 JVM now");
         assertEquals(3, result.statusBefore());
         assertEquals(3, result.statusAfter());
         assertNull(result.processStatusBefore());
@@ -200,7 +215,10 @@ class VideoStatusFailureAdminServiceTests {
 
     @Test
     void consumedStatus3AcknowledgeKeepsBeforeAndAfterEqual() {
-        when(mapper.selectRepairLogByOperationId("op-c3")).thenReturn(null);
+        when(mapper.selectRepairLogByOperationId("op-c3")).thenReturn(null, completedAudit(
+                "op-c3", "e13", "确认已阅 status3", "42", "CONSUMED", null, null, 3, 3,
+                LocalDateTime.of(2026, 1, 2, 3, 4, 6)));
+        when(mapper.selectRepairLogByOperationIdForUpdate("op-c3")).thenReturn(null);
         when(mapper.selectConsumedByEventIdForUpdate("e13"))
                 .thenReturn(consumedRow(13L, "e13", 3, LocalDateTime.now(), 30L));
         when(mapper.insertCompletedRepairLog(any())).thenReturn(1);
@@ -209,6 +227,7 @@ class VideoStatusFailureAdminServiceTests {
                 service.acknowledge("CONSUMED", "e13", "op-c3", "确认已阅 status3", "42");
 
         assertTrue(result.acknowledgedApplied());
+        assertEquals(LocalDateTime.of(2026, 1, 2, 3, 4, 6), result.completedAt());
         assertEquals(3, result.processStatusBefore());
         assertEquals(3, result.processStatusAfter());
         assertNull(result.statusBefore());
@@ -265,6 +284,45 @@ class VideoStatusFailureAdminServiceTests {
     }
 
     @Test
+    void sameTargetDuplicateOperationIsDetectedAfterTargetLockForConcurrentIdempotency() {
+        LocalDateTime completedAt = LocalDateTime.of(2026, 1, 2, 3, 4, 7);
+        when(mapper.selectRepairLogByOperationId("op-after-lock")).thenReturn(null);
+        when(mapper.selectFailedOutboxByEventIdForUpdate("e19"))
+                .thenReturn(outboxRow(19L, "e19", 10, 0, 0));
+        when(mapper.selectRepairLogByOperationIdForUpdate("op-after-lock"))
+                .thenReturn(existingAcknowledge("op-after-lock", "e19", "并发同一目标",
+                        "42", "OUTBOX", 3, 3, null, null, completedAt));
+
+        VideoStatusFailureAdminService.AcknowledgeResult result = service.acknowledge(
+                "OUTBOX", "e19", "op-after-lock", "并发同一目标", "42");
+
+        assertTrue(result.duplicate());
+        assertFalse(result.acknowledgedApplied());
+        assertEquals(completedAt, result.completedAt(),
+                "目标锁后命中的已完成审计必须返回 DB 中持久化的 completed_at");
+        verify(mapper).selectRepairLogByOperationIdForUpdate("op-after-lock");
+        verify(mapper, never()).insertCompletedRepairLog(any());
+    }
+
+    @Test
+    void sameOperationIdOnDifferentTargetAfterTargetLockIsRejectedAs409() {
+        when(mapper.selectRepairLogByOperationId("op-cross-target")).thenReturn(null);
+        when(mapper.selectFailedOutboxByEventIdForUpdate("e20"))
+                .thenReturn(outboxRow(20L, "e20", 10, 0, 0));
+        when(mapper.selectRepairLogByOperationIdForUpdate("op-cross-target"))
+                .thenReturn(existingAcknowledge("op-cross-target", "e21", "跨目标冲突",
+                        "42", "OUTBOX", 3, 3, null, null));
+
+        BusinessException conflict = assertThrows(BusinessException.class,
+                () -> service.acknowledge("OUTBOX", "e20", "op-cross-target",
+                        "跨目标冲突", "42"));
+
+        assertEquals(409, conflict.getCode(),
+                "不同目标复用同一 operationId 仍是明确 409 冲突");
+        verify(mapper, never()).insertCompletedRepairLog(any());
+    }
+
+    @Test
     void sameOperationIdWithDifferentReasonOrSourceIsRejected() {
         when(mapper.selectRepairLogByOperationId("op-3"))
                 .thenReturn(existingAcknowledge("op-3", "e17", "原原因", "42", "OUTBOX", 3, 3,
@@ -317,6 +375,35 @@ class VideoStatusFailureAdminServiceTests {
         verify(mapper, never()).selectFailedOutbox(anyLong(), anyInt());
     }
 
+    @Test
+    void missingOutboxFailureListIndexReturns503WithoutScanning() {
+        when(mapper.selectIndexColumns("video_status_outbox",
+                VideoStatusFailureAdminServiceImpl.OUTBOX_FAILURE_LIST_INDEX))
+                .thenReturn(List.of());
+
+        BusinessException missing = assertThrows(BusinessException.class,
+                () -> service.list("OUTBOX", 0L, 10));
+
+        assertEquals(503, missing.getCode());
+        assertTrue(missing.getMessage().contains(
+                VideoStatusFailureAdminServiceImpl.OUTBOX_FAILURE_LIST_INDEX));
+        verify(mapper, never()).selectFailedOutbox(anyLong(), anyInt());
+    }
+
+    @Test
+    void wrongConsumedFailureListIndexKeyOrderReturns503WithoutScanning() {
+        when(mapper.selectIndexColumns("video_status_consumed_event",
+                VideoStatusFailureAdminServiceImpl.CONSUMED_FAILURE_LIST_INDEX))
+                .thenReturn(List.of("id", "process_status"));
+
+        BusinessException wrongOrder = assertThrows(BusinessException.class,
+                () -> service.list("CONSUMED", 0L, 10));
+
+        assertEquals(503, wrongOrder.getCode());
+        assertTrue(wrongOrder.getMessage().contains("key 顺序"));
+        verify(mapper, never()).selectDiagnosableConsumed(anyLong(), anyInt());
+    }
+
     private static OutboxRow outboxRow(long id, String eventId, int retry, int lease, int confirm) {
         OutboxRow row = new OutboxRow();
         row.setId(id);
@@ -353,6 +440,23 @@ class VideoStatusFailureAdminServiceTests {
             String operationId, String eventId, String reason, String operator, String source,
             Integer statusBefore, Integer statusAfter, Integer processStatusBefore,
             Integer processStatusAfter) {
+        return existingAcknowledge(operationId, eventId, reason, operator, source,
+                statusBefore, statusAfter, processStatusBefore, processStatusAfter,
+                LocalDateTime.now().minusMinutes(1));
+    }
+
+    private VideoStatusConsumptionRepairLog completedAudit(
+            String operationId, String eventId, String reason, String operator, String source,
+            Integer statusBefore, Integer statusAfter, Integer processStatusBefore,
+            Integer processStatusAfter, LocalDateTime completedAt) {
+        return existingAcknowledge(operationId, eventId, reason, operator, source,
+                statusBefore, statusAfter, processStatusBefore, processStatusAfter, completedAt);
+    }
+
+    private VideoStatusConsumptionRepairLog existingAcknowledge(
+            String operationId, String eventId, String reason, String operator, String source,
+            Integer statusBefore, Integer statusAfter, Integer processStatusBefore,
+            Integer processStatusAfter, LocalDateTime completedAt) {
         try {
             VideoStatusConsumptionRepairLog log = new VideoStatusConsumptionRepairLog();
             log.setOperationId(operationId);
@@ -365,7 +469,7 @@ class VideoStatusFailureAdminServiceTests {
                     new VideoStatusFailureAdminServiceImpl.AcknowledgeAuditMetadata(
                             "T10_ACKNOWLEDGE_META_V1", source, statusBefore, statusAfter,
                             processStatusBefore, processStatusAfter)));
-            log.setCompletedAt(LocalDateTime.now().minusMinutes(1));
+            log.setCompletedAt(completedAt);
             return log;
         } catch (Exception e) {
             throw new IllegalStateException(e);

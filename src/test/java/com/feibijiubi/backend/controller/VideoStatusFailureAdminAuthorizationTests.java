@@ -3,7 +3,10 @@ package com.feibijiubi.backend.controller;
 import com.feibijiubi.backend.annotation.AdminOnly;
 import com.feibijiubi.backend.common.ApiResponse;
 import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.config.WebMvcConfig;
 import com.feibijiubi.backend.dto.VideoStatusFailureAcknowledgeDTO;
+import com.feibijiubi.backend.interceptor.AdminInterceptor;
+import com.feibijiubi.backend.interceptor.LoginInterceptor;
 import com.feibijiubi.backend.service.admin.VideoStatusFailureAdminService;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
@@ -17,6 +20,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.handler.MappedInterceptor;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -86,6 +91,43 @@ class VideoStatusFailureAdminAuthorizationTests {
                 assertEquals(ApiResponse.class, method.getReturnType(), method.getName());
             }
         }
+    }
+
+    @Test
+    void failureAdminPathsAreCoveredByLoginAndAdminInterceptorsInWebMvcConfig() throws Exception {
+        LoginInterceptor loginInterceptor = mock(LoginInterceptor.class);
+        AdminInterceptor adminInterceptor = mock(AdminInterceptor.class);
+        InterceptorRegistry registry = new InterceptorRegistry();
+
+        new WebMvcConfig(loginInterceptor, adminInterceptor).addInterceptors(registry);
+
+        Method getInterceptors = InterceptorRegistry.class.getDeclaredMethod("getInterceptors");
+        getInterceptors.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        List<Object> registrations = (List<Object>) getInterceptors.invoke(registry);
+
+        List<MappedInterceptor> mapped = registrations.stream()
+                .filter(MappedInterceptor.class::isInstance)
+                .map(MappedInterceptor.class::cast)
+                .toList();
+        assertTrue(mapped.stream()
+                        .filter(candidate -> candidate.getInterceptor() == adminInterceptor)
+                        .flatMap(candidate -> Arrays.stream(
+                                candidate.getIncludePathPatterns()))
+                        .anyMatch("/api/admin/**"::equals),
+                "失败事件接口必须经过 AdminInterceptor 的 /api/admin/** 路径");
+        assertTrue(mapped.stream()
+                        .filter(candidate -> candidate.getInterceptor() == loginInterceptor)
+                        .flatMap(candidate -> Arrays.stream(
+                                candidate.getIncludePathPatterns()))
+                        .anyMatch("/api/**"::equals),
+                "失败事件接口必须经过 LoginInterceptor 的 /api/** 登录路径");
+        assertFalse(mapped.stream()
+                        .filter(candidate -> candidate.getInterceptor() == loginInterceptor)
+                        .flatMap(candidate -> Arrays.stream(
+                                candidate.getExcludePathPatterns()))
+                        .anyMatch(pattern -> pattern.contains("video-status/failures")),
+                "失败事件接口不允许被加入登录排除列表");
     }
 
     @Test

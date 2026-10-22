@@ -12,7 +12,6 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -61,6 +60,14 @@ public class VideoStatusFailureAdminServiceImpl implements VideoStatusFailureAdm
     static final String PRECHECK_CONSUMED_STATUS0_EVIDENCE_UNKNOWN =
             "CONSUMED_STATUS0_EVIDENCE_UNKNOWN";
 
+    static final String OUTBOX_FAILURE_LIST_INDEX = "idx_video_status_outbox_status_id";
+    static final String CONSUMED_FAILURE_LIST_INDEX = "idx_video_status_consumed_status_id";
+    static final String FAILURE_LIST_MIGRATION_HINT =
+            "database/migrations/t10-video-status-failure-admin-indexes.sql";
+
+    private static final String OUTBOX_TABLE = "video_status_outbox";
+    private static final String CONSUMED_TABLE = "video_status_consumed_event";
+
     private static final int OUTBOX_FAILED = 3;
     private static final int OUTBOX_RETRY_BUDGET = 10;
     private static final int OUTBOX_LEASE_RECOVERY_BUDGET = 10;
@@ -77,6 +84,7 @@ public class VideoStatusFailureAdminServiceImpl implements VideoStatusFailureAdm
     public Page list(String source, long afterId, int limit) {
         String normalized = requireSource(source);
         requirePaging(afterId, limit);
+        requireFailureListIndex(normalized);
         List<FailureItem> items = new ArrayList<>();
         boolean hasMore;
         Long nextAfterId = null;
@@ -154,15 +162,7 @@ public class VideoStatusFailureAdminServiceImpl implements VideoStatusFailureAdm
         VideoStatusConsumptionRepairLog existing =
                 mapper.selectRepairLogByOperationId(operationId);
         if (existing != null) {
-            AcknowledgeAuditMetadata metadata = requireSameAcknowledgeOperation(
-                    existing, normalized, eventId, reason, operator);
-            return new AcknowledgeResult(existing.getOperationId(), existing.getAction(),
-                    metadata.source(), existing.getEventId(), existing.getOperator(),
-                    "COMPLETED", existing.getCompletedAt(), true, false,
-                    metadata.statusBefore(), metadata.statusAfter(),
-                    metadata.processStatusBefore(), metadata.processStatusAfter(),
-                    "operationId 已完成过，本次未重复写审计；确认已阅只是审计标记，"
-                            + "目标状态/计数/Redis 从未被本接口修改。");
+            return duplicateResult(existing, normalized, eventId, reason, operator);
         }
 
         Integer statusBefore = null;
@@ -197,6 +197,14 @@ public class VideoStatusFailureAdminServiceImpl implements VideoStatusFailureAdm
             processStatusAfter = row.getProcessStatus();
         }
 
+        // 目标行锁已持有后再次读取审计行：同目标同 operationId 的并发请求
+        // 会在前一个事务提交后看到已完成审计并幂等返回；不同目标同 operationId 仍 409。
+        VideoStatusConsumptionRepairLog existingAfterTargetLock =
+                mapper.selectRepairLogByOperationIdForUpdate(operationId);
+        if (existingAfterTargetLock != null) {
+            return duplicateResult(existingAfterTargetLock, normalized, eventId, reason, operator);
+        }
+
         VideoStatusConsumptionRepairLog log = new VideoStatusConsumptionRepairLog();
         log.setOperationId(operationId);
         log.setEventId(eventId);
@@ -218,11 +226,49 @@ public class VideoStatusFailureAdminServiceImpl implements VideoStatusFailureAdm
                     "审计写入影响行数异常（" + inserted + "），本次确认整体回滚");
         }
 
+        VideoStatusConsumptionRepairLog persisted =
+                mapper.selectRepairLogByOperationId(operationId);
+        if (persisted == null || persisted.getCompletedAt() == null) {
+            throw new BusinessException(500,
+                    "审计写入后无法读取 DB completed_at，本次确认整体回滚");
+        }
+
         return new AcknowledgeResult(operationId, ACTION_ACKNOWLEDGE_FAILURE, normalized, eventId,
-                operator, "COMPLETED", LocalDateTime.now(), false, true,
+                operator, "COMPLETED", persisted.getCompletedAt(), false, true,
                 statusBefore, statusAfter, processStatusBefore, processStatusAfter,
                 "已写入确认已阅审计；before/after 状态相同，未修改目标状态/计数/Redis，"
                         + "未删除 payload 或失败证据。该动作不是 status3 重放，也不是对账。");
+    }
+
+    private AcknowledgeResult duplicateResult(VideoStatusConsumptionRepairLog existing,
+                                              String source, String eventId,
+                                              String reason, String operator) {
+        AcknowledgeAuditMetadata metadata = requireSameAcknowledgeOperation(
+                existing, source, eventId, reason, operator);
+        return new AcknowledgeResult(existing.getOperationId(), existing.getAction(),
+                metadata.source(), existing.getEventId(), existing.getOperator(),
+                "COMPLETED", existing.getCompletedAt(), true, false,
+                metadata.statusBefore(), metadata.statusAfter(),
+                metadata.processStatusBefore(), metadata.processStatusAfter(),
+                "operationId 已完成过，本次未重复写审计；确认已阅只是审计标记，"
+                        + "目标状态/计数/Redis 从未被本接口修改。");
+    }
+
+    private void requireFailureListIndex(String source) {
+        boolean outbox = SOURCE_OUTBOX.equals(source);
+        String table = outbox ? OUTBOX_TABLE : CONSUMED_TABLE;
+        String indexName = outbox ? OUTBOX_FAILURE_LIST_INDEX : CONSUMED_FAILURE_LIST_INDEX;
+        List<String> expected = outbox
+                ? List.of("status", "id")
+                : List.of("process_status", "id");
+        List<String> actual = mapper.selectIndexColumns(table, indexName);
+        if (actual == null || !expected.equals(actual)) {
+            throw new BusinessException(503,
+                    "缺少 T10 失败列表所需索引 " + indexName + " " + expected
+                            + "（当前 key 顺序: " + actual + "）；请先执行 "
+                            + FAILURE_LIST_MIGRATION_HINT
+                            + "，未执行前拒绝扫描以避免无界查询");
+        }
     }
 
     private FailureItem outboxItem(OutboxRow row) {

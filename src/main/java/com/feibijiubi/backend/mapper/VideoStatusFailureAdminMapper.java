@@ -34,5 +34,11 @@ public interface VideoStatusFailureAdminMapper {
     VideoStatusConsumptionRepairLog selectRepairLogByOperationId(
             @Param("operationId") String operationId);
 
+    VideoStatusConsumptionRepairLog selectRepairLogByOperationIdForUpdate(
+            @Param("operationId") String operationId);
+
+    List<String> selectIndexColumns(@Param("tableName") String tableName,
+                                    @Param("indexName") String indexName);
+
     int insertCompletedRepairLog(VideoStatusConsumptionRepairLog log);
 }

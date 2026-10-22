@@ -198,6 +198,51 @@ class VideoStatusFailureAdminIsolatedTests {
     // ------------------------------------------------------- real mapper pagination
 
     @Test
+    void failureListIndexesExistInKeyOrderAndPaginationQueriesUseThem() {
+        assertEquals(List.of("status", "id"), jdbc.queryForList(
+                "SELECT column_name FROM information_schema.statistics "
+                        + "WHERE table_schema = DATABASE() AND table_name = 'video_status_outbox' "
+                        + "AND index_name = 'idx_video_status_outbox_status_id' "
+                        + "ORDER BY seq_in_index", String.class),
+                "outbox failure pagination requires (status, id) in that order");
+        assertEquals(List.of("process_status", "id"), jdbc.queryForList(
+                "SELECT column_name FROM information_schema.statistics "
+                        + "WHERE table_schema = DATABASE() "
+                        + "AND table_name = 'video_status_consumed_event' "
+                        + "AND index_name = 'idx_video_status_consumed_status_id' "
+                        + "ORDER BY seq_in_index", String.class),
+                "consumed failure pagination requires (process_status, id) in that order");
+
+        List<Map<String, Object>> outboxExplain = jdbc.queryForList(
+                "EXPLAIN SELECT id FROM video_status_outbox "
+                        + "FORCE INDEX (idx_video_status_outbox_status_id) "
+                        + "WHERE status = 3 AND id > 0 ORDER BY id LIMIT 21");
+        assertTrue(outboxExplain.stream()
+                        .filter(row -> "video_status_outbox".equals(row.get("table")))
+                        .allMatch(row -> "idx_video_status_outbox_status_id"
+                                .equals(row.get("key"))),
+                "outbox failure page must be a bounded (status, id) index range: "
+                        + outboxExplain);
+
+        List<Map<String, Object>> consumedExplain = jdbc.queryForList(
+                "EXPLAIN SELECT paged.* FROM ("
+                        + "(SELECT id FROM video_status_consumed_event "
+                        + "FORCE INDEX (idx_video_status_consumed_status_id) "
+                        + "WHERE process_status = 0 AND id > 0 ORDER BY id LIMIT 21) "
+                        + "UNION ALL "
+                        + "(SELECT id FROM video_status_consumed_event "
+                        + "FORCE INDEX (idx_video_status_consumed_status_id) "
+                        + "WHERE process_status = 3 AND id > 0 ORDER BY id LIMIT 21)"
+                        + ") paged ORDER BY paged.id LIMIT 21");
+        assertTrue(consumedExplain.stream()
+                        .filter(row -> "video_status_consumed_event".equals(row.get("table")))
+                        .allMatch(row -> "idx_video_status_consumed_status_id"
+                                .equals(row.get("key"))),
+                "both consumed single-status branches must use (process_status, id): "
+                        + consumedExplain);
+    }
+
+    @Test
     void outboxPaginationUsesRealKeysetMapperWithBoundedPageAndNextCursor() {
         long baseId = jdbc.queryForObject(
                 "SELECT COALESCE(MAX(id),0) FROM video_status_outbox", Long.class);
