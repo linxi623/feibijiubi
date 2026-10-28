@@ -1,6 +1,13 @@
 # 互动统计链路改进执行计划与 TODO
 
-> 状态：执行中；T01—T09 已验收并合入；T10 进行中（第一阶段失败诊断/确认已阅与只读对账已合入主分支 `6fc5e7f`，DLQ/consumed status3 受控重放/批量处置仍欠，整项未完成）；T11（dirty 恢复公平扫描与失败退避）已验收（按计划允许在 T06 后提前）。T07/T08/T09 为测试环境验收，不等于生产验收。仅表中已完成且有证据的项代表已实现能力；不代表批准生产上线。
+> 状态：执行中；T01—T09 已验收并合入；T10 进行中（第一阶段失败诊断/确认已阅与只读对账已合入主分支
+> `6fc5e7f`；T10-B1 consumed status3 单事件 proven-only 受控重放的窄范围用例已由父代理复跑通过，
+> 但 B1 仍为候选、T10 整项待验收；DLQ/批量处置仍欠，整项未完成）；T11（dirty 恢复公平扫描与失败退避）
+> 已验收（按计划允许在 T06 后提前）。T12（A/B/C1）、T13、T14-A、T14-S1、T14-S2 均为 2026-10-23/24 候选、未父验收，
+> T12/T13/T14 整项未完成。T14 的保留期与重放窗口政策已于 2026-10-23 批准，**起算点与归档存储已由本轮用户确认**
+> （见 T14 段），但**仍仅为决策、尚无实现**；T14-S1 落地了消费登记侧的 30 天绝对年龄拒绝候选，T14-S2 把同一
+> 固定上界接到 T07/T10-B1/T09 三个管理入口（均无归档/删除）。
+> T07/T08/T09 为测试环境验收，不等于生产验收。仅表中已完成且有证据的项代表已实现能力；不代表批准生产上线。
 >
 > 范围：互动入口 → Outbox → RabbitMQ → Redis → 消费事件 → 批量落库 → 重建/补偿。
 > 原则：先验证正确性，再补恢复闭环，再治理稳定性，最后优化吞吐。
@@ -36,13 +43,14 @@
 | [x] | 07 / T07 | P1 | 完善 Outbox 发布、回写、租约处理 | T06 | 已完成 | 95af60d；父代理 2026-10-22 全链路回归 `VideoStatusOutbox*Tests,VideoStatusIsolatedIntegrationTests,VideoStatusMetricsIsolatedTests,VideoStatusSchedulingRealFlowTests,VideoStatusDirtyRecoveryRealConvergenceTests`：87 tests，0 失败/错误，1 skipped（可选 benchmark），日志 `/tmp/improvement-main-regression3.log`；T07 单组 61 tests 0 失败/错误/跳过；测试环境验收 |
 | [x] | 08 / T08 | P1 | 消费重试退避、故障限速、ACK 边界 | T05、T07 | 已完成 | 0dd98ad/b846032/92eb8c1（候选 b796fc8）；候选父复验 22 tests，0 失败/错误，1 skipped，日志 `/tmp/t08-parent-final.log`；真实 10/30/120s TTL、容器 stop/start、Redis CLIENT PAUSE 120s（非进程/网络断连） |
 | [x] | 09 / T09 | P1 | 接通安全窗口内 status0 自动补偿 | T03、T07、T08 | 已完成（测试环境验收） | 主分支 `97c7357`；父代理 2026-10-22 实跑单测 356 tests，0 失败/错误，108 skipped（`/tmp/t09-main-unit.log`）；opt-in IT 62 tests，0 失败/错误，1 skipped（`/tmp/t09-main-it.log`）；候选 `aab1c64` 早前 43 tests 0 失败/错误/跳过（`/tmp/t09-parent-final.log`）；无证据模式保持受控/默认关，非生产验收 |
-| [ ] | 10 / T10 | P1 | DLQ/Outbox FAILED/status3 处置及对账闭环 | T05、T09 | 进行中（第一阶段已合入主分支 `6fc5e7f`） | 第一阶段失败分页/详情/预检查/受审计确认与单视频只读对账已合入；父代理 2026-10-22 实跑 opt-in IT 121 tests，0 失败/错误/跳过（`/tmp/improvement-t10-main-it.log`，含 T07 replay/T09 compensation），普通单测 416 tests，0 失败/错误，130 skipped（`/tmp/improvement-t10-main-final-unit.log`）；DLQ 摄入/处置、consumed status3 受控重放、批量操作和自动修复/收敛仍未实现，整项不勾选 |
+| [ ] | 10 / T10 | P1 | DLQ/Outbox FAILED/status3 处置及对账闭环 | T05、T09 | 进行中（第一阶段已合入主分支 `6fc5e7f`；T10-B1 窄范围用例父代理已复跑通过，B1 仍为候选、整项待验收） | 第一阶段失败分页/详情/预检查/受审计确认与单视频只读对账已合入；父代理 2026-10-22 实跑 opt-in IT 121 tests，0 失败/错误/跳过（`/tmp/improvement-t10-main-it.log`，含 T07 replay/T09 compensation），普通单测 416 tests，0 失败/错误，130 skipped（`/tmp/improvement-t10-main-final-unit.log`）；T10-B1 候选：父代理 2026-10-23 复跑窄范围单测 54 tests（含 `VideoStatusStatus3ReplayServiceTests` 26 例）与隔离 IT `VideoStatusStatus3ReplayIsolatedTests` 11 tests，均 0 失败/错误/跳过（`/tmp/t10b1-parent-unit.log`、`/tmp/t10b1-parent-it.log`），仍待最终裁定；DLQ 摄入/处置、刷库型 status3 修复、批量操作和自动修复/收敛仍未实现，整项不勾选 |
 | [x] | 11 / T11 | P1 | dirty 恢复公平扫描及失败退避 | T03、T05、T06 | 已完成 | be7d836；父代理 2026-10-22 实跑 `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusDirtyRecoveryRealConvergenceTests,VideoStatusDirtyRecoveryFairnessIsolatedTests' test`：3 tests，0 失败/错误/跳过，日志 `/tmp/t11-real-convergence.log`；真实 MySQL/Redis，专用头部 SADD 故障注入，四轮尾部获机会，最终 250 收敛且无 status3 |
-| [ ] | 12 / T12 | P2 | 有界重建、批量查询及受控强制修复 | T09、T10、T11 | 待开始 | — |
-| [ ] | 13 / T13 | P2 | 明确查询一致性、接实时读或保留 DB 读 | T02、T05、T12 | 待开始 | — |
-| [ ] | 14 / T14 | P2 | 事件归档、幂等保留与 Redis 容量治理 | T09、T10、T12 | 待开始 | — |
-| [ ] | 15 / T15 | P2 | 播放/分享防刷与业务幂等策略 | T04、T05 | 待开始 | — |
-| [ ] | 16 / T16 | P2 | 故障演练、端到端压测与分阶段上线 | 前述实施项验收；延期项须记录风险 | 待开始 | — |
+| [ ] | 12 / T12 | P2 | 有界重建、批量查询及受控强制修复 | T09、T10、T11 | 进行中（T12-A/T12-B 为 2026-10-23 候选且父代理已复跑验证；整项未验收） | T12-A 候选：重建分类只对 status0 候选按固定 256 条一批 pipeline `EXISTS` 查询 processed 证据，status1 不再查询；逐 key 顺序、重复 key 按出现次数计数，失败 fail closed 且无半初始化，锁/无 TTL 门闩/token release/初始化参数不变。T12-B 候选：重建候选改为 `load()` 同一 REPEATABLE_READ 只读事务内的 keyset 分页（`id > afterId`，每页 ≤1000，不用 OFFSET，`FORCE INDEX (vid,id)`），候选上界 `rebuild-max-candidates`（默认 100000）与快照读取预算 `rebuild-snapshot-budget-ms` 显式配置，超上限/超预算 `RetryableMessageException` 且不返回截断快照、无半初始化。父代理复跑：普通回归 497 tests（0 失败/错误，144 skipped，`/tmp/improvement-parent-unit-final.log`），隔离 31 tests（20 全链路 + 11 B1，0 失败/错误，1 skipped，`/tmp/improvement-parent-t12b-it.log`）；本轮补行级 id 校验（页内 id 必须存在且严格递增）、4 例分页用例与规模测量类后复验 504 tests（0 失败/错误，147 skipped，`/tmp/t12b-worker-unit.log`）与 `VideoStatusIsolatedIntegrationTests` 20 tests（0 失败/错误，1 skipped，`/tmp/t12b-worker-it.log`）。新增 opt-in `VideoStatusRebuildScaleIsolatedTests`（默认 skipped，`-DvideoStatusScale=true`）实测 0/1,000/100,000 候选各 3 次冷重建：100,000 → 5.3–9.6 s（三轮 9 个样本）、391 次 pipeline/100,000 条 EXISTS 逻辑命令、heap 池峰值增量 131–241 MiB（上界近似），预设 oracle 不漏不重；恢复轮以受限堆 `-DargLine=-Xms64m -Xmx512m` 串行复跑分页单测 16 tests 与规模类 3 tests，均 0 失败/错误（`/tmp/t12-scale-recovery.log`）；单机单 JVM、3 样本、P95 仅诊断，**不是性能验收**（`/tmp/t12-scale-full.log`）。部署硬依赖：上线前必须先执行 `t10-video-status-reconciliation-indexes.sql`，缺索引时重建失败并重试/DLQ；超候选上限同样重试/DLQ，无自动修复，需运维处置。历史并发用例间歇错误（2 errors）未定位未修复，本轮两次隔离运行均通过但不得写成已解决。T12-C1 候选（2026-10-23，**内部原语，未开放**）：新增 `video-status-replace.lua` + `RedisScriptConfig#videoStatusReplaceScript`，keys/args 同 init 但只允许“current 已存在且完整”时覆盖，拒绝码覆盖门闩/冷 miss/类型/TTL/未知字段/损坏取值/vid 不一致，校验全在写之前；三条写（HSET/SADD/ZADD）各自 pcall 返回阶段码，**不承诺回滚**；不 DEL current、不改 processed、不释放门闩、`pending=false` 不 SREM。无 HTTP/Java 入口、无自动调用；强制重建权限/审计/并发协调、崩溃恢复、完整性校验与生产容量验收仍未实现 |
+| [ ] | 13 / T13 | P2 | 明确查询一致性、接实时读或保留 DB 读 | T02、T05、T12 | 进行中（模式 B 候选，2026-10-23，未父验收；T13 不勾选） | 选 B：面向用户统计读继续以 MySQL 为唯一来源，不接 Redis 实时读、不在 read miss 同步重建；核查详情/Feed/获赞数/管理员详情读源，逐接口记录“缺行”语义差异；延迟为最终一致、无健康 SLA（正常量级约 1～2 s 由配置推算，10/30/120 s 重试与堆积可到分钟级；T05 15 s 采样、120 s 最老待处理、30 s 心跳仅为诊断阈值）；热榜 ZSet 三处写入、零读取，延期保留并记录成本；新增 `VideoStatusReadConsistencyTests` 14 例，普通回归 542 tests 0 失败/错误、171 skipped（`/tmp/t13-unit-worker.log`，受限堆串行、排除 `BackendApplicationTests`）；无 HTTP/迁移/协议变更。**2026-10-28 收口修复（仍为候选、不勾选）**：更正“`getByVid` 是唯一 Redis 统计读”的错误表述——管理端单视频只读对账 `VideoStatusReconciliationServiceImpl#readRedisSample` 也采样 `current`（只读诊断，不构成用户读入口，`getByVid` 仍无调用方）；补管理员详情 2 例（8 项精确透传含 `2^53+1` 与 `Long.MAX_VALUE`、缺行 `404 视频状态为空` 且不查作者/粉丝），定向串行 **24 tests，0 失败/错误/跳过**（末次 `-o` 离线，`/tmp/t13-fix-target-unit2-A3BgFA.log`（同轮首跑 `/tmp/t13-fix-target-unit-E1ZD6a.log` 结果相同），未重跑整包回归，未改生产 Java） |
+| [ ] | 14 / T14 | P2 | 事件归档、幂等保留与 Redis 容量治理 | T09、T10、T12 | 进行中（T14-A 只读容量核查 + 归档 dry-run 候选，2026-10-23；T14-S1 消费登记侧 30 天绝对年龄拒绝候选，2026-10-24；T14-S2 同一固定上界接入 T07/T10-B1/T09 三个管理入口候选，2026-10-24（同日审查修复轮：T09 parse 失败分支改为 withinSafeWindow=false + 白名单原因码，定向 94 tests，`/tmp/t14-s2-review-fix.log`）；均未父验收；T14 整项未完成） | T14-A 候选（**测试作用域、只读、无清理**）：`src/test/.../service/video/capacity/` 三个工具类 + `VideoStatusCapacityAuditIsolatedTests` 8 例 opt-in + 纯单测 11 + 2 例。可测数据=`information_schema` 体积估算（不 `COUNT(*)`）+ Redis `INFO memory`/`CONFIG GET`/`DBSIZE` + 有界 `SCAN`/`MEMORY USAGE` processed 抽样；终态 dry-run 只列 id/时间/状态，`FORCE INDEX` + 时间窗 + `LIMIT`，缺索引/访问路径不符报 `NOT_EVALUABLE` 不降级全表扫描；status0/1/3 与 FAILED 永不列，**终态也一律 `NOT_AUTHORIZED_FOR_DELETION`**（保留期政策已批准但归档/删除/30 天守卫均无实现、无归档成功校验与旧消息硬拒绝/去重墓碑，processed TTL 不是删除证据）；数据不足一律 UNKNOWN 不回落 0。普通回归 **563 tests，0 失败/错误，179 skipped**；隔离 8 tests，0 失败/错误/跳过；无 HTTP/schema/迁移变更。**未完成**：保留期与重放窗口政策已于 2026-10-23 批准（成功终态在线 90 天 + 归档副本 275 天；DLQ 30 天处置 SLA，非 TTL、未解决不自动删除；审计 365 天；普通重放窗口 30 天，超期转人工核查；30 天内不放宽 T07/T09/T10 守卫；T15 两表不纳入），**起算点与归档存储已由本轮用户确认**（在线 90 天从 `sent_at`/`flushed_at` 终态完成起算、非创建/接收时间；归档 275 天从归档副本校验成功起算、非创建时间，归档延后则实际总保留可超过 365 天；审计 365 天从审计行创建起算；DLQ 30 天 SLA 从首次入死信队列起算、重投不重置、未解决不自动删除；独立私有 COS 归档桶，完整性+记录数校验通过才允许删在线数据，开发阶段仅隔离测试存储），但归档、删除与 30 天守卫**均无实现**，去重墓碑、限速分页断点续跑归档、归档中断重跑与重放不重复计数演练、索引/锁影响验证仍欠（字段缺口：`sent_at` 为 JVM 时钟且 `sent_at`/`flushed_at` 无索引，DLQ 首次入队时间与归档校验记录不存在，见 `docs/tutorial/video-status-capacity-audit.md` §9.2）；T14 不勾选 |
+| [ ] | 15 / T15 | P2 | 播放/分享防刷与业务幂等策略 | T04、T05 | 进行中（第一阶段 DB 核心 + 第二阶段 HTTP 接线/Redis 准入为 2026-10-23 候选；30 天有界清理为本轮候选（默认关闭、未运行隔离用例）；均已接线/落地但未父验收、未上线，不勾选） | 新增 `video_interaction_request`（全局唯一、`request_key` 大小写敏感 `utf8mb4_bin`、state/event_id/时间）与 `video_interaction_window`（actor_type+actor_hash+vid+action 唯一、`last_counted_at` 可 NULL = 从未计数）两表 + 幂等迁移 `database/migrations/t15-video-interaction-idempotency.sql`（只新增表，不改/不删既有行，镜像 `database/feibijiubi.sql`）；新增 `VideoInteractionService#record` 事务服务：事务外幂等读重放 → 同事务占位 INSERT → 窗口 ODKU 保证行 → `FOR UPDATE` → DB `NOW(3)` 守卫更新（`last_counted_at IS NULL OR <= NOW-30min`）→ 获准才计数（异步复用既有 `createEvent` 拿 eventId / 同步复用 `increasePlayTimes`/`increaseShareTimes` 守卫更新）→ 终态 CAS；抑制零写不推进窗口；并发同 `requestKey` 靠唯一键冲突让尝试事务整体回滚后在事务外读赢家，`record()` 断言不得在已有事务中调用。第一阶段证据（历史）：`VideoInteractionServiceTests` 25 例、隔离 7+7 例、普通回归 613 tests/194 skipped（`/tmp/t15-unit-full2.log`）。**第二阶段（已接线）**：`play-count`/`share` 必填 `Idempotency-Key`（1..64 安全字符、大小写敏感），匿名必填 `X-Visitor-Id`（canonical UUID），返回 `{counted,duplicate,reason}`；准入顺序 参数校验 → 身份解析 → 视频校验（`PublishedVideoGuard`）→ 只读重放（不碰 Redis）→ Redis 两维固定窗口（60 s；单动作 60、合计 120，`app.video-interaction.*`，超限 429 统一文案，Redis 异常 503 fail-closed）→ `record`；旧签名已删除且无重载。已批准决策：两个头强制、缺失/非法 400、不兼容旧客户端且无兼容窗口；视频下架/删除后同一 `requestKey` 重试返回 404（视频校验先于重放）；匿名身份为客户端随机 UUID（可随时更换，故只约束合作客户端）、不新增身份机制；30 分钟窗口不可配置；额度在事务前消耗、DB 失败不退。证据：普通回归 666 tests，0 失败/错误，200 skipped（`/tmp/t15b-unit-full.log`）；定向单测 72 tests（`/tmp/t15b-target-unit3.log`：HttpMapping 7 + ActorResolver 7 + Admission 17 + RateLimit 9 + Service 32）；准入隔离 6 tests（`/tmp/t15b-admission-it4.log`）、第一阶段隔离回归 20 tests（`/tmp/t15b-regression-it1.log`）、维护演练 1 例（`/tmp/t15b-drill-maintenance.log`）。**仍未绿/未做**：隔离套件最近一次完整运行 `VideoStatusIsolatedIntegrationTests` 20 tests 有 1 failure（`concurrentFlushAndConsumptionPreserveAllEvents`，历史并发用例、不经过 T15 入口、根因未定位未修复，不得写成已解决或整组全绿，`/tmp/t15b-drill-it2.log`）；**T15 30 天有界清理（本轮候选，默认关闭，未运行隔离用例）**：保留期固定为常量（request 自 `completed_at` 起 30 天、window 连续 30 天无计数），**没有** `retention-days` 配置；`cleanup-enabled=false`（默认关闭，服务内二次判断）、`cleanup-batch-size=500`（启动校验 1..5000）、`cleanup-fixed-delay-ms=60000`（校验正数）；独立单线程 `ThreadPoolTaskScheduler`（线程池 bean `videoInteractionCleanupTaskScheduler`，与 `@Component` 组件 bean
+`videoInteractionCleanupScheduler` 不同名）与 T06 投递/落库/恢复/补偿链路隔离；每轮 state=1/state=2/window 各一批，先非锁定选 id 再按主键**重复时间+状态守卫**删除（避免范围删除的 next-key 锁），空 id 集合 `WHERE 1 = 0` fail closed，候选超批/非法 id 在删除前失败，服务拒绝在已有事务中运行（各 mapper 独立提交），时间阈值一律由 SQL 计算（`NOW(3)`，不新增 JVM 时钟阈值；DB 时钟/会话时区风险仍在）；迁移 `database/migrations/t15-video-interaction-cleanup-indexes.sql`（`(state,completed_at,id)` / `(last_counted_at,id)`，镜像 `database/feibijiubi.sql`）是开启硬前置：两条候选查询带 `FORCE INDEX`，缺索引明确报 1176 而不是静默全表扫描。禁止 PENDING/`completed_at IS NULL`/`last_counted_at IS NULL`，不碰 outbox/consumed/Redis 证据，无新 HTTP 接口。语义改为“记录还在即重放、记录被删后同一 requestKey 按新请求处理（仍受 30 分钟窗口）”，清理不是 30 天到点 TTL。证据：定向纯单测 **33 tests，0 失败/错误/跳过**（`VideoInteractionCleanupServiceTests` 19 + `VideoInteractionCleanupContractTests` 9 + `VideoInteractionCleanupRetentionTests` 2 + `VideoInteractionCleanupSchedulingWiringTests` 3，`/tmp/t15-cleanup-target2-unit.log`）；普通回归 **744 tests，0 失败/错误，214 skipped**（`/tmp/t15-cleanup-wiring-full.log`，其中 `VideoInteractionCleanupIsolatedTests` 13 例整体 skip）。**未运行**任何隔离 IT/scale/容器/DB/Redis/迁移，opt-in `VideoInteractionCleanupIsolatedTests` 只编译；生产死锁重试、容量/压测、服务端下发/签名访客标识、旧客户端兼容窗口、生产防刷验收仍欠；两表清理不使用 T14 的 90/275 天政策。T15 仍未验收、不勾选。教程 `docs/tutorial/video-interaction-idempotency.md`（§12 为本切片） |
+| [ ] | 16 / T16 | P2 | 故障演练、端到端压测与分阶段上线 | 前述实施项验收；延期项须记录风险 | T16-B0 同步准入测试环境基线已测；整项未完成 | 用户本轮限定为测试环境基线，不做生产验收。父代理 2026-10-25 实跑 `VideoInteractionAdmissionBaselineIsolatedTests`：3 tests，0 failures/errors/skipped，日志 `/tmp/t16-b0-parent-baseline.log`。单视频/十视频各200次同步计数，100次重放，预热排除，非HTTP/无MQ/非异步端到端；未删除或迁移数据。详见 `video-interaction-test-baseline.md`，不得重复成功测量冒充新证据；故障、并发容量及上线未验收 |
 
 执行默认按表中顺序推进，每项单独提交。依赖不是“必须全做完才允许修一个小问题”：T04 可在 T01 后作为独立小补丁提前交付，T11 可在 T06 后提前交付，但必须记录调整原因。不得为了吞吐提前跳过 T02/T03。
 
@@ -257,6 +265,137 @@ docker compose -f compose.test.yaml stop
 
 **验收**：分别在 0/1,000/100,000 候选规模测试，结果不漏不重；报告峰值内存、Redis 往返、P95 重建时间与门闩持续时间；Redis 查询不再每条独立 RTT；旧 owner 不能覆盖新结果；中途失败无半初始化；超过预算可诊断且后续能接管。
 
+**T12-A 紧耦合小切片（2026-10-23，候选，未父验收）**
+
+- 已实现：`VideoStatusRebuildServiceImpl#classifyConfirmedPending` 按快照顺序以固定 256 条一批
+  （`PROCESSED_EVIDENCE_BATCH_SIZE`）切分；每批只为 `process_status=0` 候选构造本批 key 并调用
+  `RedisUtils.hasKeys`，一次 pipeline `EXISTS` 取回逐 key 结果，按位置回填。`process_status=1`
+  已确认应用，不再发起任何 Redis 查询。批内没有 status0 候选时不发请求；不构造全量候选 key 集合。
+- fail closed：`hasKeys` 对 null 返回、条数不符、非布尔/非 0-1 元素抛 `RedisOperationException`；
+  分类路径额外拒绝 null 元素（未知不等于“未应用”）。异常发生在 `initializeRedis` 之前，
+  因此不发布半份初始化，`finally` 仍用同一 token 释放门闩；vid 锁、无 TTL 门闩、token-owned
+  release 与初始化脚本 keys/args 形状全部不变。
+- 明确未做：`selectRebuildCandidates` 仍一次全量加载该 vid 的 0/1 候选（无分页/流式/水位协议；
+  这一点已由下面的 T12-B 候选替换为 keyset 分页）；
+  0/1,000/100,000 规模的内存、Redis 往返次数、P95 重建与门闩持续时间未测量；超预算中止与告警、
+  “已存在但错误”的强制重建（管理员权限/审计/并发协调）与任何重建 HTTP 接口均未实现。
+  任意 Redis 数据丢失、进程崩溃与生产容量仍不在本切片保证范围。
+- 证据：`VideoStatusRebuildProcessedEvidenceTests` 9 例（0 候选、仅 status1、混合状态、600 候选跨
+  256 边界、跨批重复 key、Redis 异常、返回长度异常、null 结果、门闩/初始化协议顺序与形状）；
+  `RedisUtilsTests` 新增 8 例 pipeline 用例；隔离用例
+  `VideoStatusIsolatedIntegrationTests#rebuildCountsProcessedEvidenceAcrossBatchBoundary` 用真实
+  MySQL/Redis 验证 300 条 status0（跨批次）+ 40 条 status1（重建前删除 processed key）得到
+  `100 + 40 + 180 = 320` 且事件状态不变。普通单测 `474 tests, 0 failures/errors, 142 skipped`。
+  这些只是候选证据，T12 整项仍不能勾选。
+
+  时间线澄清（保留历史汇总，不互相覆盖）：T12-A 当时确实只新增了 **8 例** `RedisUtilsTests`
+  pipeline 用例；后续加固（T12-B 同一窗口）又补了 **4 例**严格回复类型用例（只接受整型 0/1，
+  拒绝小数/NaN/超范围整数/未知类型），所以该类当前累计 12 例新增 pipeline 用例。
+  “8 例”是 T12-A 切片的历史数字，不应改成 12；“12 例”是当前类总数，两个数字并存。
+
+**T12-B 紧耦合小切片（2026-10-23，父已复跑验证，T12 整项未验收）**
+
+- 已实现：`selectRebuildCandidates(vid)`（无 LIMIT 全量加载）替换为
+  `selectRebuildCandidatesAfter(vid, afterId, limit)`；`VideoStatusRebuildSnapshotServiceImpl#load`
+  在**同一个** `@Transactional(readOnly=true, isolation=REPEATABLE_READ)` 内先读基线、再按
+  `id > afterId` 逐页读到空页/短页，页大小 `rebuild-candidate-page-size`（默认 1000，
+  上限 `MAX_REBUILD_CANDIDATE_PAGE_SIZE=1000`），不使用 OFFSET。基线与所有页共享同一份
+  InnoDB 一致性快照，分页不跨事务。
+- SQL 显式 `FORCE INDEX (idx_video_status_consumed_vid_id)`。不加提示时优化器选
+  `idx_video_status_consumed_pending` 的两个 `process_status` 区间 + `Using filesort`，
+  每页都要重读该 vid 的全部候选（实测同一 vid 300 条候选、`LIMIT 100`：无提示读 300 条索引项
+  并排序，加提示只读 140 条）。该 `(vid,id)` 索引由 T10 对账迁移提供并在 `database/feibijiubi.sql`
+  镜像，**本切片无新迁移**；索引缺失时查询报错而不是静默全表扫。
+- 候选仍返回当前 DTO list，因此上界是 `rebuild-max-candidates + 1` 条（默认 100000），
+  **不是常数内存**。超过上界抛 `RetryableMessageException`，绝不返回截断快照；页大于请求大小、
+  返回 null、游标不前进同样失败。快照读取预算 `rebuild-snapshot-budget-ms`（默认 10000）用
+  `System.nanoTime()` 在页间与逐条转换前检查，超预算失败但**不中断已发出的 SQL**。
+- 不变：vid 锁、无 TTL 门闩、`finally` 同 token 释放、初始化脚本 keys/args、T12-A processed
+  证据批次、计数聚合与 processed 状态语义。两个新失败点都在 `initializeRedis` 之前，
+  因此无半初始化，下一次重建用新 owner token 接管。
+- 未做：“已存在但错误”的强制重建（权限/审计/并发协调）、重建 HTTP 接口、deadlock 专项、
+  跨批水位协议、生产容量/性能验收。0/1,000/100,000 规模本轮已用 opt-in 测量类跑出诊断数字
+  （见下），但每规模 3 样本、单机单 JVM，不构成验收，也不外推到生产。
+- 证据：`VideoStatusRebuildSnapshotPagingTests` 16 例（0 条、恰好跨页、整倍数页、上限=成功/上限+1
+  失败、游标严格前进、游标不前进、超页大小、null 页、末行缺 id、页内 id 未严格递增、
+  第二页超页大小、页间/转换期间超预算、RR 注解、不可变列表）；
+  `VideoStatusRebuildProcessedEvidenceTests` 新增“快照失败无初始化+下次接管”；
+  `VideoStatusRuntimePropertiesContextTests` 新增三键绑定/默认值/非法值；
+  `VideoStatusIsolatedIntegrationTests#rebuildPagedCandidatesMatchBaselineInsideOneRepeatableReadSnapshot`
+  （1000 条候选、另一线程在第一页后提交一条新候选，证明两页同连接同 RR 快照且并发行不可见）与
+  `#rebuildOverCandidateLimitPublishesNothingAndNextAttemptTakesOver`（超上限无半初始化、门闩释放、
+  下次接管成功）为真实 MySQL/Redis 用例。普通单测 `497 tests, 0 failures/errors, 144 skipped`
+  （`/tmp/t12b-unit-final.log`）；`VideoStatusIsolatedIntegrationTests` 全类 `20 tests, 0 failures/errors,
+  1 skipped`（`/tmp/t12b-it-class-final.log`）。教程：`docs/tutorial/video-status-rebuild-paging.md`。
+  这些只是候选证据，T12 整项仍不能勾选，也不是生产验收。
+- 父代理复跑（2026-10-23）：普通回归 `./mvnw '-Dtest=*Tests,!BackendApplicationTests' test`
+  **497 tests，0 失败/错误，144 skipped**（`/tmp/improvement-parent-unit-final.log`）；
+  opt-in 隔离 `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusIsolatedIntegrationTests,VideoStatusStatus3ReplayIsolatedTests' test`
+  **31 tests，0 失败/错误，1 skipped**（20 例全链路 + 11 例 B1，`/tmp/improvement-parent-t12b-it.log`）。
+  本轮再补行级 id 校验（页内每行 id 必须存在且严格递增）、4 例分页用例与规模测量类后复验：
+  普通回归 **504 tests，0 失败/错误，147 skipped**（`/tmp/t12b-worker-unit.log`）；
+  `VideoStatusIsolatedIntegrationTests` **20 tests，0 失败/错误，1 skipped**（`/tmp/t12b-worker-it.log`）。
+- 历史并发问题保留：T10-B1 记录过的两个并发用例
+  （`concurrentColdStartAndDuplicateDeliveryConverge`、`concurrentFlushAndConsumptionPreserveAllEvents`）
+  曾报 2 errors，而父代理本轮与本轮复验的隔离运行均通过。这是**间歇性**问题，根因未定位、未修复，
+  不因本轮通过而写成“已解决”，历史记录也不删除。
+- 部署硬依赖：T12-B 上线前必须先执行 `database/migrations/t10-video-status-reconciliation-indexes.sql`。
+  `selectRebuildCandidatesAfter` 的 `FORCE INDEX (idx_video_status_consumed_vid_id)` 让该索引从
+  “T10 对账更快”变成“冷缓存重建的硬依赖”：缺索引时 MySQL 直接报 1176，重建在 `initializeRedis`
+  之前失败（无半份 current，门闩由 `finally` 释放），消费链路把它当 `DataAccessException` 重试→DLQ。
+  候选超 `rebuild-max-candidates` 同样重试→DLQ，**没有自动修复**：不自动截断、不自动提高上限，
+  也没有强制重建入口，必须运维按错误信息停写/调配置并重启。
+- 规模测量（新增 opt-in `VideoStatusRebuildScaleIsolatedTests`，默认 skipped，`-DvideoStatusScale=true`）：
+  0/1,000/100,000 候选各 3 次冷重建，预设 oracle（`current = 100 + 候选数`，并交叉核对 DB 行数、
+  去重 eventId、`SUM(delta)`、其余七计数为 0、事件状态未变）每次重复都断言。实测
+  （`/tmp/t12-scale-full.log`，52.98 s）：0 → 18/18/22 ms；1,000 → 164/190/379 ms，4 次 pipeline /
+  1,000 条 EXISTS；100,000 → 7,789/8,143/9,649 ms，391 次 pipeline / 100,000 条 EXISTS。门闩持有与
+  重建耗时几乎相同。恢复轮在受限堆（`-DargLine=-Xms64m -Xmx512m`）下串行复跑，0 → 17/19/24 ms，
+  1,000 → 179/184/405 ms，100,000 → 5,349/5,609/6,152 ms，仍是 391 次 pipeline / 100,000 条 EXISTS
+  （`/tmp/t12-scale-recovery.log`，43.76 s，0 失败/错误），三轮 100,000 的 9 个样本落在 5.3–9.6 s。
+  pipeline 次数严格等于 `ceil(候选数/256)`。**限制**：单机单 JVM、无并发/故障注入、
+  每规模 3 样本（P95 仅诊断，输出 `p95=n/a`）；测量把读取预算放宽到 1 小时，heap 池峰值之和只是
+  上界近似（不是候选 retained size）。**风险**：默认 `rebuild-snapshot-budget-ms=10000` 与默认 100000
+  上限同一量级，接近上限规模的冷重建可能触碰预算；未在默认预算下跑 100,000，故不断言必然失败，
+  生产前必须按实际规模/硬件重估。
+
+**T12-C1 受控替换内部原语（2026-10-23，候选，未开放、未父验收）**
+
+- 新增 `src/main/resources/lua/video-status-replace.lua` 与 `RedisScriptConfig#videoStatusReplaceScript`
+  （`DefaultRedisScript<String>`），keys/args 形状与 `video-status-init.lua` 完全一致，但语义相反：
+  init 要求 `current` **不存在**，replace 只允许 `current` **已存在且完整**（冷 miss 返回
+  `CURRENT_MISSING`，绝不顺手初始化）。
+- 校验顺序固定为：门闩 token → current 类型 → dirty/hot 类型 → current 无 TTL → vid → hot 有限
+  → 八计数 canonical 且 ≤ `Long.MAX` → `hasPending` → 已有字段集合 → 已有取值 → vid 一致。
+  拒绝码：`STALE_REBUILD`、`CURRENT_MISSING`、`INVALID_REDIS_TYPE`、`CURRENT_HAS_TTL`、
+  `INVALID_ARGUMENT`、`COUNTER_OUT_OF_RANGE`、`UNEXPECTED_FIELDS`、`CURRENT_INVALID_VALUE`、
+  `VID_MISMATCH`。**所有校验都在第一条写命令之前，任何拒绝都是零写入。**
+- 未知字段不用 `HKEYS`（无界）：先 `HLEN` 与固定上限 9 比较，再对九个已知字段逐个 `HGET`，
+  命令数固定为 10。已有取值也必须是合法 current（vid 非零、八计数 canonical ≤ `Long.MAX`），
+  否则 `CURRENT_INVALID_VALUE`——覆盖已损坏的 Hash 只会把损坏洗白。
+- 写入：一次 `HSET` 写九个字段 → 仅 `hasPending=true` 时 `SADD dirty`（`false` **不** `SREM`，
+  保守保留脏标记）→ `ZADD hot`。三条写各自 `pcall` 包裹，失败返回阶段码
+  `REPLACE_HSET_FAILED` / `REPLACE_DIRTY_FAILED` / `REPLACE_HOT_FAILED`，成功返回 `REPLACED`。
+  **不承诺回滚**：Lua 串行执行不等于事务，运行时错误（noeviction OOM、ACL 拒绝、实例故障）下
+  前序阶段可能已写入，阶段码表达“执行到哪一步、哪一步未知”；也不用“读回相等”证明执行成功。
+- 不做：不 `DEL` current、不改 `processed` 幂等 key 及其 TTL、不释放门闩（仍由调用方同 token 释放，
+  旧 token 永远 `STALE_REBUILD`）；无 unproven 模式、无放宽开关。
+- **未开放**：没有 HTTP 入口、没有 Java 业务调用者、没有注册自动调用（`grep videoStatusReplaceScript`
+  只命中配置类）。强制重建仍需管理员权限、审计表/幂等 operationId、与 vid 锁/门闩/批量刷库的
+  并发协调，以及崩溃后“已替换一半”的处置流程；完整性校验（与 MySQL 基线/事件账本对账）也不在本原语内。
+- 证据：opt-in `VideoStatusReplaceLuaIsolatedTests` **24 tests，0 失败/错误/跳过**
+  （`/tmp/t12c1-replace-it2.log`，真实 Redis 16379，脚本经 `RedisScriptConfig` bean 执行）覆盖正常替换
+  九字段+hot、`pending=false` 不 `SREM` 且不动其它 vid、processed 与 TTL 不变、冷 miss/类型/TTL/
+  未知字段/缺失字段/损坏取值/旧 owner/缺门闩/vid 不一致/非法参数、`Long.MAX` 与 `2^53+1` 精确、
+  `Long.MAX+1` 越界，以及 ACL 只对专用临时用户禁用 `HSET`/`SADD`/`ZADD` 的**真实运行时部分失败**
+  （分别验证阶段码与“Hash 已写、dirty 未写、hot 未写”的既成事实）。普通回归
+  `528 tests，0 失败/错误，171 skipped`（`/tmp/t12c1-unit3.log`，较上轮 504/147 正好多出本类 24 例 skip）。
+  教程：`docs/tutorial/video-status-replace-primitive.md`。
+- 测试环境注意：本机 JDK 21 下 Mockito inline mock maker 需要 `-Djdk.attach.allowAttachSelf=true`，
+  否则 ByteBuddy 的外部进程 attach 在内存/提交受限时失败，整轮回归会误报大量
+  `Could not initialize plugin: interface org.mockito.plugins.MockMaker`（与被测代码无关）。
+- **T12 仍不能勾选**：强制重建入口（权限/审计/并发协调）、崩溃恢复、完整性校验与生产容量验收仍缺。
+
 ### T13：读路径与热榜取舍
 
 **步骤**
@@ -267,11 +406,104 @@ docker compose -f compose.test.yaml stop
 
 **验收**：所选模式有 API/产品说明；正常、miss、Redis 故障、损坏字段、重建中各有测试；不会解析失败返回虚假 0；降级时延有界；热榜保留有明确消费者或明确成本理由。
 
+**T13 模式 B 决策（2026-10-23，候选，未父验收）**
+
+- **决策**：在计划允许的 A/B 中选 **B**。面向用户的统计读继续以 MySQL `video_status` 为唯一来源；
+  不引入 Redis 实时读，不在 read miss 同步触发重建，不为读路径放宽 DB 错误守卫，也不为“测试覆盖
+  Redis”给读路径新增 Redis 调用。因此“Redis 查询未接线”是本决策结论，不是未完成 bug；要改成 A
+  必须先有新的书面决定，并为 miss / 坏字段 / 重建门闩 / Redis 超时四种状态定义读语义。
+- **读源证据（代码核查）**：`GET /api/videos/{vid}` → `VideoStatusMapper#selectByVid`（单行，
+  7 项计数，无 `unlikeTimes`）；`GET /api/videos/feed` → `VideoMapper#selectFeed`（`video ⋈ video_status` 同一条 SQL 投影，
+  只有 `playTimes`/`commentTimes`，无逐条补查）；`loveCount` →
+  `VideoStatusMapper#countLikeByUid`（`COALESCE(SUM(like_times),0)`）；管理员详情 →
+  `selectByVid`（8 项，不做可见性过滤）。四个入口都不含任何 Redis/Redisson 依赖，测试用反射把这
+  一点固定住，因此 `current` 的 miss/损坏/门闩/故障在用户可见链路上不可达。
+  Redis `current` 的读取方**不止一个**，因此不再有“唯一的 Redis 统计读”这种说法：
+  `VideoStatusServiceImpl#getByVid` 是**无调用方**的只读门面（miss 回落 DB 且不回填、不取锁、
+  不重建；坏字段抛 `VideoStatusCounterRangeException`；Redis 故障抛 `RedisOperationException`
+  不回落 DB、不返回 0；不读门闩），不能叫“用户读入口”；另一个读取方是管理端单视频只读对账
+  `VideoStatusReconciliationServiceImpl#readRedisSample`（一次 `multiGet` 采样八个字段做诊断，
+  不写 Redis/MySQL、不领租约、不改事件状态，输出不进入任何用户可见统计响应）。
+- **口径差异（已逐接口写入 `docs/api.md`）**：详情=已过审+未删除（私密仅作者），缺行 `500
+  视频统计数据异常`；Feed=已过审+公开+未删除，缺行时整条被 JOIN 丢弃（不显示 0）；`loveCount`
+  只聚合已过审+公开+未删除视频的 `like_times`，不减 `unlike_times`，空集为 0；管理员详情不筛
+  可见性，缺行 `404 视频状态为空`。`unlike_times` 只累计、无用户可见读接口。
+- **延迟**：最终一致，**无健康时延 SLA**。正常量级“约 1～2 秒”由配置推算
+  （`outbox-fixed-delay-ms=1000` + `flush-fixed-delay-ms=500` + 处理），不是实测分布；失败重试
+  10/30/120 s、`round-budget-ms` 预算内堆积会把延迟推到分钟级。T05 的 15 s 采样、
+  `PENDING_ALERT_AGE_MILLIS=120 s`、`SCHEDULER_ALERT_AGE_MILLIS=30 s` 只是诊断阈值，不是保证。
+- **热榜 ZSet 延期保留**：`feed:hot:videos:v1` 有三处写入（`video-status-increment.lua` 每次应用
+  事件 `ZINCRBY`、`video-status-init.lua` 重建 `ZADD`、未开放的 `video-status-replace.lua` 替换
+  `ZADD`）、**零处读取**；无 TTL、删除视频不 `ZREM`、累计加权分无时间衰减；内存是 O(视频数) 而
+  非 O(事件数)。当前用户可见收益为 0，保留只为“不动统计协议”；接入或删除需独立变更，先定义
+  排序/衰减、删除、历史热度重建与分页。
+- **测试证据**：新增 `VideoStatusReadConsistencyTests` **16 例**（纯 Mockito）：详情/Feed/获赞
+  正常值（含 3e9、9e9 精确）、统计行缺失（详情 `500 视频统计数据异常`、Feed 由 JOIN 丢弃）、
+  `DataAccessResourceFailureException` 透传（不返回 0/空页）；管理员详情 2 例（2026-10-28 补）：
+  8 项计数逐项精确透传（`playTimes=2^53+1=9007199254740993`、`likeTimes=Long.MAX_VALUE`，私密视频
+  也照样返回，证明服务层不做可见性过滤；SQL 无可见性条件由源码核查确认，不属于此 mock 测试的证明范围），以及统计行缺失时 `404 视频状态为空` 且 `userMapper`/
+  `userFollowMapper` 零交互、`countVideoByUid` 从未调用；结构守卫（三个读服务不声明
+  Redis/Redisson 依赖）；`getByVid` miss（回落 DB、不回填、不取锁、不重建）、门闩不被读取、坏字段
+  显式异常且不 fail-open 到 DB、Redis 故障透传；VO 字段面（详情 7 项、Feed 2 项、无 `unlikeTimes`）
+  与 Mapper XML 单个 `<select>` 块的 SQL 口径断言。既有 `VideoStatusCounterReadTests` 8 例继续覆盖
+  命中/坏字段/vid 不匹配/miss，本项不重复改写成空测试。2026-10-28 定向收口运行（受限堆串行，
+  `-DvideoStatusIT=false -DvideoStatusScale=false -DvideoStatusBaseline=false`）：
+  `VideoStatusReadConsistencyTests,VideoStatusCounterReadTests` = **24 tests，0 失败/错误，0 skipped**
+  （末次 `-o` 离线，`/tmp/t13-fix-target-unit2-A3BgFA.log`，同轮首跑 `/tmp/t13-fix-target-unit-E1ZD6a.log` 结果相同；`MAVEN_OPTS='-Xms64m -Xmx256m'`、
+  `argLine='-Xms64m -Xmx512m -Djdk.attach.allowAttachSelf=true'`，未启动隔离 compose 环境，未跑
+  `BackendApplicationTests`）。首版记录的普通回归 542 tests 为 2026-10-23 历史数字，本轮未重跑，
+  不作为当前证据。
+- **未做**：真实 HTTP 端到端 DB 可见延迟实测、生产容量、热榜读取/删除、`unlike_times` 用户可见读、
+  `getByVid` 接线；用户详情 500 与管理员详情 404 的文案差异按原样保留（改文案会改线上返回值）。
+  **T13 仍是候选、不能勾选**；T12（强制重建/生产容量）与 T10（DLQ/批量）的未完成项不因本决策改变。
+- 教程：`docs/tutorial/video-status-read-consistency.md`。
+- 关联记录：父代理复跑 T12-C1 窄范围用例
+  `./mvnw -DvideoStatusIT=true -Dtest=VideoStatusReplaceLuaIsolatedTests test`（实际
+  `argLine=-Xms64m -Xmx512m -Djdk.attach.allowAttachSelf=true` 受限堆）= **24 tests，0 失败/错误/
+  跳过**（`/tmp/t12c1-parent-it.log`）。这只是原语本身的窄范围验证，**不是 T12 验收**。
+
 ### T14：归档与容量治理
+
+**已批准政策（2026-10-23，用户批准；仅为决策，尚未实现）**：成功终态 Outbox（`SENT=2`）与消费账本
+（`FLUSHED=2`）在线保留 **90 天**，归档副本再保留 **275 天**（两段**起算点不同**，见下：只在归档不延迟时才近似“合计 365 天”，
+归档延后时实际总保留更长，**不得**写成从事件创建固定 365 天）；DLQ **30 天内必须处置**
+（处理 SLA，**不是 TTL**，未解决不自动删除、不配置自动过期）；操作审计保留 **365 天**；最大**普通**事件
+重放窗口为事件发生后 **30 天**，超过转人工核查并拒绝普通重放；30 天以内仍须满足全部现有 age、
+`processed` TTL 与证据守卫，T07/T09/T10 的拒绝条件一条都不放宽。T15 的 `video_interaction_request` /
+`video_interaction_window` **不纳入**本政策（它们的保留期由 T15 自己的 30 天清理切片单独决定，见 T15 行：
+request 自 `completed_at` 起 30 天、window 连续 30 天无计数，默认关闭，不是 TTL）；旧的"同一 `requestKey`
+永不重复计数"表述已被 T15 决策**取代**为"记录还在即重放，记录被清理后同一 `requestKey` 按新请求处理、
+仍受 30 分钟窗口约束"。**政策已批准、起算点已确认但无实现**：没有归档执行器、没有删除代码，30 天新守卫只有消费登记侧候选切片
+（T14-S1），T14-A dry-run 依旧 `NOT_AUTHORIZED_FOR_DELETION`。**本轮用户确认的起算点与存储**（未新增日历日期）：在线 90 天从终态完成起算——
+Outbox 用 `sent_at`（发布 confirm 成功后回写），消费账本用 `flushed_at`（批量落库事务内写入），**不是** `created_at` /
+`consumed_at`；归档副本 275 天从**归档副本校验成功**起算（不是事件创建时间，也不从“在线 90 天结束”自动顺延，
+归档延后时实际总保留可超过 365 天）；审计 365 天从**审计行创建**（`created_at`）起算；DLQ 30 天 SLA 从**首次进入
+死信队列**起算，**重投不重置、未解决不自动删除**；归档落在**独立私有 COS 归档桶**，只有**文件完整性 + 记录数量
+校验通过**才允许删除在线数据，**开发阶段只允许隔离测试存储**。
+
+**字段核查结论（只读源码/schema，详见 `docs/tutorial/video-status-capacity-audit.md` §9.2）**：`sent_at` / `flushed_at`
+都存在且语义正确，但 `sent_at` 写的是 **JVM 时钟**（`markSent` 传入 `LocalDateTime.now()`），两列**都没有索引**
+（现有是 `(status, created_at, id)` / `(process_status, consumed_at, id)`）；`flushed_at` 在 T10-B1 重放（`resetRepairToReceived`）
+会被清空，只能表示“最近一次落库完成”；**DLQ 首次入队时间完全不存在**（只有 durable 队列，无消费者、无 DB 表）；
+**归档校验记录完全不存在**；`FileStorageService` 只能同桶操作、只能判存在、写不了 manifest，**不适合**归档。
+**终态时间缺失的历史行不能猜成 `created_at`/`consumed_at`、不能回填伪时间，只能保守排除自动删除。**
+
+**下一步最小可测试切片（建议、待父审，本轮不实现）**：S1 = 30 天旧消息拒绝的入口全覆盖（单一窗口判定被消费应用、
+T07 Outbox 重放、T10-B1 status3 重放、T09 status0 补偿重发四处共用；注意消费侧现有唯一年龄守卫只在**重复/重投路径**
+`handleReceived`、基准是 `consumed_at` 且**依赖账本行存在**，首次登记/首次应用无守卫，所以新守卫必须独立于账本行存在性；
+**relay 不新增拒绝**）。**S1 现状（2026-10-24）：消费登记（T14-S1）与三个管理入口（T14-S2）均已落地候选切片，
+relay 与自动重放/恢复路径仍不拒绝。** 原建议“30 天必须按严格小于 processed TTL 落地”**已被父决策推翻**：
+该守卫是纯事件年龄上限、从不读 `processed` 证据，与 `redisEventTtlDays` 无先后约束。S2 = 归档时间字段 + 校验记录（下一轮才建
+`(status, sent_at, id)` / `(process_status, flushed_at, id)` 索引与归档记录表，只做“可证明”，**不做执行器**）。
+**命名提示**：本文件的“S2（归档时间字段）”与父代理本轮交付的 **T14-S2（30 天守卫接入三个管理入口）**
+**不是**同一件事；归档侧 S2 仍未实现。
+
+**生产清理前置（必须先实现并验收）**：旧消息硬拒绝或去重墓碑、仅终态、安全归档确认、限速分页断点重跑、归档后重放
+旧消息不重复计数（含 30 天重放守卫本身）的演练与索引/锁影响验证。
 
 **步骤**
 - 估算日事件量 × 行/索引大小、processed key 数量 × 保留天数及 Redis 实测字节数。
-- 先确定最大重放窗口、DLQ 保留和审计期限，再确定清理策略。
+- 最大重放窗口、DLQ 处理时限与审计期限已按上述政策确定；下一步是把它们落成可验收的实现，而不是继续等决策。
 - 仅清理安全终态且满足保留窗口的数据；status0/1/3 与待处置 FAILED 不随普通历史数据清理。
 - 若删除消费记录，必须保留足够的去重证据，或明确拒绝过期旧消息；“processed 还有 TTL”不是删除 DB 幂等证据的充分条件。
 - 小批清理/归档、断点续跑、限速，验证索引与在线查询锁影响。
@@ -287,6 +519,137 @@ docker compose -f compose.test.yaml stop
 - 点赞/收藏/投币维持现有行锁、唯一键、余额守卫；不要替换成只有 Redis 去重。
 
 **验收**：同一访问在定义窗口内重试只生成规定数量的事件，窗口外按规则计数；并发请求不能绕过限制；超限返回统一业务响应；限流 Redis 故障时的 fail-open/fail-closed 行为明确并有测试；合理流量不会被整站阻断。
+
+**已交付：T15 第一阶段 DB 核心（2026-10-23 候选；第二阶段已接线，整项仍未验收、未上线、不勾选）**
+
+> 本小节是**第一阶段历史记录**（保留原文），当前事实与第二阶段证据见下一小节。
+
+- 产品语义（已批准）：同一 actor 对同一 vid 的同一动作，**滚动 30 分钟**内最多计一次；同一
+  `requestKey` **永远只计一次**（重复提交重放原结果，含“被抑制”这个结果）；抑制不推进窗口；
+  ⚠️ “永远只计一次”已被本节末尾的 **T15 30 天有界清理**决策取代：记录还在即重放，记录被清理后
+  同一 `requestKey` 按新请求处理（仍受 30 分钟窗口约束）。本条保留为第一阶段历史原文。
+  匿名 actor 用**随机 UUID 而非指纹**，DB 只存 `actor_type` + 规范化 64 hex `actor_hash`。
+- 表：`video_interaction_request`（`request_key` 列级 `utf8mb4_bin` 保证大小写敏感的唯一键、
+  state `0 PENDING/1 COUNTED/2 SUPPRESSED`、`event_id`、时间）与 `video_interaction_window`
+  （`actor_type+actor_hash+vid+action` 唯一、`last_counted_at` **可 NULL = 从未计数**）。
+  迁移 `database/migrations/t15-video-interaction-idempotency.sql` 幂等、只新增表，
+  不 `ALTER`/`UPDATE`/`DELETE` 既有行；已镜像到 `database/feibijiubi.sql`。
+- 流程：事务外幂等读（命中重放 / 形状冲突 409）→ 同一事务内 INSERT 占位 → 窗口 ODKU
+  保证行（自赋值，绝不初始化 `last_counted_at`）→ `SELECT ... FOR UPDATE` → DB `NOW(3)`
+  守卫更新（`last_counted_at IS NULL OR <= NOW(3)-30min`，1 行=获准、0 行=抑制且零写）→
+  获准才计数（异步复用既有 `createEvent` 并保存其 eventId；同步复用既有 `increasePlayTimes`/
+  `increaseShareTimes` 守卫更新）→ 终态 CAS。四步同一事务提交。
+- 并发同 `requestKey`：唯一键冲突让本次尝试事务**整体回滚**，回滚后在事务外读赢家并重放；
+  禁止在回调里捕获后继续使用 rollback-only 事务。`record()` 显式断言**不得在已有事务中调用**。
+- 证据：单测 `VideoInteractionServiceTests`（第一阶段 25 例，第二阶段补齐后 32 例，恢复轮修复后 33 例）；opt-in 隔离 `VideoInteractionIsolatedTests`
+  7 例（异步，含 Outbox 触发器故障整事务回滚）与 `VideoInteractionSyncIsolatedTests` 7 例
+  （同步，含 `Long.MAX` 计数失败整事务回滚、`requestKey` 大小写敏感）；第一阶段普通回归 613 tests，
+  0 失败/错误，194 skipped（`/tmp/t15-unit-full2.log`；当前工作区为 666/200，见下一小节）。
+- 第一阶段遗留的“明确未做”清单（无 HTTP 接口/无调用方、无身份解析、无 Redis 接线、无超限统一响应）
+  **已被第二阶段实现**，其余未做项见下一小节。
+
+**已交付：T15 第二阶段 HTTP 接线 + Redis 准入（2026-10-23 候选，未父验收、未上线，T15 不勾选）**
+
+- 入口：`POST /api/videos/{vid}/play-count` 与 `/share`（`UserVideoController`）保持 `@OptionalLogin`，
+  新增必填 `Idempotency-Key`（`[A-Za-z0-9._:-]{1,64}`，大小写敏感）与匿名必填 `X-Visitor-Id`（canonical UUID），
+  返回 `ApiResponse<VideoInteractionVO>{counted,duplicate,reason}`；两个头在 Controller 上故意 `required=false`，
+  由服务层给明确 400（否则 `MissingRequestHeaderException` 会退化成 500）。
+  旧签名 `UserVideoService#increasePlayCount(Integer)` / `#increaseShare(Integer)` **已删除且无重载**，
+  新签名带 `currentUserId, vid, requestKey, visitorId`，只委派准入、不加 `@Transactional`。
+- 准入编排 `VideoInteractionAdmissionServiceImpl`（固定顺序）：参数校验（`VideoInteractionValidation`）→
+  身份解析（`VideoInteractionActorResolver`：登录优先、域分离 SHA-256、不采集 IP/UA/指纹）→
+  视频校验（`PublishedVideoGuard#requirePublishedPlayable`，400/404/500，与点赞/投币/收藏/进度同一份规则）→
+  **只读重放查询（不碰 Redis）** → Redis 准入 → `record`。
+- Redis 准入 `VideoInteractionRateLimitServiceImpl` 复用 `lua/fixed-window-rate-limit.lua`，同一 actor 两维
+  （单动作默认 60 次/60 s、合计默认 120 次/60 s；`app.video-interaction.*` 启动期校验，`application.yml` 无条目）；
+  超限 429 单一文案 `操作过于频繁，请稍后再试`；脚本 `null`/负数/异常 → 503（fail-closed）。
+- 已批准并落地的决策：两个头**强制**、缺失/非法 400、**不兼容旧客户端且无兼容窗口**；
+  视频校验先于重放（视频下架/删除后同一 `requestKey` 重试返回 **404**）；匿名身份用客户端随机 UUID、
+  不新增身份机制；30 分钟窗口不可配置。
+- 证据（均来自已有日志，本轮未复跑）：普通回归 **666 tests，0 失败/错误，200 skipped，BUILD SUCCESS**
+  （`/tmp/t15b-unit-full.log`，`Tests run` 第 14129 行）；定向单测 **72 tests，0 失败/错误**
+  （`/tmp/t15b-target-unit3.log`，HttpMapping 7 + ActorResolver 7 + Admission 17 + RateLimit 9 + Service 32）；
+  opt-in 准入隔离 `VideoInteractionAdmissionIsolatedTests` **6 tests，0 失败/错误/跳过**
+  （`/tmp/t15b-admission-it4.log`）；第一阶段隔离回归 20 tests，0 失败/错误
+  （`/tmp/t15b-regression-it1.log`）；维护演练 1 例通过（`/tmp/t15b-drill-maintenance.log`，
+  演练入口 `countOnePlay()` 每次随机访客 + 随机 `requestKey`）。
+- **仍未绿/未做**：隔离套件最近一次完整运行 `VideoStatusIsolatedIntegrationTests` **20 tests，1 failure，
+  1 skipped，BUILD FAILURE**（`/tmp/t15b-drill-it2.log`，`concurrentFlushAndConsumptionPreserveAllEvents`
+  `condition did not converge in 30 seconds`）——历史并发用例、不经过 T15 入口、根因未定位未修复，
+  不得写成已解决或“整组全绿”。仍欠：
+  生产死锁重试、容量/压测、服务端下发/签名访客标识、旧客户端兼容窗口、任何生产防刷验收
+  （两表保留期/清理已由下一小节交付为**默认关闭的候选**，未运行隔离用例，仍不是 T14 的 90/275 天政策）。
+  恢复轮修正：唯一键冲突后读不到赢家返回 500，避免误报请求冲突 409，事务仍回滚；
+  `VideoInteractionServiceTests` 定向实跑 33 tests，0 failures/errors/skipped（`/tmp/t15-resume-service-unit.log`），
+  包含 Outbox 冲突回滚用例；未重跑全量或隔离演练，不改变历史并发失败与未验收结论。
+  教程：`docs/tutorial/video-interaction-idempotency.md`（§11 为第二阶段当前事实）。
+
+**已交付：T15 30 天有界清理（本轮候选，默认关闭，未运行隔离用例，T15 仍不勾选）**
+
+- 保留期已由用户确认并写死为常量（**不可配置**）：`video_interaction_request` 终态行自 `completed_at`
+  起 30 天；`video_interaction_window` 连续 30 天无计数。做成配置项就能配 0 天，窗口行每轮被删、30 分钟
+  限计被静默绕过，因此**没有** `retention-days` 键。
+- 语义变更：记录还在 → 同一 `requestKey` 重放历史结果；记录已被清理 → 同一 `requestKey` 按新请求处理、
+  仍受 30 分钟窗口约束。清理**默认关闭**且按批推进，**不是** 30 天到点 TTL（31 天前的行在下一轮读到它之前
+  仍会重放）。
+- 旋钮（`app.video-interaction.*`，`application.yml` 无条目即默认值）：`cleanup-enabled=false`、
+  `cleanup-batch-size=500`（启动校验 1..5000）、`cleanup-fixed-delay-ms=60000`（校验正数）。独立单线程
+  `ThreadPoolTaskScheduler`（**bean `videoInteractionCleanupTaskScheduler`**，与 `@Component` 调度组件
+  `videoInteractionCleanupScheduler` **不同名**——同名会让 Spring Boot 关闭 bean 覆盖时启动失败；线程前缀
+  `video-interaction-cleanup-`，5 s 有界停机）与 T06 投递/落库/恢复/补偿链路隔离，并由
+  `VideoInteractionCleanupSchedulingWiringTests` 在真实 Spring 上下文（`allow-bean-definition-overriding=false`）
+  里钉住两个 bean 的类型与 `@Scheduled` 引用。
+- `VideoInteractionCleanupServiceImpl#cleanupOnce` 每轮三批（state=1 / state=2 / 空闲窗口），每批最多
+  `cleanup-batch-size`：非锁定选 id → **按主键等值删并重复时间+状态守卫**（候选读与删除之间没有事务，
+  守卫是“不删刚推进的窗口行”的唯一防线）→ 不开显式事务（各 mapper 独立提交），服务拒绝在已有事务中运行。
+  空 id 集合 `WHERE 1 = 0` fail closed；候选超批/`null`/非正 id 在删除前失败；时间阈值一律由 SQL 计算
+  （`NOW(3)`，不新增 JVM 时钟阈值；DB 时钟/会话时区风险仍在）；
+  `timeout=3` 只是语句超时意图，**不承诺**硬 3 秒截止；**也不保证**优化器访问路径与锁足迹
+  （间隙锁/next-key、锁等待时长），那必须用真实 MySQL 的 `EXPLAIN`/锁观测实测，本轮未运行 IT、无实测数据。
+- 永不清理：已提交 PENDING、`completed_at IS NULL` 的终态行、`last_counted_at IS NULL` 的窗口行。不碰
+  `video_status` / Outbox / 消费账本 / Redis（含 `processed`），无新 HTTP 接口、无分布式锁、无游标水位。
+- 迁移 `database/migrations/t15-video-interaction-cleanup-indexes.sql`（幂等，只加索引，镜像
+  `database/feibijiubi.sql`）是开启清理的**硬前置**：`(state, completed_at, id)` 与
+  `(last_counted_at, id)`；两条候选查询带 `FORCE INDEX`，缺索引时 MySQL 报 1176、清理可见失败，不降级
+  全表扫描；`state` 必须单值查询（`IN (1,2)` 会引入全局 filesort，`LIMIT` 提前终止失效）。
+- 证据（本轮实跑，受限堆串行，`-DvideoStatusIT=false -DvideoStatusScale=false`）：定向纯单测 **33 tests，
+  0 失败/错误/跳过**（`VideoInteractionCleanupServiceTests` 19 + `VideoInteractionCleanupContractTests` 9 +
+  `VideoInteractionCleanupRetentionTests` 2 + `VideoInteractionCleanupSchedulingWiringTests` 3，
+  `/tmp/t15-cleanup-target2-unit.log`；调度装配单独 `/tmp/t15-cleanup-wiring-unit.log`）；普通回归 **744 tests，
+  0 失败/错误，214 skipped**（`/tmp/t15-cleanup-wiring-full.log`，其中 opt-in `VideoInteractionCleanupIsolatedTests`
+  13 例整体 skip）。**未运行**任何隔离 IT/scale/容器/DB/Redis/迁移/删除；opt-in 隔离类（过期/新鲜/NULL/PENDING
+  矩阵、删窗口后首次计数+第二次抑制、29 天重放 vs 删除后同键变新请求、选 id→推进时间→删 0 行、真实行锁交错、
+  批有界收敛、重跑幂等、`EXPLAIN` 命中索引、不碰统计账本）**只编译**。因为生产清理全局扫描、无法限定 vid，
+  该类每轮清理前先检查“是否存在不是本类造出的过期候选行”，存在即失败退出、不删未知测试数据。
+- **调度 bean 同名阻塞修复轮（父审查发现，本轮修复）**：`@Component VideoInteractionCleanupScheduler` 的默认 bean 名
+  `videoInteractionCleanupScheduler` 与线程池 `@Bean(name=...)` 曾同名；Spring Boot 默认
+  `allow-bean-definition-overriding=false`，应用会在启动时抛 `BeanDefinitionOverrideException`（reviewer 与单测都
+  看不见）。修复：线程池 bean 改为 `videoInteractionCleanupTaskScheduler`（常量 `CLEANUP_TASK_SCHEDULER_BEAN` 与
+  `@Bean` 方法名同步），`@Component` 组件保留原名；新增无 DB、无完整应用的**真实 Spring 上下文回归**
+  `VideoInteractionCleanupSchedulingWiringTests`（3 例，显式关闭 bean 覆盖）：验证两个 bean 的类型/名称/唯一性、
+  `@Scheduled(scheduler=...)` 引用可解析、缺线程池 bean 时 refresh 必须失败并点名。把常量临时改回同名后该测试实测
+  以 `BeanDefinitionOverrideException` 失败（已还原），证明它能抓住这个阻塞。同时把实现类 javadoc 的
+  “不为额外间隙负责”改为“**不保证**优化器访问路径/锁足迹，须真实 MySQL 实测”，并去掉未运行 IT 却写“已钉住”的表述。
+  修复后定向纯单测 **33 tests**（`/tmp/t15-cleanup-target2-unit.log`）、普通回归 **744 tests，0 失败/错误，214 skipped**
+  （`/tmp/t15-cleanup-wiring-full.log`）。父代理此前复跑的 63 tests（`/tmp/t15-cleanup-parent-unit.log`）不验证启动，
+  不作为修复后证据；隔离 IT 仍只编译未运行。
+- **审查修复轮（同轮，另跑纯单测）**：① 隔离类 `@AfterEach` 不再调用全局 `cleanupOnce()`（那会在 foreign guard
+  拒绝后照样执行、把刚拒绝的别人的过期行删掉），改为只用本次跟踪的 id 集合走 `deleteExpiredRequestsByIds` /
+  `deleteIdleWindowsByIds`（同样带时间/状态守卫，一次语句删完，无 `LIMIT`、无轮次）；跟踪完整性由 foreign guard
+  兜底（任何未跟踪的过期候选都算外来数据），并加**源码文本契约** `isolatedTeardownDeletesOnlyOwnTrackedIdsAndNeverRunsGlobalCleanup`
+  防止有人把收尾改回全局清理；② 两个“先选候选再推进时间”的确定性用例补上 `assertOnlyOwnExpiredCandidates()`，
+  避免外来过期行把 3 行候选页挤掉而报成误异；③ `VideoInteractionService` 接口把“永远只计一次”改为“记录保留期内
+  只计一次”，并给 `lookupReplay` 补“重放以请求行仍存在为界”的说明；④ 运行手册速率拆成请求行 2×500/分钟=1000 行/分钟
+  （≈1.44 M/天）与窗口行最多 500/分钟（≈0.72 M/天），合计 1500 行/分钟（≈2.16 M/天），并注明这是**理想上限非实测**；
+  ⑤ `database/feibijiubi.sql` 的表注释改为保留期口径，历史迁移 `t15-video-interaction-idempotency.sql` **只加注释说明、
+  不改任何可执行 DDL**（去掉注释后与 HEAD 逐字一致）；⑥ `VideoInteractionProperties` 类说明改为“准入+清理参数”，
+  scheduler 注明占位符默认值 `60000` 与字段默认 `60_000L` 是两份字面量、必须一起改；⑦ 时钟表述收窄为“**不新增 JVM
+  时钟阈值**”，并写明 DB `NOW(3)`/会话时区/DST 的风险并未消失且无时区切换测试。修复后定向纯单测 **30 tests，
+  0 失败/错误/跳过**（`/tmp/t15-cleanup-reviewfix-unit.log`），普通回归 **741 tests，0 失败/错误，214 skipped**
+  （`/tmp/t15-cleanup-reviewfix-full.log`）。隔离 IT 仍**只编译未运行**。
+- 残余风险（记录不修）：Outbox 积压超过 30 天（本身是事故）时同 `requestKey` 重试会产生第二个 `eventId`，
+  旧事件是否再次计数取决于消费侧 30 天年龄守卫（T14-S1）与既有重放/补偿窗口，**不写成“必然重复”**；
+  已提交的 `NULL last_counted_at` 行按语义永不清理（当前代码不可达，属理论泄漏）。
 
 ### T16：系统验收、容量评估和上线
 
@@ -416,6 +779,67 @@ docker compose -f compose.test.yaml stop
 - 迁移前置：`database/migrations/t10-video-status-failure-admin-indexes.sql` 与 `t10-video-status-reconciliation-indexes.sql` 均需先执行；两个索引已镜像到 `database/feibijiubi.sql`。迁移只加索引，不改列/数据。
 - 文档：`AGENTS.md`/`CLAUDE.md` 保持一致；`docs/api.md` 补齐参数、响应、错误与边界；新增中文对账教程 `video-status-reconciliation.md`，并更新失败管理教程与当前进度文档。
 
+### T10-B1 候选进展记录（2026-10-23，候选待父代理验收）
+
+- 状态：**候选实现，未父验收，T10 整项仍不勾选**。本块只做一件事：consumed
+  `process_status=3` 的**单事件、proven-only、受审计**重放；不带 DLQ、不带批量、不带自动修复、
+  不修刷库型 status3。
+- 唯一写入口：`POST /api/admin/video-status/failures/{eventId}/replay?source=CONSUMED`（`@AdminOnly`，
+  操作人只取 `currentUserId`，请求体只有 `operationId`/`reason`）。同一 MySQL 事务内：
+  consumed `3→0` CAS（`process_status=3 AND redis_applied_at IS NULL AND payload_hash=?`）、
+  Outbox `SENT→PENDING` CAS、写 `REPLAY_CONSUMED_TO_RECEIVED` 的 COMPLETED 审计；任一步影响行数非 1
+  或抛异常整体回滚。
+- 投递策略：**不要在事务内或提交后由请求线程 publish**。事务只改 DB，提交后由既有 Outbox relay
+  领取/confirm/退避/租约恢复投递同 eventId、同 payload；提交后进程崩溃仍可从 PENDING 恢复。
+  因此要求同 eventId 的 Outbox 行存在且为 `SENT`，否则 409 拒绝，不降级为仅内存发送。
+- 安全边界：只要 `redis_applied_at` 非空（刷库型 status3）即拒绝；processed 缺失固定
+  `CONSUMED_PROCESSED_EVIDENCE_MISSING`，**不当作未应用**；无 TTL/ TTL 不足/Redis 读取异常一律拒绝，
+  绝不 fail-open；没有 unproven 模式，不能绕过或替代 T09 的 integrity 前提；不覆盖任意 Redis 数据丢失。
+  双窗口（DB `consumed_at` 年龄 + payload `occurredAt`，未来容忍 300s）；不改 payload、不新建 eventId、
+  不清零 `consumer_retry_count`、不刷新 `consumed_at`、不删除 `last_error`、不清零 Outbox 三份预算。
+- 读写一致：`GET .../precheck?source=CONSUMED` 对 status3 返回 `replay` 子结构（`decision`/`eligible`/
+  `refusalCode`/`processedTtlSeconds`/`outboxStatus`/`replayAttempts`），与 POST 共用
+  `VideoStatusStatus3ReplayService#evaluate`；预检查仍只读且永不返回 SAFE；`acknowledge` 与列表行为不变。
+- 预算：`status3-replay-max-attempts`（默认 3，启动期校验 1..100），按同 eventId 的审计行动作有界计数
+  （`LIMIT maxAttempts+1`，走 `idx_video_status_repair_event(event_id,id)`）。
+- 证据（候选）：普通单测 `./mvnw '-Dtest=*Tests,!BackendApplicationTests' test` 实跑 **456 tests，
+  0 failures / 0 errors / 141 skipped**（日志 `/tmp/t10b1-unit.log`）；新增
+  `VideoStatusStatus3ReplayServiceTests` 26 例。隔离 IT（仅 `compose.test.yaml` 13307/16379/15673）
+  `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusStatus3ReplayIsolatedTests' test` 实跑 **11 tests，
+  0 failures / 0 errors / 0 skipped**（`/tmp/t10b1-it.log`），其中 proven 路径经真实 relay→真实消费者→
+  真实刷库收敛到 FLUSHED 且计数只累计一次，审计写入失败时真实 MySQL 事务整体回滚。T10 组回归
+  `VideoStatusFailureAdmin*Tests,VideoStatusReconciliation*Tests,VideoStatusStatus3Replay*Tests`
+  为 **100 tests，0 failures/errors/skipped**（`/tmp/t10b1-t10-group.log`）。
+- 既有缺陷保留（非本块引入）：`VideoStatusIsolatedIntegrationTests` 的
+  `concurrentColdStartAndDuplicateDeliveryConverge` 与 `concurrentFlushAndConsumptionPreserveAllEvents`
+  在 `-DvideoStatusIT=true` 下报 **2 errors**（该类 17 tests，0 failures）；未修改 HEAD 的基线整组为
+  **1 failure / 2 errors / 1 skipped**（`/tmp/t10b1-baseline.log`），其中唯一 failure 就是上文 lease
+  fixture 问题。并发用例与本块改动无关，未在本块修复（不顺手改无关缺陷）。
+- 字段修正（父代理，2026-10-23）：`VideoStatusStatus3ReplayService#evaluate` 的 eligible 分支
+  原先把 `redisAppliedEvidencePresent` 写死为 `true`，与“eligibility 已排除 `redis_applied_at`
+  非空”的事实相反；现改为 `redisEvidence`（eligible 路径必然为 `false`）。单元
+  `VideoStatusStatus3ReplayServiceTests` 与隔离 `VideoStatusStatus3ReplayIsolatedTests` 各补一条
+  `assertFalse(eligible.redisAppliedEvidencePresent())` 断言。只影响预检查 `replay` 子结构的展示字段，
+  不改拒绝判定、不写状态、不改协议。
+- 父代理复跑证据（2026-10-23，窄范围）：`./mvnw '-Dtest=VideoStatusStatus3ReplayServiceTests,VideoStatusFailureAdminAuthorizationTests,VideoStatusFailureAdminServiceTests' test`
+  **54 tests，0 failures / 0 errors / 0 skipped**（`/tmp/t10b1-parent-unit.log`）；
+  `./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusStatus3ReplayIsolatedTests' test`
+  **11 tests，0 failures / 0 errors / 0 skipped**（`/tmp/t10b1-parent-it.log`）。只证明 B1 窄范围用例通过，
+  不构成 B1 最终验收，也不代表 T10 全组或生产验收。
+- 三预算运维说明（本轮文档补强）：B1 保留 Outbox 三份预算，临近耗尽时重放后再失败一次会快速
+  FAILED；此时 T07 的单事件 Outbox 重放因“存在消费账本”一律 409，不能作为兜底；必须停下诊断，
+  不允许清零预算、改状态或换 eventId。已写入 `video-status-status3-replay.md`（3.3 节、8 节）与
+  `docs/api.md` 10.5。
+- 测试 fixture 修正（本轮）：`VideoStatusOutboxLeaseTests.roundBudgetSmallerThanConfirmTimeoutIsStillAccepted`
+  失败根因是 fixture 只设了 confirm=30 / outbox 租约=35，漏设 `status0CompensationLeaseSeconds`
+  （默认 30 < 35，先被补偿租约校验拒绝，测不到 roundBudget 规则）。已在 fixture 补 35，
+  生产校验代码未改、未放宽；该用例实跑通过（`/tmp/t10b1-worker-lease-after.log`）。普通单测回归
+  `./mvnw '-Dtest=*Tests,!BackendApplicationTests' test` 为 **456 tests，0 failures / 0 errors，
+  141 skipped**（`/tmp/t10b1-worker-unit.log`，skipped 均为 opt-in 隔离用例），无新增失败类别。
+  `VideoStatusIsolatedIntegrationTests` 的两个并发失败仍未处理（不在本块范围）。
+- 边界：以上均为测试环境证据，不是生产验收，也不是进程崩溃/两 JVM/Redis 数据丢失演练（T16）；
+  DLQ 摄入/处置、批量处置、刷库型 status3（需刷库重试或 T12 门闩内重建）、自动修复仍未实现。
+
 ### T11 验收记录（2026-10-22）
 
 - 状态：**已完成**；实现候选 `be7d836`，在主仓库基线 `dc41477` 上以 `git merge --squash be7d836` 暂存。本次只补验收文档，未修改代码、未提交 git、未取消暂存。
@@ -434,6 +858,195 @@ docker compose -f compose.test.yaml stop
 - 主分支真实复验：`./mvnw -DvideoStatusIT=true '-Dtest=VideoStatusIsolatedIntegrationTests,VideoStatusConsumerRetryLifecycleIsolatedTests' test`，22 tests，0 failures/errors，1 skipped（可选benchmark）；日志 `/tmp/improvement-t08-main-it.log`。与候选复验独立运行，不仅依赖子代理报告。
 - 测试隔离修复：purge 不会移除已预取的 unacked，先停止本测试监听器使其归队再清理专用队列，类结束关闭上下文；不删除数据库历史事件，不降低100轮及计数断言。
 
+### T14-A 只读容量核查与归档 dry-run（2026-10-23，候选，T14 未完成）
+
+- 状态：**候选、未父验收**；T14 整项**未完成、不能勾选**。本轮只新增测试作用域只读工具与文档，**没有生产代码、
+  没有 HTTP 接口、没有 scheduler、没有 schema/迁移变更**，未部署、未提交 git、未 reset/clean/stash。
+- 交付物：`src/test/java/com/feibijiubi/backend/service/video/capacity/` 下 `VideoStatusCapacityAudit`（只读 IO）、
+  `VideoStatusCapacityEstimator`（纯公式与 UNKNOWN 语义）、`VideoStatusCapacityReport`（模型 + 中文渲染）；
+  用例 `VideoStatusCapacityEstimatorTests`（11）、`VideoStatusCapacityReportTests`（2）、
+  `VideoStatusCapacityAuditIsolatedTests`（8，opt-in，仅 `compose.test.yaml` 的 MySQL 13307 / Redis 16379）。
+- 只读证据（真实隔离环境断言，不是口头承诺）：审计前后 ① 被采样行 `SELECT *` 快照逐字段相等；② MySQL 写语句计数
+  （`SHOW GLOBAL STATUS` 的 `Com_insert/update/delete/replace/truncate/alter_table/create_table/drop_table`）不变；
+  ③ Redis 写命令计数（`SET/SETEX/HSET/SADD/ZADD/DEL/UNLINK/EXPIRE/PERSIST/CONFIG SET/FLUSHALL/FLUSHDB` 的 calls）不变；
+  ④ `DBSIZE` 不变；⑤ 重建门闩仍存在、值不变、**TTL 仍为 -1（没有被补 TTL）**；⑥ `processed` key 值与 TTL 只随
+  真实时间衰减、未被重写。工具侧同时禁用 `KEYS`、全表扫描、任何 DB 写/DDL、任何 Redis 写、`CONFIG SET`、
+  `FLUSHALL/FLUSHDB`、删除门闩或 processed key。
+- 禁删判定：只允许终态进入候选（outbox `status=2 SENT`、consumed `process_status=2 FLUSHED`）；`status0/1/3`
+  与 Outbox `FAILED` 永不列出，`Window` 构造器直接拒绝 `terminalStatus != 2`，查询若返回非终态整体判
+  `NOT_EVALUABLE`。**即使是终态也一律 `NOT_AUTHORIZED_FOR_DELETION`**：保留期与重放窗口政策虽已于 2026-10-23
+  批准，但归档/删除执行器、归档成功校验、旧消息硬拒绝/去重墓碑与 30 天重放守卫都未实现，所以“processed 还有
+  TTL”不能作为删除 DB 幂等证据的依据。报告固定输出 `writePerformed=false`、`deletionAuthorized=false`、
+  `RETENTION_PERIOD_UNDECIDED`（工具代码未改；含义是“清理执行与安全证明未实现”，不是“政策未决策”）。
+- 有界与索引：dry-run 先用 `information_schema.statistics` 校验
+  `idx_video_status_outbox_created (status, created_at, id)` /
+  `idx_video_status_consumed_created (process_status, consumed_at, id)` 的**列序完全匹配**，再用 `FORCE INDEX` 的
+  `EXPLAIN` 要求 `key` 为该索引且 `type != ALL`，两条都过才查询；否则 `NOT_EVALUABLE` + `INDEX_MISSING` /
+  `ACCESS_PATH_NOT_INDEXED`，候选为空且不执行查询。查询固定“时间窗（`now-N 天`）+ `ORDER BY 时间,id` + `LIMIT 上限+1`”，
+  用例实测 `type=range` 且 `Using index`（覆盖索引，不回表）。两个索引已在 `database/feibijiubi.sql`（T05 迁移）中，
+  **本切片不新增迁移**；缺索引的环境应当先执行 T05 迁移，而不是让 dry-run 扫全表。
+- 容量口径：可测（表体积估算、Redis 内存指标、processed 抽样单键字节）与**配置假设**
+  （`-DvideoStatusCapacityAssumedDailyEvents`、`-DvideoStatusCapacityAssumedRetentionDays`，默认 0=未提供）严格分开，
+  报告逐行标注“配置假设，不是测量”。公式：DB 日增 ≈ 假设日事件量 ×(outbox 行+索引字节 + consumed 行+索引字节)；
+  Redis 日增 ≈ 假设日事件量 × 单键实测字节（样本 min～max）；processed key 数量 ≈ 假设日事件量 × 假设保留天数；
+  保留占用 ≈ Redis 日增 × 假设保留天数；耗尽天数 ≈ (maxmemory − used_memory) ÷ Redis 日增。DB 日增给区间
+  （点估计 ×0.5～×1.5，理由=`information_schema` 估算误差与 payload 分布未知）。**数据不足一律 UNKNOWN 并附原因，
+  绝不回落 0**：未提供假设日事件量、processed 样本 < 5、未提供假设保留天数、`maxmemory=0`（未设上限）都对应 UNKNOWN
+  （已批准政策不会自动代入这些配置参数）。
+- 实测（测试环境，**不是生产容量结论**）：普通回归
+  `./mvnw '-Dtest=*Tests,!BackendApplicationTests' test` = **563 tests，0 失败/错误，179 skipped**
+  （`MAVEN_OPTS='-Xms64m -Xmx256m'`、`argLine='-Xms64m -Xmx512m -Djdk.attach.allowAttachSelf=true'` 串行；新增 13 个
+  纯单测 + 8 个隔离 skip，较上轮 542/171 正好 +21/+8）。隔离验收
+  `./mvnw -DvideoStatusIT=true -Dtest=VideoStatusCapacityAuditIsolatedTests test` = **8 tests，0 失败/错误/跳过**，
+  并生成临时路径 dry-run 报告（示例 `%TEMP%ideo-status-capacity-audit-<random>.txt`）。该次隔离样本（仅诊断）：
+  outbox 估算 5384 行/3.65 MB、consumed 估算 29523 行/27.30 MB、`used_memory≈9.95 MB`、`DBSIZE=34765`、
+  `maxmemory=0`/`noeviction`、processed 单键 104～120 B；假设 100,000 事件/天时 DB 日增 80.1～240.3 MB/天、
+  Redis 日增 10.4～12.0 MB/天、30 天保留 312～360 MB，**Redis 耗尽天数 UNKNOWN**（`maxmemory=0`）。
+- 报告卫生：只含表名/索引名、字节数、候选 id/时间/状态、Redis 指标；**不含**连接串、主机、账号密码、
+  完整 eventId、payload、`last_error`。隔离用例用随机 secret 标记做负向断言（报告文本不得出现）。
+- 关联记录（父代理 T13 窄范围复跑，2026-10-23）：`VideoStatusReadConsistencyTests` **14 tests，0 失败/错误/跳过**
+  （`/tmp/t13-parent-unit.log`）。这只复跑 T13 的窄范围单测类，**不构成 T13 全链验收**，T13 仍为候选、不勾选。
+- 未做 / 阻塞 T14（保留期与重放窗口政策已于 2026-10-23 批准，缺的是实现与验收）：① 归档、删除的任何实现；
+  30 天重放守卫已有消费登记侧（T14-S1）与三个管理入口（T14-S2，见下）的候选切片，但 relay/自动重放路径
+  仍不拒绝；② 旧消息硬拒绝或去重墓碑方案；③ 归档成功校验；④ 小批、限速、断点续跑的归档执行器；
+  ⑤ 归档中断后重跑无重复/漏归档的演练；⑥ 归档后重放旧消息不重复计数的演练（含 30 天守卫本身）；
+  ⑦ 索引与在线查询锁影响验证；⑧ 生产容量与外部告警（T16）。**起算点与存储已于本轮用户确认**（在线 90 天按
+  `sent_at`/`flushed_at` 终态完成起算、非创建/接收时间；归档 275 天从归档副本校验成功起算；审计 365 天从审计行
+  创建起算；DLQ 30 天 SLA 从首次入死信队列起算、重投不重置；独立私有 COS 归档桶、完整性+记录数校验通过才允许
+  删在线数据、开发阶段仅隔离测试存储），**剩余未定项**：终态时间列的索引迁移、归档校验记录的存储形态、DLQ 首次
+  入队时间的落库点（“30 天窗口必须严格小于默认 `redisEventTtlDays=30`”这一旧建议**已由 T14-S1 推翻**，见下）。
+  在这些前提落地前，工具结论永远是“候选可见，但不授权删除”。
+- 教程：`docs/tutorial/video-status-capacity-audit.md`（含 noeviction 内存告警建议与安全恢复、未来清理前提）；
+  `docs/api.md` §1.4 记录“无新增 HTTP 接口”；`AGENTS.md`/`CLAUDE.md` 保持一致。
+
+### T14-S1 消费登记前的 30 天绝对年龄拒绝（2026-10-24，候选，T14 未完成）
+
+- 状态：**候选、未父验收**；T14 整项**未完成、不能勾选**。范围只包含**一个入口**（消费登记），
+  不是 S1 的全入口覆盖，也**不是**归档授权。无 schema/迁移/COS/删除/新 HTTP 接口。
+- 交付物：`VideoStatusEventAgeGuard`（唯一判定 + 固定常量 `MAX_NORMAL_REPLAY_AGE_DAYS = 30` + 固定安全原因常量）；
+  `VideoStatusConsumptionServiceImpl` 改为双构造（生产 `Clock.systemDefaultZone()`、测试可注入 `Clock`），
+  在 `event.validate()` + `validatePayloadHash(...)` **之后**、任何 mapper/序列化**之前**调用守卫。
+- 边界（显式数学定义）：严格 `occurredAt.isBefore(now.minusDays(30))` 才拒，**恰好 30 天允许**，纳秒不截断；
+  未来时间**不新增拒绝**（保留既有行为，且明确记录**不是防篡改机制**）；缺 `occurredAt` 仍由既有 `validate()` 拒绝，
+  payload/指纹语义不变。
+- 拒绝路径：`NonRetryableMessageException`（固定安全原因，不含 payload/完整 eventId）→ 消费者既有
+  NonRetryable → 死信转发 + ACK 边界；**不进 retry 队列、不是静默 ACK**；消费者异常分类与 ACK 边界**未改**。
+- 已存在账本：因为守卫早于任何 mapper 交互，**status1/2 的重复事件同样被拒**，不再走 `handleDuplicate`
+  静默返回 `REDIS_ALREADY_APPLIED`/`ALREADY_FLUSHED`；**未新增** `handleReceived` 调用；既有 7 天重投守卫不变
+  （默认 7 天更严且可配置，上限受 processed TTL 约束，**不能假定永远 7 天**）。
+- 配置：固定常量，**不新增任何可放宽配置**；不改 `VideoStatusProperties`（`redisEventTtlDays` 与
+  7 天窗口的启动校验不动），不改 `application.yml`。
+- 纠正旧建议：**“30 天必须严格小于 processed TTL”不成立**——该守卫只读事件发生时间，从不读 `processed` 证据，
+  因此与 `redisEventTtlDays` 无先后约束；仍保留“严格小于 TTL”的只有真正依赖 `processed` 的 7 天自动重放与 T09 窗口。
+- 不夸大的写边界：`register` 内无 MySQL/Redis 写（`REQUIRES_NEW` 事务空回滚），但全流程**不是零写**：
+  消费者会转发到 DLQ（broker 写）、遥测记一次失败。
+- 部署/归档前提：旧消费者仍会放行旧事件，所以归档安全要求**全体消费者同版本部署**；混版本后删归档终态行或
+  回滚到旧消费者都会重新放行。本守卫本身**不构成归档授权**，dry-run 仍 `NOT_AUTHORIZED_FOR_DELETION`。
+- 未覆盖（当时）：T07 Outbox 重放、T10-B1 status3 重放、T09 status0 补偿三个入口**未**调用该判定；
+  管理侧现有更严格的 7 天双窗口守卫保留。**这三个入口已由后续 T14-S2（下）接入同一固定上界**，但
+  relay/自动重放/恢复路径仍不拒绝，因此**仍不得**声称“所有入口拒绝旧消息”或“请求全流程零变更”。
+- 可测证据：`VideoStatusEventAgeGuardTests` 9 例（固定时钟：窗口内/恰好 30 天/±1 纳秒/超 1 秒/未来/默认时区墙钟一致）；
+  `VideoStatusConsumptionRegistrationTests` 6 例（超龄零 mapper 交互、已有 status1 行既不查也不改、FLUSHED 行不被静默吸收、
+  恰好 30 天与窗口内登记不变、既有 7 天 `markRepairRequired` 路径在 30 天内不变）；
+  `VideoStatusEventConsumerAckBoundaryTests` 新增 1 例证明新异常走 DLQ + ACK 一次。定向
+  `50 tests, 0 失败/错误`（`/tmp/t14-s1-target-unit2.log`）；普通回归
+  `./mvnw '-Dtest=*Tests,!BackendApplicationTests' test` = **684 tests，0 失败/错误，201 skipped**
+  （`/tmp/t14-s1-unit-full.log`，`MAVEN_OPTS='-Xms64m -Xmx256m'`、
+  `argLine='-Xms64m -Xmx512m -Djdk.attach.allowAttachSelf=true'`，串行；IT/scale 关闭）。
+  **未开隔离栈、未跑 IT/scale、未动容器或服务**。测试环境候选，不是生产验收。
+- 教程/文档：`docs/tutorial/video-status-capacity-audit.md` §9.3.1；`docs/api.md` §1.4（无新增接口）；
+  `AGENTS.md`/`CLAUDE.md` 同内容。
+
+### T14-S2 三个管理入口接入同一固定 30 天上界（2026-10-24，候选，T14 未完成）
+
+> **命名提示**：本切片的编号是父代理指定的 **T14-S2**，与本文件上面作为“下一步建议”的 **S2 = 归档时间字段 +
+> 校验记录**不是同一件事；归档侧 S2 仍未实现。
+
+- 状态：**候选、未父验收**；T14 整项**未完成、不能勾选**。范围只包含“把已有固定上界接到已有入口”，
+  不是全入口覆盖，也**不是**归档授权。无 schema/迁移/COS/删除/新配置项/新 HTTP 路由。
+- 接入点（四处共用 `VideoStatusEventAgeGuard#isOutsideNormalReplayWindow`）：
+  ① T07 `VideoStatusOutboxReplayService#replay`（createdAt/occurredAt 双窗口之后、消费账本查询与
+  `resetFailedToPending` 之前）；② T10-B1 `VideoStatusStatus3ReplayService#evaluate`（occurredAt 窗口之后、
+  预算**比较**/`processed` 证据与任何写之前；有界 `countReplayAttempts` 查询作为调用实参在 `evaluate` 之前已
+  执行；precheck 与 replay 同源）；③ T09
+  `VideoStatusStatus0CompensationServiceImpl#evaluate`（preview 与 `compensateOne` 同源）；
+  ④ 消费登记（T14-S1，不变）。
+- 原因码：`EVENT_OVER_NORMAL_REPLAY_WINDOW`（读写两侧同一字符串）。**刻意不复用**
+  `CONSUMED_OVER_SAFE_WINDOW` / `STATUS0_OVER_SAFE_WINDOW`：那两个码描述**可配置**窗口（启动校验只要求小于
+  `redisEventTtlDays`，因此允许被调到 30 天以上），而这里是**固定政策上界**；混用会让运维无法区分两者
+  （处置完全不同），且原码的说明文本会变成不成立的说法。
+- 优先级不变：新检查排在每个入口原有“可配置窗口”判定**之后**，默认 7 天更严，所以默认配置下的超龄事件
+  仍返回原来的原因；新码只在运维把 `consumer-recovery-auto-replay-max-age-seconds` 调到 30 天以上时兜底。
+  恰好 30 天共享 predicate 不拒，但原更严格的 7 天/TTL/年龄/未来 300s/指纹条件仍可拒。
+- 时钟：各服务保持原取时方式（写侧均为 `LocalDateTime.now()`），T09 preview 整轮取一次 JVM `now` 与
+  `runOnce` 共用同一 `evaluate`；租约/冷却/静默期仍用 SQL 的 DB `NOW(3)`，两者不混用；一个 `evaluate` 内
+  不重复取时间。入口级用例只用“明显在内（20/29 天）/明显在外（31 天）”，纳秒级边界仍由
+  `VideoStatusEventAgeGuardTests` 的固定时钟用例负责（入口用真实时钟，断言“恰好 30 天”会 flaky）。
+- T09 写边界（不夸大）：判定早于 Redis 证据与发布，但拒绝路径**不是零写**——它按原协议释放租约并写冷却/诊断
+  `last_error`；它**不**发布 MQ、**不**改业务计数、**不**自动把合法事件隔离成 status3。
+- T09 读侧收紧（同一次 evaluate 的必然结果）：`preview.items[]` 新增 `refusalCode`；`withinSafeWindow` 从
+  “只看 DB 年龄”改为“DB 年龄 + occurredAt 窗口”，`eligible` 不再在写侧会拒绝的行上为 true；
+  `selectStatus0CompensationPreview` 额外读 `payload`（只读、仍有界）。preview 仍**不**访问 Redis。
+  payload 解析失败、`validate()` 失败或与账本行不一致时 `evaluate` 返回 `withinSafeWindow=false`（`occurredAt`
+  无从证明）并给三个固定内容码之一，不回显原始异常文本（未识别消息回落 `STATUS0_EVENT_INVALID`）；
+  指纹不符（`STATUS0_FINGERPRINT_MISMATCH`）不在 preview 判定内，由 `runOnce` 在读 Redis 证据前单独校验。
+- 不变：固定 30 常量与“恰好 30 天允许”边界；`VideoStatusProperties`、可调窗口与 `processed` TTL 交叉校验；
+  relay（不新增拒绝）；无 schema/迁移/新 HTTP 路由。
+- 可测证据（纯 Mockito，串行，`-DvideoStatusIT=false -DvideoStatusScale=false`，
+  `MAVEN_OPTS='-Xms64m -Xmx256m'`、`argLine='-Xms64m -Xmx512m -Djdk.attach.allowAttachSelf=true'`）：
+  `VideoStatusOutboxReplayBoundaryTests` 8→**11**、`VideoStatusStatus3ReplayServiceTests` 26→**28**、
+  `VideoStatusStatus0CompensationTests` 31→**35**、`VideoStatusConsumptionRegistrationTests` 6→**7**；定向
+  **96 tests, 0 失败/错误/跳过**（`/tmp/t14-s2-target-unit2.log`），相关类回归 **48 tests, 0 失败/错误**
+  （`/tmp/t14-s2-related-unit.log`）。**未开隔离栈、未跑 IT/scale、未动容器/DB/Redis/COS**。测试环境候选，
+  不是生产验收。
+- 审查修复轮（同一候选，2026-10-24）：T09 `evaluate` 的 parse 失败分支由
+  `new Status0Verdict(withinDbWindow, null, e.getMessage())` 改为 `withinSafeWindow=false` + 白名单原因码
+  （只允许三个固定内容码，其余回落 `STATUS0_EVENT_INVALID`，不回显原始异常文本；外层 `compensateOne` 的
+  `STATUS0_` 消毒器语义不同，本次未动、未合并）。新增 malformed payload / `validate()` 失败 / 账本-payload
+  不一致三例（读侧 `withinSafeWindow=false`、`eligible=false`、精确码；写侧同码 `release`、不发布、不读 Redis），
+  指纹不符一例（写侧 `STATUS0_FINGERPRINT_MISMATCH`、不发布、不读 Redis），并在
+  `previewUsesDatabaseClockForGraceAndLeaseDecisions` 用真实合法 fixture 补正向断言
+  `withinSafeWindow=true` / `eligible=true` / `refusalCode=null`；`VideoStatusStatus0CompensationTests`
+  35→**39**。定向运行 **94 tests, 0 失败/错误/跳过**（`/tmp/t14-s2-review-fix.log`）；仍未开隔离栈、无
+  IT/scale、无 schema/迁移/路由，候选、未父验收。
+- 仍不做 / 不得声称：无归档与删除能力（dry-run 仍 `NOT_AUTHORIZED_FOR_DELETION`）；未升级的旧消费者仍会
+  放行旧事件（全兼容部署才能依赖未来归档）；relay 与自动重放/恢复路径不新增拒绝；未来时间戳仍不拒绝，
+  所以不是防篡改机制；首次消费前就积压超过 30 天的**合法**旧事件仍会直接进死信、不产生账本行、不自动补算
+  （relay 确认状态与消费独立，不能断言它一定已 `SENT`）。
+- 教程：`docs/tutorial/video-status-capacity-audit.md` §9.3.2（含 S1 审核备注）；`docs/api.md` §1.4 与 §8.8；
+  `AGENTS.md`/`CLAUDE.md` 同内容。
+
+### T11 recovery-contract 测试覆盖补充（2026-10-23，候选，仅测试作用域，本轮未实跑）
+
+**只改 `src/test/java/.../service/video/VideoStatusIsolatedIntegrationTests.java`**：没有生产 Java、SQL、
+schema、迁移、配置或 HTTP 变更；不 reset/clean/stash/commit，也不连接生产、不删除全局 dirty/门闩/`processed`。
+
+- 把真实 `VideoStatusDirtyRecoveryScheduler` 注册进测试上下文（`TestApplication` 的 `@Bean`；该上下文没有
+  `@EnableScheduling`，`@Scheduled` 不自动触发，用例显式调 `recoverDirtyVids()`），因此“恢复”走真实链路，
+  而不是手工 `SADD`。
+- 类内 `await(...)` 增加**超时有界诊断**：失败时打印 `vid`、`baseline`、`current`、`process_status` 0/1/2/3
+  计数、dirty 归属与 dirty 基数（每段单独兜底）；不打印 payload、eventId、`last_error`、连接信息或凭证。
+  所有等待仍是有界 30 秒，没有放大。
+- `concurrentFlushAndConsumptionPreserveAllEvents`（4 个消费者线程 + 1 个 flush 线程）收尾从“只跑 flush”
+  改为“真实 recovery + 真实 flush”：`stats.apply` 的 Lua `SADD` 与 `markRedisApplied` 的 `0→1` 不是原子的，
+  落库线程在这个窗口里 `SPOP` 到该 vid 时既不会落库（`selectPendingForUpdate`/`countPendingByVid` 只看
+  status 1），也不会把标记放回（生产代码从不 `SREM`），recovery 是唯一的重新唤醒路径——这与
+  “recovery remains required”的既有契约一致，不是测试补丁。断言同时加强为 200 条全部 status 2 且本 vid 无 0/1 残留。
+- 新增确定性用例 `dirtyMarkerLostBetweenApplyAndStatusCommitIsRecoveredOnlyByRealRecoveryScheduler`
+  （每次新建 vid、不手工 `SADD`/`SREM`）：register → `stats.apply`（Redis +1、Lua `SADD`，仍 status 0）→
+  真实 flush 消耗掉 dirty 标记但不落库 → `markRedisApplied`（status 1）→ 证明 DB 有 status 1 待刷而 dirty
+  已缺失 → 只跑 flush 若干轮基线不变（机制上不可能收敛）→ 真实 recovery 在计算出的有界轮次
+  （`ceil(全库 status-1 distinct vid / flush-dirty-batch-size) + 2`）内补回 dirty → 真实 flush 落库 →
+  独立 oracle（`baseline == current == 101`、事件 status 2、`SUM(delta)` == 1）。**否决 scout 的“把
+  countPending 扩成 status 0”建议**：那会改变落库协议并对尚未提交状态的事件空转。
+- 边界：这是**确定性机制复现**，不是那两个历史并发错误的根因实证（历史记录见 T15 段：
+  `/tmp/t15b-drill-it2.log` 的 `concurrentFlushAndConsumptionPreserveAllEvents` 30 秒未收敛）——
+  原始日志没有 baseline/current/状态快照，本用例与该历史的关联仍只是假说。
+- 本轮环境：隔离栈 `feibijiubi-test-mysql-1`/`redis-1`/`rabbitmq-1` 均为 `Exited (0)`（已停数小时），
+  按任务约束（只对已运行隔离服务跑定向测试、不启动/重启服务）**没有实跑这两个 opt-in 方法**，只执行了
+  `./mvnw -DskipTests test-compile`（成功）。因此本切片是“已实现 + 已编译”，**测试结论待父代理启动隔离栈后复跑**，
+  不得写成已通过或已验收。
+
 ### 计划变更记录
 
 - 初版：仅生成执行计划和 TODO；所有实施项均为待开始。没有执行代码修改、配置修改、迁移、测试、基础设施启动或部署。
@@ -441,6 +1054,25 @@ docker compose -f compose.test.yaml stop
 - 2026-10-22：T07（主分支 `95af60d`）全链路回归 87 tests、T08（主分支 `0dd98ad`/`b846032`/`92eb8c1`）候选父复验 22 tests 均通过，按测试环境验收勾选完成；当时 T09 仍仅为设计，T10 未开始，不宣称全计划或生产验收完成。
 - 2026-10-22：T09 在主分支 `97c7357` 完成最终验收：单测 356 tests（0 失败/错误，108 skipped）、opt-in IT 62 tests（0 失败/错误，1 skipped），按测试环境验收勾选；无证据模式仍受控/默认关，不宣称生产验收。当时 T10 只有第一阶段 15 个单测候选、未合入；该历史状态后由 2026-10-22 T10 第一阶段合入更新，见下方记录。
 - 2026-10-22：T10 第一阶段失败诊断/确认已阅与只读对账合入主分支 `6fc5e7f`，父代理实跑 opt-in IT 121 tests（0 失败/错误/跳过）与普通单测 416 tests（0 失败/错误，130 skipped）。T10 **整项仍进行中且不勾选**；DLQ/consumed status3 受控重放/批量处置/自动修复仍未实现，结果不是生产验收。
+- 2026-10-23：新增 T14-A **只读**容量核查 + 归档 dry-run 候选（测试作用域工具 + 8 例隔离用例 + 13 例纯单测；普通回归 563 tests / 179 skipped）。T14 只完成“可测、可复现、零副作用”的核查部分；**保留期与重放窗口政策已于同日批准（仅决策、无实现），去重墓碑、归档执行与演练仍未做**，因此 T14 仍为进行中、不勾选；无 HTTP/schema/迁移变更，未部署。
+- 2026-10-23：`VideoStatusIsolatedIntegrationTests` 补齐恢复契约覆盖（真实 recovery bean + 超时有界诊断；并发用例改为 recovery+flush 收尾；新增确定性“dirty 标记在状态提交前被落库消耗”用例）。仅测试类、`AGENTS.md`/`CLAUDE.md` 与本文档变更，无生产代码/SQL/schema 变更；**当时隔离栈未运行，两个 opt-in 方法未实跑，只 `test-compile` 通过**。后续父代理获用户许可后启动已有隔离容器（保留卷、无迁移），仅运行这两个方法：2 tests，0 failures/errors/skipped，日志 `/tmp/t18-recovery-contract-parent-it.log`；确定性用例 baseline/current 均为 101，setup flush/recovery 各一轮。这是恢复机制的定向证据，不宣称历史并发失败根因已被证明，也不是完整套件或生产验收。
+- 本轮（用户确认，未新增日历日期）：T14 的保留/归档**起算点与存储**落定并核查字段，仍无任何实现。确认：在线 90 天从终态完成起算（Outbox `sent_at` = 发布 confirm 成功后回写；消费账本 `flushed_at` = 批量落库事务内写入），**不是** `created_at` / `consumed_at`；归档副本 275 天从**归档副本校验成功**起算（不是事件创建时间，归档延后时实际总保留可超过 365 天）；审计 365 天从审计行创建起算；DLQ 30 天处置 SLA 从首次入死信队列起算、重投不重置、未解决不自动删除；归档用独立私有 COS 归档桶，文件完整性 + 记录数量校验通过才允许删除在线数据，开发阶段仅隔离测试存储。字段核查（只读源码/schema）：`sent_at` 为 JVM 时钟且与 `flushed_at` 均**无索引**；`flushed_at` 在 T10-B1 重放时被清空，只表示最近一次落库完成；**DLQ 首次入队时间与归档校验记录完全不存在**；`FileStorageService` 只能同桶、只判存在、写不了 manifest，不适合归档；终态时间缺失的历史行**不得**猜成创建/接收时间或回填，只能保守排除自动删除。下一步最小切片为**建议、待父审**（S1 = 30 天旧消息拒绝入口全覆盖，relay 不新增拒绝；S2 = 归档时间字段 + 校验记录，含新索引，不做执行器）。本轮仅改文档：不改 Java/SQL/配置/schema，不执行测试/迁移/DB/Redis/Docker，未提交；T14 仍不勾选，dry-run 仍 `NOT_AUTHORIZED_FOR_DELETION`，未新建任何资源。
+- 2026-10-24：T14-S1 交付**消费登记前 30 天绝对年龄拒绝**候选（`VideoStatusEventAgeGuard` + `VideoStatusConsumptionServiceImpl#register`）。
+  只覆盖一个入口（消费登记），T07/T10-B1/T09 入口未接入（**同日后续由 T14-S2 接入，见下条**），因此不得声称“全入口拒绝旧消息”；既有 7 天重投守卫与管理侧
+  更严的 7 天双窗口**未改**（但可配置，不能假定永远 7 天）。边界为严格 `occurredAt.isBefore(now - 30 天)`（恰好 30 天允许、
+  纳秒不截断），未来时间不新增拒绝且明确**不是防篡改机制**；固定常量、无配置开关、不改 `VideoStatusProperties`/`application.yml`。
+  超龄抛 `NonRetryableMessageException` → 既有 DLQ + ACK 边界（非静默 ACK），且早于任何 mapper 交互，所以已有 status1/2 账本行
+  不再被静默吸收。**纠正旧建议**：“30 天必须严格小于 processed TTL”不成立（不读 `processed` 证据）。不夸大写边界：
+  `register` 内无 DB/Redis 写，但全流程不是零写（DLQ 转发 + 遥测）。证据：定向 50 tests、普通回归 684 tests（0 失败/错误，201 skipped；
+  `/tmp/t14-s1-target-unit2.log`、`/tmp/t14-s1-unit-full.log`），**未开隔离栈/未跑 IT/scale**。归档安全仍要求全体消费者同版本部署；
+  本守卫不构成归档授权，T14 仍进行中、不勾选。
+- 2026-10-24：T14-S2 把同一固定 30 天上界接到 T07 Outbox 重放、T10-B1 status3 重放（precheck/replay 同源）、T09 status0 补偿
+  （preview/runOnce 同源）三个管理入口；统一原因码 `EVENT_OVER_NORMAL_REPLAY_WINDOW`（不复用可配置窗口码），新检查排在各自原有
+  窗口判定**之后**（默认 7 天更严，拒绝优先级不变），且都在状态重置/审计写入/MQ 发布之前。T09 preview 新增只读 `refusalCode`、
+  `withinSafeWindow` 改为“DB 年龄 + occurredAt 窗口”（与写侧一致）。**无 schema/迁移/COS/删除/新配置/新 HTTP 路由**；不改固定常量、
+  原可调窗口或 TTL 交叉校验、relay。测试：定向 **96 tests**（`/tmp/t14-s2-target-unit2.log`）、`VideoStatus*Tests` **565 tests，0 失败/错误，
+  181 skipped**（`/tmp/t14-s2-videostatus-unit2.log`），未开隔离栈、未跑 IT/scale。仍无归档/删除能力，旧消费者仍可绕过，
+  relay/自动重放不拒绝，未来时间戳仍不拒绝；T14 仍进行中、不勾选。
 
 ## 9. 暂不纳入本轮
 

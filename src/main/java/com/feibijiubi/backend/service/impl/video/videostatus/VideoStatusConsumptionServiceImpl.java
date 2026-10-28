@@ -12,19 +12,20 @@ import com.feibijiubi.backend.enums.VideoStatusConsumeProcessStatus;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
 import com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusConsumptionService;
-import lombok.RequiredArgsConstructor;
+import com.feibijiubi.backend.service.video.videostatus.VideoStatusEventAgeGuard;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class VideoStatusConsumptionServiceImpl
         implements VideoStatusConsumptionService {
 
@@ -33,6 +34,37 @@ public class VideoStatusConsumptionServiceImpl
     private final ObjectMapper objectMapper;
     private final VideoStatusConsumedEventMapper consumedEventMapper;
     private final VideoStatusProperties properties;
+    private final Clock clock;
+
+    /** 生产构造：两个构造器必须显式标注，否则 Spring 找不到默认构造会启动失败。 */
+    @Autowired
+    public VideoStatusConsumptionServiceImpl(
+            ObjectMapper objectMapper,
+            VideoStatusConsumedEventMapper consumedEventMapper,
+            VideoStatusProperties properties
+    ) {
+        // 事件时间由业务侧 LocalDateTime.now() 产生（主机时区、无时区字段），
+        // 因此默认时钟必须是系统时区，否则非 UTC 主机上 30 天年龄会算偏。
+        this(
+                objectMapper,
+                consumedEventMapper,
+                properties,
+                Clock.systemDefaultZone()
+        );
+    }
+
+    /** 测试可注入固定时钟，用来验证 30 天绝对年龄边界，不依赖 sleep。 */
+    public VideoStatusConsumptionServiceImpl(
+            ObjectMapper objectMapper,
+            VideoStatusConsumedEventMapper consumedEventMapper,
+            VideoStatusProperties properties,
+            Clock clock
+    ) {
+        this.objectMapper = objectMapper;
+        this.consumedEventMapper = consumedEventMapper;
+        this.properties = properties;
+        this.clock = clock;
+    }
 
     @Override
     @Transactional(
@@ -46,9 +78,13 @@ public class VideoStatusConsumptionServiceImpl
     ) {
         event.validate();
         validatePayloadHash(semanticPayloadHash);
+        // T14-S1：登记前统一做 30 天绝对年龄拒绝，且必须早于任何 mapper 交互——
+        // 包括唯一键冲突后的账本查询。这样已存在 status1/2 账本行的旧事件同样被拒，
+        // 不会退化成 handleDuplicate 的“静默吸收”。
+        LocalDateTime now = LocalDateTime.now(clock);
+        rejectExpiredEvent(event, now);
 
         VideoStatusConsumedEvent received = new VideoStatusConsumedEvent();
-        LocalDateTime now = LocalDateTime.now();
         received.setEventId(event.eventId());
         received.setVid(event.vid());
         received.setEventType(event.type().name());
@@ -242,6 +278,27 @@ public class VideoStatusConsumptionServiceImpl
             );
         }
         return RegistrationResult.NEEDS_REDIS_APPLY;
+    }
+
+    /**
+     * 超出普通重放绝对窗口就转死信：抛 {@link NonRetryableMessageException}，
+     * 由消费者现有的 NonRetryable → DLQ + ACK 边界处理（不是静默 ACK）。
+     *
+     * <p>本方法只读事件时间，不写库、不写 Redis；原因文本是固定常量，
+     * 不输出 payload、完整 eventId 或任何用户数据。</p>
+     */
+    private void rejectExpiredEvent(
+            VideoStatusChangedEvent event,
+            LocalDateTime now
+    ) {
+        if (VideoStatusEventAgeGuard.isOutsideNormalReplayWindow(
+                event.occurredAt(),
+                now
+        )) {
+            throw new NonRetryableMessageException(
+                    VideoStatusEventAgeGuard.EXPIRED_REASON
+            );
+        }
     }
 
     private String serialize(VideoStatusChangedEvent event) {

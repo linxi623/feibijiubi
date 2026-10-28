@@ -196,7 +196,18 @@
         LIMIT #{limit}
     </select>
 
-    <select id="selectRebuildCandidates"
+    <!--
+      T12-B：重建候选的 keyset 分页读取。
+      * 只按 id 严格前进（id > afterId），不用 OFFSET，页大小由调用方限制 <= 1000；
+      * FORCE INDEX (vid, id)：该索引的列顺序正好等于“同一 vid + id 升序”，
+        一页只读“已匹配的候选 + 被 process_status 过滤掉的相邻行”这一小段索引，
+        不需要 filesort。不加提示时优化器会选 idx_video_status_consumed_pending
+        的两个 process_status 区间再 filesort，每页都要重读该 vid 的全部候选
+        （页数 x 候选数的重复扫描）；这正是“加了 LIMIT 但实际仍然全量读”的陷阱。
+        该索引由 t10-video-status-reconciliation-indexes.sql 提供并在
+        database/feibijiubi.sql 里镜像；索引缺失时查询直接报错，不会静默退化为全表扫描。
+    -->
+    <select id="selectRebuildCandidatesAfter"
             resultMap="VideoStatusConsumedEventResultMap">
         SELECT id,
                event_id,
@@ -206,9 +217,14 @@
                payload,
                process_status
         FROM video_status_consumed_event
+        FORCE INDEX (idx_video_status_consumed_vid_id)
         WHERE vid = #{vid}
           AND process_status IN (0, 1)
+        <if test="afterId != null">
+            AND id &gt; #{afterId}
+        </if>
         ORDER BY id
+        LIMIT #{limit}
     </select>
 
     <select id="selectPendingForUpdate"
@@ -365,6 +381,7 @@
             event_type,
             delta,
             payload_hash,
+            payload,
             process_status,
             consumer_retry_count,
             last_attempt_at,

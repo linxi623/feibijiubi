@@ -4,9 +4,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * T10 第一阶段：失败事件只读诊断与“受审计确认已阅（ACKNOWLEDGE）”。
- * 确认只写审计，不修改事件/计数/Redis；明确不实现 DLQ、status3 自动重放、批量重放、
- * 对账或强制重建。仅 Outbox FAILED(status=3) 与 consumed status3 可确认；status0 只读。
+ * T10 失败事件只读诊断、“受审计确认已阅（ACKNOWLEDGE）”与 T10-B1 consumed status3 受控重放的
+ * 预检查。确认只写审计，不修改事件/计数/Redis；重放本体在
+ * {@link VideoStatusStatus3ReplayService}，本接口只负责把它“读写拒绝条件一致”的判定
+ * 暴露给只读预检查。明确不实现 DLQ、批量重放、自动修复或强制重建。
  */
 public interface VideoStatusFailureAdminService {
 
@@ -33,7 +34,23 @@ public interface VideoStatusFailureAdminService {
 
     record Precheck(String source, String eventId, String decision, String reasonCode,
                     boolean redisAppliedEvidencePresent, boolean withinSafeWindow,
-                    Long consumedAgeSeconds, boolean canAcknowledge, String note) {
+                    Long consumedAgeSeconds, boolean canAcknowledge,
+                    ReplayPrecheck replay, String note) {
+    }
+
+    /**
+     * T10-B1 consumed status3 重放预检查（与 POST replay 共用同一套判定）。
+     *
+     * <p>只有 {@code process_status=3} 的目标才返回本结构；status0 仍是只读诊断。
+     * {@code decision} 为 {@code PROVEN_REPLAY_ELIGIBLE} 或
+     * {@code REFUSED_CONTROLLED_REPAIR_ONLY}，后者给出稳定 {@code refusalCode}。
+     * 即使 {@code eligible=true} 也仍需管理员显式 POST：它不是一个 SAFE 结论，
+     * 也不代表事件已修复。</p>
+     */
+    record ReplayPrecheck(String decision, boolean eligible, String refusalCode,
+                          boolean redisAppliedEvidencePresent, boolean withinSafeWindow,
+                          Long consumedAgeSeconds, Integer outboxStatus,
+                          Long processedTtlSeconds, int replayAttempts, int maxReplayAttempts) {
     }
 
     record Detail(FailureItem item, Precheck precheck, String note) {

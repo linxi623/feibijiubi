@@ -8,6 +8,12 @@ public final class RedisConstants {
     // 客户端请求cosKey的限流
     public static final String RATE_UPLOAD_PREFIX = "rate:upload-token:user:";
 
+    // T15：播放/分享准入的固定窗口计数（只做准入，不做去重；去重在 MySQL 幂等表）
+    public static final String RATE_VIDEO_INTERACTION_ACTION_PREFIX =
+            "rate:video-interaction:action:";
+    public static final String RATE_VIDEO_INTERACTION_ACTOR_PREFIX =
+            "rate:video-interaction:actor:";
+
     // 分类
     public static final String CATEGORY_PREFIX = "category:tree:v1";
 

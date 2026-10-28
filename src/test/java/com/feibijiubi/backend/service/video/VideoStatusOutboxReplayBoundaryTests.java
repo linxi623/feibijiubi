@@ -10,6 +10,7 @@ import com.feibijiubi.backend.event.VideoStatusChangedEvent;
 import com.feibijiubi.backend.event.VideoStatusEventType;
 import com.feibijiubi.backend.mapper.VideoStatusOutboxRepairMapper;
 import com.feibijiubi.backend.service.admin.VideoStatusOutboxReplayService;
+import com.feibijiubi.backend.service.video.videostatus.VideoStatusEventAgeGuard;
 import com.feibijiubi.backend.vo.VideoStatusOutboxReplayVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -254,6 +256,66 @@ class VideoStatusOutboxReplayBoundaryTests {
         assertNoWrite();
     }
 
+    // ------------------------------------------------- 5) T14-S2 固定 30 天上界
+
+    @Test
+    @DisplayName("窗口被调到 45 天（合法配置）时，31 天前的 occurredAt 仍被固定 30 天上界拒绝且零写")
+    void occurredAtBeyondFixedThirtyDayBoundIsRejectedWithoutAnyWrite() {
+        useWidenedWindow();
+        String eventId = "t07b-" + UUID.randomUUID();
+        fake.row = failedRow(eventId,
+                payload(eventId, LocalDateTime.now().minusDays(31)));
+        fake.createdAgeSeconds = 5L;
+
+        BusinessException rejected = assertThrows(BusinessException.class,
+                () -> service.replay(eventId, "op-" + UUID.randomUUID(),
+                        "超 30 天重放", OPERATOR));
+
+        assertEquals(409, rejected.getCode());
+        assertTrue(rejected.getMessage().contains(VideoStatusEventAgeGuard.REFUSAL_CODE),
+                rejected.getMessage());
+        assertFalse(rejected.getMessage().contains("occurredAt 已达/超过安全重放窗口"),
+                "固定上界不能借用可配置窗口的文案：" + rejected.getMessage());
+        assertNoWrite();
+    }
+
+    @Test
+    @DisplayName("同一 45 天配置下 29 天前的 occurredAt 仍可重放（上界只拒超过 30 天的）")
+    void occurredAtInsideFixedBoundStillReplaysUnderWidenedWindow() {
+        useWidenedWindow();
+        String eventId = "t07b-" + UUID.randomUUID();
+        fake.row = failedRow(eventId,
+                payload(eventId, LocalDateTime.now().minusDays(29)));
+        fake.createdAgeSeconds = 5L;
+
+        VideoStatusOutboxReplayVO vo = service.replay(
+                eventId, "op-" + UUID.randomUUID(), "窗口内重放", OPERATOR);
+
+        assertTrue(vo.isReplayApplied());
+        assertEquals(List.of("selectByEventIdForUpdate", "selectRepairLogByOperationId",
+                "selectCreatedAgeSeconds", "selectConsumedProcessStatus",
+                "resetFailedToPending", "insertCompletedRepairLog"), fake.calls);
+    }
+
+    @Test
+    @DisplayName("默认 7 天窗口下超龄事件仍返回原有 occurredAt 窗口原因，不被新码替换")
+    void defaultWindowStillReportsOriginalOccurredAtReason() {
+        String eventId = "t07b-" + UUID.randomUUID();
+        fake.row = failedRow(eventId,
+                payload(eventId, LocalDateTime.now().minusDays(31)));
+        fake.createdAgeSeconds = 5L;
+
+        BusinessException rejected = assertThrows(BusinessException.class,
+                () -> service.replay(eventId, "op-" + UUID.randomUUID(),
+                        "默认窗口重放", OPERATOR));
+
+        assertEquals(409, rejected.getCode());
+        assertTrue(rejected.getMessage().contains("occurredAt"), rejected.getMessage());
+        assertFalse(rejected.getMessage().contains(VideoStatusEventAgeGuard.REFUSAL_CODE),
+                "默认窗口更严，拒绝优先级不能变：" + rejected.getMessage());
+        assertNoWrite();
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private void assertNoWrite() {
@@ -294,16 +356,33 @@ class VideoStatusOutboxReplayBoundaryTests {
     }
 
     private String validPayload(String eventId) {
+        return payload(eventId, LocalDateTime.now().minusSeconds(1));
+    }
+
+    private String payload(String eventId, LocalDateTime occurredAt) {
         long delta = 1L;
         VideoStatusChangedEvent event = new VideoStatusChangedEvent(
                 eventId, VID, VideoStatusEventType.PLAY, delta,
                 VideoStatusEventType.PLAY.calculateHotScore(delta),
-                LocalDateTime.now().minusSeconds(1), 2, "t07b-unit");
+                occurredAt, 2, "t07b-unit");
         try {
             return objectMapper.writeValueAsString(event);
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    /**
+     * 合法但把可配置重放窗口调到 30 天以上的配置：启动校验只要求窗口小于
+     * {@code redisEventTtlDays * 86400}，所以 60 天 TTL + 45 天窗口可以通过 {@code validate()}。
+     */
+    private void useWidenedWindow() {
+        VideoStatusProperties widened = new VideoStatusProperties();
+        widened.setRedisEventTtlDays(60);
+        widened.setConsumerRecoveryAutoReplayMaxAgeSeconds(
+                (int) Duration.ofDays(45).toSeconds());
+        widened.validate();
+        service = new VideoStatusOutboxReplayService(fake.proxy(), widened, objectMapper);
     }
 
     /** 纯内存假 mapper：记录调用顺序，按脚本返回；不接触任何外部资源。 */

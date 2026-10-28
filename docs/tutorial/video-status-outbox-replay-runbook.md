@@ -40,6 +40,9 @@
    与 payload 的 `occurredAt`（生产端 JVM 时钟）都必须**严格小于**
    `app.video-status.consumer-recovery-auto-replay-max-age-seconds`（默认 604800 秒 = 7 天）——
    **正好等于上限也拒绝**；`occurredAt` 在未来（> now+5min）直接拒绝（防伪造新鲜度）；
+   另外 `occurredAt` 还受**固定 30 天普通重放上界**约束（T14-S2，`EVENT_OVER_NORMAL_REPLAY_WINDOW`）：
+   上面的可调窗口只要求小于 `redisEventTtlDays`，可以被调到 30 天以上，而超过 30 天的普通重放一律拒绝；
+   默认 7 天更严，所以默认配置下超龄事件仍只会看到窗口原因；
 3. `payload` 可解析为 `VideoStatusChangedEvent`、`event.validate()` 通过，
    且 payload 的 `eventId / vid / type` 与数据库行完全一致；
 4. **消费账本必须完全不存在**：只要 `video_status_consumed_event` 已有该 eventId 的行（0/1/2/3 任一），
@@ -82,6 +85,7 @@ SELECT event_id, last_error FROM video_status_outbox WHERE event_id = '<eventId>
 | payload 非法 / 与行不一致 | 不要重放；保持 FAILED，人工核对业务影响（T10） |
 | `consumedProcessStatus` 非空（0/1/2/3） | 不要重放；`2` 已完成无需重投，`0/1` 交自动恢复（T09），`3` 需要 T10 修复 |
 | `created_at` 或 `occurredAt` 达到/超过安全窗口（含边界） | 不要重放；走 T10 对账/业务补偿 |
+| `occurredAt` 超过固定 30 天（窗口被调到 30 天以上时才会走到） | 不要重放（`EVENT_OVER_NORMAL_REPLAY_WINDOW`）；转人工核查 |
 | 已 `SENT` / 仍在 `PENDING`/`SENDING` | 不要人工干预；GET 会给出明确原因 |
 | FAILED + payload 合法一致 + 双窗口内 + **无任何 consumed 行** | 可以执行步骤 3 |
 

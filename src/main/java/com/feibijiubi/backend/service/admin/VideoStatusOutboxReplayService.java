@@ -7,6 +7,7 @@ import com.feibijiubi.backend.entity.VideoStatusConsumptionRepairLog;
 import com.feibijiubi.backend.entity.VideoStatusOutbox;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
 import com.feibijiubi.backend.mapper.VideoStatusOutboxRepairMapper;
+import com.feibijiubi.backend.service.video.videostatus.VideoStatusEventAgeGuard;
 import com.feibijiubi.backend.vo.VideoStatusOutboxReplayVO;
 import com.feibijiubi.backend.vo.VideoStatusOutboxStatusVO;
 import lombok.RequiredArgsConstructor;
@@ -42,10 +43,13 @@ import java.util.Objects;
  *       重复投递由消费端 eventId 幂等吸收。</li>
  *   <li><b>可证明才重放</b>：payload 必须可解析、{@code event.validate()} 通过，
  *       且 eventId/vid/type 与数据库行一致；否则拒绝（属于 T10 修复场景）。</li>
- *   <li><b>安全窗口（双重）</b>：{@code created_at}（DB 时钟，{@code TIMESTAMPDIFF} 秒）与
+ *   <li><b>安全窗口（双重 + 固定上界）</b>：{@code created_at}（DB 时钟，{@code TIMESTAMPDIFF} 秒）与
  *       payload 的 {@code occurredAt}（生产端 JVM 时钟）都必须落在
  *       {@code consumerRecoveryAutoReplayMaxAgeSeconds} 内；<b>正好等于上限也拒绝</b>。
- *       {@code occurredAt} 在未来（超过 now+5min）同样拒绝，防止伪造新鲜度绕过窗口。</li>
+ *       {@code occurredAt} 在未来（超过 now+5min）同样拒绝，防止伪造新鲜度绕过窗口。
+ *       此外 {@code occurredAt} 还受 T14-S2 的固定 30 天上界约束：该可调窗口只要求小于
+ *       {@code redisEventTtlDays}，因此可以被调到 30 天以上；超过 30 天的普通重放一律拒绝
+ *       （{@code EVENT_OVER_NORMAL_REPLAY_WINDOW}），只能转人工核查。</li>
  *   <li><b>不动账本</b>：不写 video_status、不改 consumed_event、不碰 Redis。
  *       consumed 已存在（0/1/2/3 任一）都明确拒绝，不声称“安全”也不自动处置。</li>
  *   <li><b>同事务 + CAS</b>：状态重置（{@code status=3} 的 CAS，影响行数必须为 1）、
@@ -119,6 +123,8 @@ public class VideoStatusOutboxReplayService {
         vo.setReplayBlockedReason(blocked);
         vo.setNote("payload/leaseToken/last_error 原文均不返回；replayEligible 只是必要条件，"
                 + "POST 重放会再次校验 payload、eventId/vid/type、createdAt 与 occurredAt 双重安全窗口、"
+                + "occurredAt 的固定 " + VideoStatusEventAgeGuard.MAX_NORMAL_REPLAY_AGE_DAYS
+                + " 天普通重放上界（reasonCode=" + VideoStatusEventAgeGuard.REFUSAL_CODE + "）、"
                 + "以及“consumed 一律拒绝”的账本边界。"
                 + "本工具不覆盖 DLQ 与任何 consumed 处置（T09/T10 范围）。");
         return vo;
@@ -203,6 +209,17 @@ public class VideoStatusOutboxReplayService {
             throw new BusinessException(409,
                     "payload 的 occurredAt 已达/超过安全重放窗口（" + maxAgeSeconds + "s），拒绝重放；"
                             + "请走 T10 对账/业务补偿，不重发旧事件");
+        }
+
+        // 5b) T14-S2 固定政策上界（30 天）：上面的可配置窗口只要求小于 redisEventTtlDays，
+        //     因此可以被调到 30 天以上；默认 7 天更严，所以这里只兜底“窗口被调大”的场景，
+        //     默认配置下的超龄事件仍然给出上面的原有原因，不会换成新码。
+        //     本检查在状态 CAS / Outbox 重置 / 审计写入之前，拒绝路径不产生任何写。
+        if (VideoStatusEventAgeGuard.isOutsideNormalReplayWindow(occurredAt, now)) {
+            throw new BusinessException(409,
+                    VideoStatusEventAgeGuard.REFUSAL_MESSAGE
+                            + "（reasonCode=" + VideoStatusEventAgeGuard.REFUSAL_CODE + "）；"
+                            + "本次未重置状态、未写审计、未重发消息");
         }
 
         // 6) 消费账本：临时工具从严——只要已存在 consumed 记录就拒绝，

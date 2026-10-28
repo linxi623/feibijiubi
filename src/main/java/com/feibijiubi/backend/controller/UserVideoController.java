@@ -3,10 +3,11 @@ package com.feibijiubi.backend.controller;
 import com.feibijiubi.backend.annotation.OptionalLogin;
 import com.feibijiubi.backend.common.ApiResponse;
 import com.feibijiubi.backend.service.video.UserVideoService;
+import com.feibijiubi.backend.vo.VideoInteractionVO;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,11 +21,23 @@ public class UserVideoController {
         this.userVideoService = userVideoService;
     }
 
+    /**
+     * 播放计数：需要 {@code Idempotency-Key}；未登录时还需要 {@code X-Visitor-Id}。
+     *
+     * <p>两个头都用 {@code required = false} 接收，再由服务层给出明确的 400：如果交给 Spring 的
+     * 必填校验，缺头会抛 {@code MissingRequestHeaderException}，全局异常处理器目前只覆盖了
+     * 参数缺失/类型不符两个分支，会退化成 500，把“客户端忘了带头”误报成服务端错误。</p>
+     */
     @OptionalLogin
     @PostMapping("/{vid}/play-count")
-    public ApiResponse<Void> increasePlayCount(@PathVariable Integer vid) {
-        userVideoService.increasePlayCount(vid);
-        return ApiResponse.success(null);
+    public ApiResponse<VideoInteractionVO> increasePlayCount(
+            @PathVariable Integer vid,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestHeader(value = "X-Visitor-Id", required = false) String visitorId,
+            HttpServletRequest request) {
+        Integer currentUserId = (Integer) request.getAttribute("currentUserId");
+        return ApiResponse.success(userVideoService.increasePlayCount(
+                currentUserId, vid, idempotencyKey, visitorId));
     }
 
     @PostMapping("/{vid}/progress")
@@ -57,9 +70,14 @@ public class UserVideoController {
 
     @OptionalLogin
     @PostMapping("/{vid}/share")
-    public ApiResponse<Void> increaseShare(@PathVariable Integer vid) {
-        userVideoService.increaseShare(vid);
-        return ApiResponse.success(null);
+    public ApiResponse<VideoInteractionVO> increaseShare(
+            @PathVariable Integer vid,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestHeader(value = "X-Visitor-Id", required = false) String visitorId,
+            HttpServletRequest request) {
+        Integer currentUserId = (Integer) request.getAttribute("currentUserId");
+        return ApiResponse.success(userVideoService.increaseShare(
+                currentUserId, vid, idempotencyKey, visitorId));
     }
 
     @PostMapping("/{vid}/collect")

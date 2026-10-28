@@ -637,7 +637,9 @@ class VideoStatusOutboxLeaseTests {
         VideoStatusProperties properties = new VideoStatusProperties();
         properties.setRoundBudgetMs(1);
         properties.setPublishConfirmTimeoutSeconds(30);
+        // 两个独立租约都要满足 confirm + 5s，否则先被租约校验拒绝，测不到 roundBudget 规则。
         properties.setOutboxLeaseSeconds(35);
+        properties.setStatus0CompensationLeaseSeconds(35);
         assertDoesNotThrow(properties::validate,
                 "round budget only bounds 'claim the next item'; it cannot kill an in-flight publish");
     }

@@ -3,9 +3,10 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <!--
-  T10 第一阶段：失败事件只读分页/详情/预检查与受审计“确认已阅（ACKNOWLEDGE）”。
-  只 SELECT 安全列，不查 payload / lease_token / last_error 原文；
-  没有 UPDATE/DELETE 目标事件的语句，确认只写 repair_log 审计。
+  T10 失败诊断与处置 mapper。
+  第一阶段（诊断/确认已阅）只有 SELECT 安全列与一条审计 INSERT；T10-B1 追加 consumed
+  status3 受控重放的 3 条写语句，全部带精确 CAS。没有改计数、改 Redis、改 payload
+  或新增 eventId 的语句，也不在任何语句里 SELECT lease_token。
 -->
 <mapper namespace="com.feibijiubi.backend.mapper.VideoStatusFailureAdminMapper">
 
@@ -118,6 +119,113 @@
             FOR UPDATE
     </select>
 
+    <!-- ================================================== T10-B1 status3 重放 -->
+
+    <!--
+      重放目标行（预检查用，不加锁）：payload_hash/delta 用于证明消费账本身份；
+      不返回 payload 原文，也不返回 lease_token。
+      年龄用 DB 时钟计算，避免 JVM/DB 时区差异把窗口边界算歪。
+    -->
+    <select id="selectStatus3ReplayTarget"
+            resultType="com.feibijiubi.backend.service.admin.VideoStatusStatus3ReplayRow$ConsumedTarget"
+            timeout="3">
+        SELECT id, event_id, vid, event_type, delta, payload_hash, process_status,
+               consumer_retry_count, consumed_at, redis_applied_at,
+               CASE WHEN last_error IS NULL OR last_error = '' THEN 0 ELSE 1 END
+                   AS last_error_present,
+               TIMESTAMPDIFF(SECOND, consumed_at, NOW(3)) AS consumed_age_seconds
+        FROM video_status_consumed_event
+        WHERE event_id = #{eventId}
+    </select>
+
+    <!-- 重放路径专用：唯一键 + 行锁，让同一 eventId 的重放请求在 DB 层串行。 -->
+    <select id="selectStatus3ReplayTargetForUpdate"
+            resultType="com.feibijiubi.backend.service.admin.VideoStatusStatus3ReplayRow$ConsumedTarget"
+            timeout="3">
+        SELECT id, event_id, vid, event_type, delta, payload_hash, process_status,
+               consumer_retry_count, consumed_at, redis_applied_at,
+               CASE WHEN last_error IS NULL OR last_error = '' THEN 0 ELSE 1 END
+                   AS last_error_present,
+               TIMESTAMPDIFF(SECOND, consumed_at, NOW(3)) AS consumed_age_seconds
+        FROM video_status_consumed_event
+        WHERE event_id = #{eventId}
+            FOR UPDATE
+    </select>
+
+    <!-- Outbox 投递源：payload 是 relay 真正会发布的内容，必须在写之前校验。 -->
+    <select id="selectOutboxReplaySource"
+            resultType="com.feibijiubi.backend.service.admin.VideoStatusStatus3ReplayRow$OutboxSource"
+            timeout="3">
+        SELECT id, event_id, aggregate_id AS vid, event_type, payload, status, sent_at
+        FROM video_status_outbox
+        WHERE event_id = #{eventId}
+    </select>
+
+    <select id="selectOutboxReplaySourceForUpdate"
+            resultType="com.feibijiubi.backend.service.admin.VideoStatusStatus3ReplayRow$OutboxSource"
+            timeout="3">
+        SELECT id, event_id, aggregate_id AS vid, event_type, payload, status, sent_at
+        FROM video_status_outbox
+        WHERE event_id = #{eventId}
+            FOR UPDATE
+    </select>
+
+    <!--
+      重放预算的有界计数：只数同一 eventId + 本动作的审计行，索引
+      idx_video_status_repair_event(event_id, id) 直接支持；外层的 LIMIT #{cap}
+      保证即使历史异常也不会做无界 COUNT（cap = maxAttempts + 1）。
+    -->
+    <select id="countReplayAttempts" resultType="java.lang.Integer" timeout="3">
+        SELECT COUNT(*)
+        FROM (
+            SELECT id
+            FROM video_status_consumption_repair_log
+            WHERE event_id = #{eventId}
+              AND action = #{action}
+            LIMIT #{cap}
+        ) AS bounded_replays
+    </select>
+
+    <!--
+      CAS 重置：只允许“从未写入 redis_applied_at 的 status3”回到 RECEIVED，
+      且 payload_hash 必须是本次已校验通过的那份内容：
+        * process_status = 3 AND redis_applied_at IS NULL：刷库型 status3
+          （Redis 已应用、DB 未落库）必须拒绝，它只能走刷库重试/重建；
+        * consumer_retry_count 不归零：历史重试是诊断证据，本接口不为重放
+          开启新预算（与 T07 的 outbox 预算归零语义不同，切勿照搬）；
+        * consumed_at 不变：不刷新事件年龄，安全窗口仍以原登记时间为准；
+        * last_error 不清空：失败详情是证据，正常 0→1 的 markRedisApplied 会清空它；
+        * last_attempt_at 更新为 NOW(3)：本次确实尝试过处置。
+      影响行数必须恰好为 1，否则整个重放事务回滚。
+    -->
+    <update id="resetConsumedRepairToReceivedForReplay" timeout="3">
+        UPDATE video_status_consumed_event
+        SET process_status = 0,
+            last_attempt_at = NOW(3)
+        WHERE event_id = #{eventId}
+          AND process_status = 3
+          AND redis_applied_at IS NULL
+          AND payload_hash = #{payloadHash}
+    </update>
+
+    <!--
+      可靠投递复用：把已 SENT 的 Outbox 行退回 PENDING，由既有 relay 领取、
+      confirm、失败退避与租约恢复投递同一 eventId/同一 payload。
+        * next_retry_at = NULL：立即可被领取，不再等上次退避；
+        * lease_token/sending_at 清空：旧租约持有者的回写 CAS 全部要求 token 相等；
+        * retry/lease_recovery/confirm_writeback 三份历史预算不归零（不抹掉失败证据）。
+      本接口不在事务内 publish，也不在提交后自行发送：投递完全交给既有持久化机制。
+    -->
+    <update id="resetOutboxSentToPendingForReplay" timeout="3">
+        UPDATE video_status_outbox
+        SET status = 0,
+            next_retry_at = NULL,
+            sending_at = NULL,
+            lease_token = NULL
+        WHERE event_id = #{eventId}
+          AND status = 2
+    </update>
+
     <select id="selectRepairLogByOperationId"
             resultType="com.feibijiubi.backend.entity.VideoStatusConsumptionRepairLog"
             timeout="3">
@@ -126,7 +234,6 @@
         FROM video_status_consumption_repair_log
         WHERE operation_id = #{operationId}
     </select>
-
     <!-- 锁定目标事件后再读一次：处理同目标同 operationId 的并发幂等。 -->
     <select id="selectRepairLogByOperationIdForUpdate"
             resultType="com.feibijiubi.backend.entity.VideoStatusConsumptionRepairLog"

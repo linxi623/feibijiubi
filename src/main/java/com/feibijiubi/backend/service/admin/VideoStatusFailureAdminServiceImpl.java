@@ -17,10 +17,11 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * T10 第一阶段实现：只读失败诊断 + 受审计确认已阅（ACKNOWLEDGE）。
- * status3 预检查故意保守：只返回 REQUIRES_CONTROLLED_REPAIR；redis_applied_at 为空
- * 不证明未应用，超龄也不伪造成 SAFE。确认只写审计，不修改目标状态/计数/Redis，
- * 不创建新 eventId；consumed status0 只读，不能确认。
+ * T10 失败诊断实现：只读诊断 + 受审计确认已阅（ACKNOWLEDGE），并复用
+ * {@link VideoStatusStatus3ReplayService} 的判定输出 status3 重放预检查。
+ * status3 预检查不给 SAFE：{@code redis_applied_at} 为空不证明未应用，超龄也不伪造安全。
+ * 确认只写审计，不修改目标状态/计数/Redis，不创建新 eventId；consumed status0 只读，
+ * 不能确认也不能重放。
  */
 @Service
 @RequiredArgsConstructor
@@ -78,6 +79,7 @@ public class VideoStatusFailureAdminServiceImpl implements VideoStatusFailureAdm
     private final VideoStatusFailureAdminMapper mapper;
     private final VideoStatusProperties properties;
     private final ObjectMapper objectMapper;
+    private final VideoStatusStatus3ReplayService status3ReplayService;
 
     @Override
     @Transactional(readOnly = true)
@@ -128,8 +130,9 @@ public class VideoStatusFailureAdminServiceImpl implements VideoStatusFailureAdm
             throw notFound(source, eventId);
         }
         return new Detail(consumedItem(row), precheckConsumed(row),
-                "只读详情：status0 仅用于诊断且不能确认；status3 必须走受控修复，"
-                        + "本接口不改状态、不新建 eventId。");
+                "只读详情：status0 仅用于诊断且不能确认、不能重放；status3 如需受控重放"
+                        + "请用 POST /api/admin/video-status/failures/{eventId}/replay?source=CONSUMED"
+                        + "（proven-only，未满足证据一律拒绝）。本接口不改状态、不新建 eventId。");
     }
 
     @Override
@@ -318,7 +321,7 @@ public class VideoStatusFailureAdminServiceImpl implements VideoStatusFailureAdm
                 ? PRECHECK_OUTBOX_CONSUMED_LEDGER_EXISTS
                 : PRECHECK_OUTBOX_REQUIRES_CONTROLLED_REPAIR;
         return new Precheck(SOURCE_OUTBOX, row.getEventId(),
-                DECISION_REQUIRES_CONTROLLED_REPAIR, reason, false, false, null, true,
+                DECISION_REQUIRES_CONTROLLED_REPAIR, reason, false, false, null, true, null,
                 "Outbox FAILED 的 T07 单事件重放是另一条极窄路径；本 T10 预检查不认证 SAFE。 "
                         + "已存在 consumed 账本、或无法证明窗口/账本边界时，必须进入受控修复。"
                         + "确认已阅只写审计，不重放、不改状态。");
@@ -333,9 +336,10 @@ public class VideoStatusFailureAdminServiceImpl implements VideoStatusFailureAdm
         if (status == CONSUMED_RECEIVED) {
             return new Precheck(SOURCE_CONSUMED, row.getEventId(),
                     DECISION_DIAGNOSTIC_ONLY, PRECHECK_CONSUMED_STATUS0_EVIDENCE_UNKNOWN,
-                    redisEvidence, withinSafeWindow, age, false,
+                    redisEvidence, withinSafeWindow, age, false, null,
                     "status0 仅用于诊断且不能确认：本接口不领取、不重发、不转 status3。"
-                            + "redis_applied_at 为空不能证明未应用，需 T09/T10/T12 继续核对。");
+                            + "redis_applied_at 为空不能证明未应用，需 T09/T12 继续核对；"
+                            + "status3 的受控重放只适用于 status3 目标，status0 不适用。");
         }
         String reason;
         if (!redisEvidence && !withinSafeWindow) {
@@ -350,9 +354,12 @@ public class VideoStatusFailureAdminServiceImpl implements VideoStatusFailureAdm
         return new Precheck(SOURCE_CONSUMED, row.getEventId(),
                 DECISION_REQUIRES_CONTROLLED_REPAIR, reason, redisEvidence,
                 withinSafeWindow, age, true,
+                status3ReplayService.precheckStatus3Replay(row.getEventId()),
                 "status3 预检查不会返回 SAFE：redis_applied_at 为空不证明未应用，"
-                        + "超龄也不等于安全。本阶段不修改 process_status、不创建新 eventId、"
-                        + "不自动重放；确认已阅只写审计，受控修复/对账仍需后续任务。");
+                        + "超龄也不等于安全。replay 子结构给出与 POST replay 完全一致的判定："
+                        + "PROVEN_REPLAY_ELIGIBLE 仍需管理员显式 POST（证明 processed 幂等证据仍在），"
+                        + "REFUSED_* 给出稳定的 refusalCode。本接口不修改 process_status、"
+                        + "不创建新 eventId、不自动重放。");
     }
 
     private AcknowledgeAuditMetadata requireSameAcknowledgeOperation(

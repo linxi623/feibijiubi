@@ -52,8 +52,17 @@ public interface VideoStatusConsumedEventMapper {
             @Param("limit") int limit
     );
 
-    List<VideoStatusConsumedEvent> selectRebuildCandidates(
-            @Param("vid") Integer vid
+    /**
+     * T12-B：重建候选的 keyset 分页读取（按 id 严格前进，不用 OFFSET）。
+     *
+     * <p>{@code afterId == null} 表示第一页。调用方必须把它放在与基线读取
+     * <b>同一个</b> REPEATABLE_READ 只读事务里，逐页读到空页/短页为止；
+     * 页大小由调用方限制在 1..{@link com.feibijiubi.backend.config.VideoStatusProperties#MAX_REBUILD_CANDIDATE_PAGE_SIZE}。</p>
+     */
+    List<VideoStatusConsumedEvent> selectRebuildCandidatesAfter(
+            @Param("vid") Integer vid,
+            @Param("afterId") Long afterId,
+            @Param("limit") int limit
     );
 
     List<VideoStatusConsumedEvent> selectPendingForUpdate(

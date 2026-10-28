@@ -7,6 +7,7 @@ import com.feibijiubi.backend.config.VideoStatusProperties;
 import com.feibijiubi.backend.mapper.VideoStatusFailureAdminMapper;
 import com.feibijiubi.backend.service.admin.VideoStatusFailureAdminRow.ConsumedRow;
 import com.feibijiubi.backend.service.admin.VideoStatusFailureAdminRow.OutboxRow;
+import com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusEventFingerprintServiceImpl;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,10 +20,12 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.env.EnumerablePropertySource;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.ContextConfiguration;
@@ -147,8 +150,15 @@ class VideoStatusFailureAdminIsolatedTests {
             "org.redisson.spring.starter.RedissonAutoConfigurationV2"})
     @MapperScan(basePackageClasses = VideoStatusFailureAdminMapper.class)
     @EnableConfigurationProperties(VideoStatusProperties.class)
-    @Import(VideoStatusFailureAdminServiceImpl.class)
+    @Import({VideoStatusFailureAdminServiceImpl.class, VideoStatusStatus3ReplayService.class,
+            VideoStatusEventFingerprintServiceImpl.class})
     static class TestApplication {
+
+        /** 本类不连 Redis：status3 重放的 processed 证据读取只做 mock，不访问任何端点。 */
+        @Bean
+        StringRedisTemplate stringRedisTemplate() {
+            return org.mockito.Mockito.mock(StringRedisTemplate.class);
+        }
     }
 
     @Autowired
@@ -163,6 +173,8 @@ class VideoStatusFailureAdminIsolatedTests {
     PlatformTransactionManager transactionManager;
     @Autowired
     ObjectMapper objectMapper;
+    @Autowired
+    VideoStatusStatus3ReplayService status3ReplayService;
 
     int vid;
 
@@ -591,7 +603,8 @@ class VideoStatusFailureAdminIsolatedTests {
                             }
                         });
         VideoStatusFailureAdminServiceImpl failingService =
-                new VideoStatusFailureAdminServiceImpl(failingMapper, properties, objectMapper);
+                new VideoStatusFailureAdminServiceImpl(failingMapper, properties, objectMapper,
+                        status3ReplayService);
 
         TransactionTemplate template = new TransactionTemplate(transactionManager);
         assertThrows(DataIntegrityViolationException.class,

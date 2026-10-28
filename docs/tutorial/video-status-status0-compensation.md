@@ -71,6 +71,14 @@ preview 不访问 Redis，因此每一项都明确返回 `evidenceStatus=EVIDENC
 `PREVIEW_ONLY_MASTER_SWITCH_OFF`、`BLOCKED_INTEGRITY_NOT_CONFIRMED`、
 `PROVEN_PROCESSED_EVIDENCE_ONLY` 或 `ALLOW_UNPROVEN_REPLAY`。
 preview 的静默期/租约/冷却判断同样使用同一条 SQL 返回的 `NOW(3)`，不与 JVM 时钟混用；
+**年龄/内容判定与 `runOnce` 共用同一个 `evaluate`**（T14-S2）：`items[]` 新增 `refusalCode`，
+`withinSafeWindow` 同时包含 DB 年龄与 payload `occurredAt` 窗口，因此 `eligible=true`
+不会出现在写侧会拒绝的行上（但它仍不读 Redis，仍不代表写侧一定发送）。
+payload 解析失败、`validate()` 失败或与账本行不一致时 `withinSafeWindow=false`（`occurredAt` 无从证明），
+`refusalCode` 只可能是固定内容码 `STATUS0_PAYLOAD_INVALID` / `STATUS0_EVENT_INVALID` /
+`STATUS0_EVENT_MISMATCH`，不回显原始异常文本（未识别消息回落 `STATUS0_EVENT_INVALID`）；
+写侧的指纹不符（`STATUS0_FINGERPRINT_MISMATCH`）不在 preview 判定内，所以 `eligible=true` 仍可能被
+`runOnce` 以指纹原因拒绝。
 超龄事件计数最多扫描 `status0-compensation-over-safe-window-count-cap` 条，达到上限时
 返回 `overSafeWindowLowerBound=true`，只声称“至少这么多”，不对全表做无界 COUNT。
 

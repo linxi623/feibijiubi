@@ -10,11 +10,13 @@ import com.feibijiubi.backend.mq.VideoStatusEventPublisher;
 import com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusStatus0CompensationClaimService;
 import com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusStatus0CompensationServiceImpl;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusEventFingerprintService;
+import com.feibijiubi.backend.service.video.videostatus.VideoStatusEventAgeGuard;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusStatus0CompensationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -32,6 +34,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -491,7 +494,115 @@ class VideoStatusStatus0CompensationTests {
             assertThat(item.withinGrace()).isTrue();
             assertThat(item.leaseFree()).isTrue();
             assertThat(item.cooldownElapsed()).isTrue();
+            // 正向口径：合法 fixture（DB 年龄 100s、occurredAt 100s 前、attempts 1<5、无租约/冷却）
+            // 下读写两侧都放行，因而不会报任何拒绝原因码。
+            assertThat(item.withinSafeWindow()).isTrue();
+            assertThat(item.eligible()).isTrue();
+            assertThat(item.refusalCode()).isNull();
         });
+    }
+
+    @Test
+    void malformedPayloadIsNotReportedAsSafeAndReleasesWithoutPublishOrRedisRead() {
+        enable();
+        VideoStatusConsumedEvent row = claimedRow(100L);
+        row.setPayload("{not-a-json-payload}");
+        when(mapper.selectStatus0CompensationPreview(null, 10)).thenReturn(List.of(row));
+
+        VideoStatusStatus0CompensationService.PreviewItem item =
+                service.preview(10, null).items().get(0);
+
+        assertThat(item.withinSafeWindow()).isFalse();
+        assertThat(item.eligible()).isFalse();
+        assertThat(item.refusalCode()).isEqualTo("STATUS0_PAYLOAD_INVALID");
+
+        VideoStatusStatus0CompensationService.RoundResult result = service.runOnce(null);
+
+        assertThat(result.releasedOnFailure()).isEqualTo(1);
+        assertThat(result.republished()).isZero();
+        verify(publisher, never()).publish(any(), anyString());
+        verify(mapper).releaseStatus0Compensation(
+                eq(row.getEventId()), eq("lease-1"),
+                eq(properties.getStatus0CompensationCooldownSeconds()),
+                eq("STATUS0_PAYLOAD_INVALID")
+        );
+        // 内容无法验证时既不读 processed，也不回显原始异常文本。
+        verifyNoInteractions(redisTemplate);
+    }
+
+    @Test
+    void invalidEventIsNotReportedAsSafeAndReleasesWithoutPublishOrRedisRead() throws Exception {
+        enable();
+        VideoStatusConsumedEvent row = claimedRow(100L);
+        VideoStatusChangedEvent invalid = new VideoStatusChangedEvent(
+                row.getEventId(), 1, VideoStatusEventType.LIKE, 1L, 1.5,
+                LocalDateTime.now().minusSeconds(100), 1, "trace-1"
+        );
+        row.setPayload(objectMapper.writeValueAsString(invalid));
+        when(mapper.selectStatus0CompensationPreview(null, 10)).thenReturn(List.of(row));
+
+        VideoStatusStatus0CompensationService.PreviewItem item =
+                service.preview(10, null).items().get(0);
+
+        assertThat(item.withinSafeWindow()).isFalse();
+        assertThat(item.eligible()).isFalse();
+        assertThat(item.refusalCode()).isEqualTo("STATUS0_EVENT_INVALID");
+
+        service.runOnce(null);
+
+        verify(publisher, never()).publish(any(), anyString());
+        verify(mapper).releaseStatus0Compensation(
+                eq(row.getEventId()), eq("lease-1"),
+                eq(properties.getStatus0CompensationCooldownSeconds()),
+                eq("STATUS0_EVENT_INVALID")
+        );
+        verifyNoInteractions(redisTemplate);
+    }
+
+    @Test
+    void ledgerPayloadMismatchIsNotReportedAsSafeAndReleasesWithoutPublish() {
+        enable();
+        VideoStatusConsumedEvent row = claimedRow(100L);
+        // 账本 delta 与 payload 不一致：属于内容判定失败，同样无法证明 occurredAt。
+        row.setDelta(2L);
+        when(mapper.selectStatus0CompensationPreview(null, 10)).thenReturn(List.of(row));
+
+        VideoStatusStatus0CompensationService.PreviewItem item =
+                service.preview(10, null).items().get(0);
+
+        assertThat(item.withinSafeWindow()).isFalse();
+        assertThat(item.eligible()).isFalse();
+        assertThat(item.refusalCode()).isEqualTo("STATUS0_EVENT_MISMATCH");
+
+        service.runOnce(null);
+
+        verify(publisher, never()).publish(any(), anyString());
+        verify(mapper).releaseStatus0Compensation(
+                eq(row.getEventId()), eq("lease-1"),
+                eq(properties.getStatus0CompensationCooldownSeconds()),
+                eq("STATUS0_EVENT_MISMATCH")
+        );
+        verifyNoInteractions(redisTemplate);
+    }
+
+    @Test
+    void fingerprintMismatchReleasesWithoutPublishOrRedisRead() {
+        enable();
+        VideoStatusConsumedEvent row = claimedRow(100L);
+        when(fingerprintService.hash(any())).thenReturn("hash-from-recomputed-payload");
+
+        VideoStatusStatus0CompensationService.RoundResult result = service.runOnce(null);
+
+        assertThat(result.releasedOnFailure()).isEqualTo(1);
+        assertThat(result.republished()).isZero();
+        verify(publisher, never()).publish(any(), anyString());
+        verify(mapper).releaseStatus0Compensation(
+                eq(row.getEventId()), eq("lease-1"),
+                eq(properties.getStatus0CompensationCooldownSeconds()),
+                eq("STATUS0_FINGERPRINT_MISMATCH")
+        );
+        // 指纹不符在读取 processed 证据之前就拒绝。
+        verifyNoInteractions(redisTemplate);
     }
 
     @Test
@@ -626,6 +737,85 @@ class VideoStatusStatus0CompensationTests {
                 .isEqualTo(10 + 30 + 50);
     }
 
+    @Test
+    void occurredAtBeyondFixedThirtyDayBoundIsReleasedUnderWidenedWindow() {
+        useWidenedWindow();
+        enable();
+        VideoStatusConsumedEvent row = claimedRow(Duration.ofDays(31).toSeconds());
+
+        VideoStatusStatus0CompensationService.RoundResult result =
+                service.runOnce(null);
+
+        assertThat(result.releasedOnFailure()).isEqualTo(1);
+        assertThat(result.republished()).isZero();
+        verify(publisher, never()).publish(any(), anyString());
+        verify(mapper, never()).markStatus0CompensationRepublished(
+                anyString(), anyString());
+        // 固定上界判定必须早于 Redis 证据检查：拒绝路径不读 processed。
+        verifyNoInteractions(redisTemplate);
+        verify(mapper).releaseStatus0Compensation(
+                eq(row.getEventId()), eq("lease-1"),
+                eq(properties.getStatus0CompensationCooldownSeconds()),
+                eq(VideoStatusEventAgeGuard.REFUSAL_CODE)
+        );
+    }
+
+    @Test
+    void previewAndRunOnceReportTheSameRefusalCodeBeyondThirtyDays() {
+        useWidenedWindow();
+        enable();
+        VideoStatusConsumedEvent row = claimedRow(Duration.ofDays(31).toSeconds());
+        when(mapper.selectStatus0CompensationPreview(null, 10)).thenReturn(List.of(row));
+
+        VideoStatusStatus0CompensationService.PreviewItem item =
+                service.preview(10, null).items().get(0);
+
+        assertThat(item.refusalCode()).isEqualTo(VideoStatusEventAgeGuard.REFUSAL_CODE);
+        assertThat(item.eligible()).isFalse();
+        assertThat(item.withinSafeWindow()).isFalse();
+
+        service.runOnce(null);
+
+        verify(mapper).releaseStatus0Compensation(
+                row.getEventId(), "lease-1",
+                properties.getStatus0CompensationCooldownSeconds(),
+                item.refusalCode()
+        );
+        verify(publisher, never()).publish(any(), anyString());
+    }
+
+    @Test
+    void occurredAtInsideFixedBoundIsStillRepublishedUnderWidenedWindow() {
+        useWidenedWindow();
+        enable();
+        claimedRow(Duration.ofDays(20).toSeconds());
+        when(redisTemplate.getExpire(anyString(), eq(TimeUnit.SECONDS)))
+                .thenReturn(properties.getStatus0CompensationRequiredProcessedTtlSeconds());
+        when(mapper.markStatus0CompensationRepublished(anyString(), anyString()))
+                .thenReturn(1);
+
+        VideoStatusStatus0CompensationService.RoundResult result =
+                service.runOnce(null);
+
+        assertThat(result.republished()).isEqualTo(1);
+        verify(publisher).publish(any(), eq("lease-1"));
+    }
+
+    @Test
+    void defaultSevenDayWindowStillReportsOriginalOverSafeWindowReason() {
+        enable();
+        VideoStatusConsumedEvent row = claimedRow(Duration.ofDays(31).toSeconds());
+
+        service.runOnce(null);
+
+        verify(publisher, never()).publish(any(), anyString());
+        verify(mapper).releaseStatus0Compensation(
+                eq(row.getEventId()), eq("lease-1"),
+                eq(properties.getStatus0CompensationCooldownSeconds()),
+                eq("STATUS0_OVER_SAFE_WINDOW")
+        );
+    }
+
     private VideoStatusStatus0CompensationServiceImpl serviceWithNanos(
             LongSupplier nanoTime) {
         return new VideoStatusStatus0CompensationServiceImpl(
@@ -636,6 +826,18 @@ class VideoStatusStatus0CompensationTests {
     private void enable() {
         properties.setStatus0CompensationEnabled(true);
         properties.setStatus0CompensationIntegrityConfirmed(true);
+    }
+
+    /**
+     * 合法但把可配置安全窗口调到 30 天以上的配置：启动校验只要求窗口小于
+     * {@code redisEventTtlDays * 86400}，所以 60 天 TTL + 45 天窗口可以通过 {@code validate()}。
+     * 实现类每次调用都读同一个 {@code properties} 引用，所以不需要重建服务。
+     */
+    private void useWidenedWindow() {
+        properties.setRedisEventTtlDays(60);
+        properties.setConsumerRecoveryAutoReplayMaxAgeSeconds(
+                (int) Duration.ofDays(45).toSeconds());
+        properties.validate();
     }
 
     private VideoStatusConsumedEvent claimedRow(long ageSeconds) {

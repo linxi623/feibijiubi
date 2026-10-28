@@ -1,5 +1,6 @@
 package com.feibijiubi.backend.service.impl.video.videostatus;
 
+import com.feibijiubi.backend.common.RedisOperationException;
 import com.feibijiubi.backend.common.RetryableMessageException;
 import com.feibijiubi.backend.enums.VideoStatusConsumeProcessStatus;
 import com.feibijiubi.backend.event.VideoStatusDelta;
@@ -26,6 +27,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class VideoStatusRebuildServiceImpl
         implements VideoStatusRebuildService {
+
+    /** 每批 processed 证据的固定上限：有界内存、有界 pipeline，不随候选总数增长。 */
+    private static final int PROCESSED_EVIDENCE_BATCH_SIZE = 256;
 
     @Resource(name = "videoStatusInitScript")
     private DefaultRedisScript<String> videoStatusInitScript;
@@ -111,6 +115,15 @@ public class VideoStatusRebuildServiceImpl
     /**
      * current 是 MySQL 已落库基线，加上所有已确认应用到 Redis、
      * 但仍未批量落库的事件（消费事件状态 0/1）。
+     *
+     * <p>T12-A：只有状态 0（RECEIVED）需要 Redis processed 证据，按固定有界批次
+     * 做一次 pipeline EXISTS，替换原先每条事件的单次 RTT；状态 1
+     * （REDIS_APPLIED_PENDING_FLUSH）已确认应用，不再查询 Redis。
+     * 批次按快照顺序切分，逐 key 结果按位置回填，因此累计顺序与原实现一致；
+     * 不额外构造全量候选 key 集合，也不允许用“存在的总数”代替逐条证据。</p>
+     *
+     * <p>证据查询失败（异常、条数不符、未知结果）直接上抛，绝不发布半份初始化：
+     * 调用方在 {@code initializeRedis} 之前就失败，门闩由 finally 释放。</p>
      */
     private InitialValues classifyConfirmedPending(
             VideoStatusRebuildSnapshot snapshot
@@ -119,25 +132,44 @@ public class VideoStatusRebuildServiceImpl
         double pendingHotScore = 0D;
 
         try {
-            for (VideoStatusRebuildSnapshot.Candidate candidate
-                    : snapshot.candidates()) {
-                boolean confirmed =
-                        candidate.processStatus()
-                                == VideoStatusConsumeProcessStatus
-                                .REDIS_APPLIED_PENDING_FLUSH.getCode()
-                                || (candidate.processStatus()
-                                == VideoStatusConsumeProcessStatus.RECEIVED
-                                .getCode()
-                                && Boolean.TRUE.equals(redisUtils.hasKey(
-                                RedisKeyUtils.processedKey(
-                                        candidate.eventId()
-                                )
-                        )));
-                if (!confirmed) {
-                    continue;
+            List<VideoStatusRebuildSnapshot.Candidate> candidates =
+                    snapshot.candidates();
+            for (int start = 0; start < candidates.size();
+                 start += PROCESSED_EVIDENCE_BATCH_SIZE) {
+                int end = Math.min(
+                        start + PROCESSED_EVIDENCE_BATCH_SIZE,
+                        candidates.size()
+                );
+                List<VideoStatusRebuildSnapshot.Candidate> batch =
+                        candidates.subList(start, end);
+                List<Boolean> evidence = loadProcessedEvidence(
+                        snapshot.vid(),
+                        batch
+                );
+
+                int evidenceIndex = 0;
+                for (VideoStatusRebuildSnapshot.Candidate candidate : batch) {
+                    boolean confirmed;
+                    if (candidate.processStatus()
+                            == VideoStatusConsumeProcessStatus
+                            .REDIS_APPLIED_PENDING_FLUSH.getCode()) {
+                        confirmed = true;
+                    } else if (candidate.processStatus()
+                            == VideoStatusConsumeProcessStatus.RECEIVED
+                            .getCode()) {
+                        confirmed = Boolean.TRUE.equals(
+                                evidence.get(evidenceIndex)
+                        );
+                        evidenceIndex++;
+                    } else {
+                        confirmed = false;
+                    }
+                    if (!confirmed) {
+                        continue;
+                    }
+                    pending.add(candidate.delta());
+                    pendingHotScore += candidate.hotScoreDelta();
                 }
-                pending.add(candidate.delta());
-                pendingHotScore += candidate.hotScoreDelta();
             }
 
             Totals current = Totals.from(snapshot);
@@ -155,6 +187,46 @@ public class VideoStatusRebuildServiceImpl
                     e
             );
         }
+    }
+
+    /**
+     * 为本批状态 0 候选取 processed 证据：一批一次 pipeline EXISTS。
+     * 批内没有状态 0 候选时不发起任何 Redis 请求；
+     * 返回结果必须与本批 key 等长、同序且没有空值，否则抛
+     * {@link RedisOperationException}（未知不等于“未应用”）。
+     */
+    private List<Boolean> loadProcessedEvidence(
+            Integer vid,
+            List<VideoStatusRebuildSnapshot.Candidate> batch
+    ) {
+        List<String> keys = new ArrayList<>(batch.size());
+        for (VideoStatusRebuildSnapshot.Candidate candidate : batch) {
+            if (candidate.processStatus()
+                    == VideoStatusConsumeProcessStatus.RECEIVED.getCode()) {
+                keys.add(RedisKeyUtils.processedKey(candidate.eventId()));
+            }
+        }
+        if (keys.isEmpty()) {
+            return List.of();
+        }
+        List<Boolean> evidence = redisUtils.hasKeys(keys);
+        if (evidence == null || evidence.size() != keys.size()) {
+            throw new RedisOperationException(
+                    "Redis processed 证据条数与候选事件不一致，vid=" + vid
+                            + "，expected=" + keys.size()
+                            + "，actual="
+                            + (evidence == null ? "null" : evidence.size())
+            );
+        }
+        for (Boolean value : evidence) {
+            if (value == null) {
+                throw new RedisOperationException(
+                        "Redis processed 证据包含空结果，vid=" + vid
+                                + "，无法判定事件是否已应用"
+                );
+            }
+        }
+        return evidence;
     }
 
     private void initializeRedis(

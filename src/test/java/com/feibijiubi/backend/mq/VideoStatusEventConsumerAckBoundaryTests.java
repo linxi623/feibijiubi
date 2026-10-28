@@ -1,12 +1,14 @@
 package com.feibijiubi.backend.mq;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.feibijiubi.backend.common.NonRetryableMessageException;
 import com.feibijiubi.backend.common.RetryableMessageException;
 import com.feibijiubi.backend.config.VideoStatusProperties;
 import com.feibijiubi.backend.enums.RegistrationResult;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
 import com.feibijiubi.backend.event.VideoStatusEventType;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusConsumptionService;
+import com.feibijiubi.backend.service.video.videostatus.VideoStatusEventAgeGuard;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusEventFingerprintService;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusService;
 import com.rabbitmq.client.Channel;
@@ -147,6 +149,28 @@ class VideoStatusEventConsumerAckBoundaryTests {
         verify(channel, never()).basicNack(15L, false, true);
     }
 
+    @Test
+    void staleEventRejectionGoesDeadThenAckExactlyOnce() throws Exception {
+        stubStaleEventRejection();
+        Channel channel = mock(Channel.class);
+
+        consumer.consume(message(17L), channel);
+
+        // T14-S1：30 天年龄拒绝走既有 NonRetryable → DLQ + ACK 边界，
+        // 不是静默 ACK，也不进入 retry 队列。
+        verify(forwarder).toDead(
+                any(Message.class),
+                eq(VideoStatusEventAgeGuard.EXPIRED_REASON)
+        );
+        verify(forwarder, never()).toRetry(any(Message.class), anyInt());
+        verify(channel).basicAck(17L, false);
+        verify(channel, never()).basicNack(17L, false, true);
+        verify(videoStatusService, never()).apply(any());
+        // NonRetryable 路径不写消费失败记录（只有可重试路径才记）。
+        verify(consumptionService, never())
+                .recordConsumerFailure(anyString(), anyInt(), anyString());
+    }
+
     private void stubSuccessfulApply() throws Exception {
         VideoStatusChangedEvent event = event();
         when(objectMapper.readValue(any(byte[].class),
@@ -165,6 +189,16 @@ class VideoStatusEventConsumerAckBoundaryTests {
         when(fingerprintService.hash(event)).thenReturn("b".repeat(64));
         when(consumptionService.register(event, "b".repeat(64)))
                 .thenThrow(new RetryableMessageException("redis down"));
+    }
+
+    private void stubStaleEventRejection() throws Exception {
+        VideoStatusChangedEvent event = event();
+        when(objectMapper.readValue(any(byte[].class),
+                eq(VideoStatusChangedEvent.class))).thenReturn(event);
+        when(fingerprintService.hash(event)).thenReturn("c".repeat(64));
+        when(consumptionService.register(event, "c".repeat(64)))
+                .thenThrow(new NonRetryableMessageException(
+                        VideoStatusEventAgeGuard.EXPIRED_REASON));
     }
 
     private static VideoStatusChangedEvent event() {

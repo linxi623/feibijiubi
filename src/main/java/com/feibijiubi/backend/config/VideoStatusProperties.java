@@ -31,6 +31,21 @@ public class VideoStatusProperties {
     public static final int MAX_CONSUMER_MAX_RETRIES = 100;
     public static final int MAX_LEASE_OR_CONFIRM_TIMEOUT_SECONDS = 3_600;
     /**
+     * T12-B：重建候选 keyset 分页的固定页大小上限。
+     *
+     * <p>一页最多 1000 行是“单次数据库往返 + 单次转换循环”的显式上界，不是性能调优旋钮：
+     * 页大小越大，单页内存与一次转换的耗时越长，预算检查的粒度也越粗。</p>
+     */
+    public static final int MAX_REBUILD_CANDIDATE_PAGE_SIZE = 1_000;
+    /**
+     * T12-B：重建候选总数上限允许配置到的最大值。
+     *
+     * <p>候选 list 是“有界”而不是“常数内存”：上界就是本项配置。给一个远高于默认值的
+     * 硬上限，是为了防止把 {@code rebuild-max-candidates} 误配成近似无界的数字后，
+     * 又回到“一个视频的候选全量进堆”的老问题。</p>
+     */
+    public static final int MAX_REBUILD_MAX_CANDIDATES = 10_000_000;
+    /**
      * T07：投递租约必须比 publish confirm 超时多出的安全余量（秒）。
      *
      * <p>confirm 只是“等 MQ 回执”的上限；拿到回执之后还要做 markSent / markConfirmedPending /
@@ -105,6 +120,23 @@ public class VideoStatusProperties {
     // 避免每次 preview 对全表做无界 COUNT。
     private int status0CompensationOverSafeWindowCountCap = 1000;
 
+    // ------------------------------------------------------------------ T10-B1
+    // consumed status3 受控重放的尝试上限：按 repair_log 中同一 eventId、
+    // action=REPLAY_CONSUMED_TO_RECEIVED 的已完成审计行计数（有界查询）。
+    // 重放后若刷库再次数据异常，行会重新落回 status3；没有上限就会形成
+    // “重放→再入 status3→再重放”的人工死循环，因此这里只允许有限次人工干预。
+    private int status3ReplayMaxAttempts = 3;
+
+    // ------------------------------------------------------------------ T12-B
+    // 重建候选的 keyset 分页页大小（一页最多 1000 行，不允许 OFFSET）。
+    private int rebuildCandidatePageSize = MAX_REBUILD_CANDIDATE_PAGE_SIZE;
+    // 单个视频允许的重建候选总数上限：超过即失败重试，绝不返回截断快照。
+    // 默认 100000 覆盖当前数据规模，同时把最坏情况的内存/转换成本写进配置而不是隐含在代码里。
+    private int rebuildMaxCandidates = 100_000;
+    // 快照读取预算（毫秒）：从 load() 开始读基线起计时，页间与逐条转换时检查。
+    // 它只决定“还要不要继续读下一页/转下一条”，不会中断已在执行的 SQL。
+    private long rebuildSnapshotBudgetMs = 10_000L;
+
 
     /**
      * 启动期参数校验。任何非法取值都在启动阶段抛出可读错误，
@@ -156,6 +188,13 @@ public class VideoStatusProperties {
                 1, MAX_CONSUMER_MAX_RETRIES);
         requireRange("status0CompensationOverSafeWindowCountCap",
                 status0CompensationOverSafeWindowCountCap, 1, MAX_BATCH_SIZE);
+        requireRange("status3ReplayMaxAttempts", status3ReplayMaxAttempts,
+                1, MAX_CONSUMER_MAX_RETRIES);
+        requireRange("rebuildCandidatePageSize", rebuildCandidatePageSize,
+                1, MAX_REBUILD_CANDIDATE_PAGE_SIZE);
+        requireRange("rebuildMaxCandidates", rebuildMaxCandidates,
+                1, MAX_REBUILD_MAX_CANDIDATES);
+        requirePositiveDelay("rebuildSnapshotBudgetMs", rebuildSnapshotBudgetMs);
         requirePositiveDelay("status0CompensationMinAgeSeconds",
                 status0CompensationMinAgeSeconds);
         requirePositiveDelay("status0CompensationFixedDelayMs",
@@ -220,6 +259,34 @@ public class VideoStatusProperties {
      * 幂等证据可能先过期，必须拒绝发送而不是仅检查 Key 当前是否存在。
      */
     public long getStatus0CompensationRequiredProcessedTtlSeconds() {
+        long leaseOrConfirmSeconds = Math.max(
+                status0CompensationLeaseSeconds,
+                publishConfirmTimeoutSeconds
+        );
+        return Math.addExact(mqRetryBackoffSeconds(), leaseOrConfirmSeconds);
+    }
+
+    /**
+     * T10-B1：consumed status3 受控重放（proven 路径）要求 processed Key 的最小剩余 TTL。
+     *
+     * <p>重放不再由本线程直接 publish，而是把 Outbox 行从 SENT 退回 PENDING，交给既有
+     * relay 领取/confirm/租约恢复投递。因此“从此刻到消费者真正应用这条消息”的最大耗时
+     * 需要覆盖 Outbox 投递租约（租约过期后由恢复流程接管继续投递），而不只是 T09 的
+     * 补偿租约；这里取所有投递/回写余量中的最大值，比 T09 更保守。</p>
+     */
+    public long getStatus3ReplayRequiredProcessedTtlSeconds() {
+        long deliverySeconds = Math.max(
+                Math.max(outboxLeaseSeconds, status0CompensationLeaseSeconds),
+                publishConfirmTimeoutSeconds
+        );
+        return Math.addExact(mqRetryBackoffSeconds(), deliverySeconds);
+    }
+
+    /**
+     * 重放消息从进入 MQ 到最后一次消费失败所允许的最长重试退避（秒）。
+     * T09 的 status0 补偿与 T10-B1 的 status3 重放共用同一份计算，避免出现两种口径。
+     */
+    private long mqRetryBackoffSeconds() {
         long retryBackoffSeconds = 0L;
         for (int attempt = 1; attempt <= consumerMaxRetries; attempt++) {
             if (attempt <= 1) {
@@ -233,11 +300,7 @@ public class VideoStatusProperties {
                         retryBackoffSeconds, RETRY_BACKOFF_LATER_SECONDS);
             }
         }
-        long leaseOrConfirmSeconds = Math.max(
-                status0CompensationLeaseSeconds,
-                publishConfirmTimeoutSeconds
-        );
-        return Math.addExact(retryBackoffSeconds, leaseOrConfirmSeconds);
+        return retryBackoffSeconds;
     }
 
     private void requirePositiveDelay(String name, long value) {

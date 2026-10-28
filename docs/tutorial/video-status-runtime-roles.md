@@ -123,12 +123,14 @@ SELECT MIN(created_at) FROM video_status_consumed_event WHERE process_status IN 
 在隔离环境（MySQL 13307 / Redis 16379 / RabbitMQ 15673）用**真实开关**和**真实业务入口**把 4.1/4.2
 的顺序跑一遍（每次运行创建独立用户/视频，不清理部署数据）：
 
-1. `async-enabled=true` 下调用真实 `UserVideoService#increasePlayCount`：只新增 Outbox(`status=0`)，
+1. `async-enabled=true` 下调用真实 `UserVideoService#increasePlayCount(Integer currentUserId, Integer vid,
+   String requestKey, String visitorId)`（演练里由 `countOnePlay()` 每次给新的随机访客与随机 `requestKey`，
+   因为 T15 第二阶段后同一访客/同一键会被窗口抑制或幂等重放）：只新增 Outbox(`status=0`)，
    DB 基线与 Redis current 都不变；`relay()` → 真实消费者 → flush 后收敛为 1/1。
 2. 停输入并置 `outbox-relay-enabled=false` 后调用 `relay()`：Outbox 仍为 `status=0`、消费表无新行、
    主/重试/死信队列 ready 与 unacked 均为 0；恢复开关后同一事件被投递并收敛（证明停投只停投递）。
 3. 切 sync 前显式排空：本 vid 的 Outbox `0/1`=0、`process_status` `0/1`=0、队列为空、dirty 不含该 vid。
-4. `async-enabled=false` 后调用同一 `UserVideoService` 入口：直接写 `video_status` 基线，
+4. `async-enabled=false` 后调用同一 `UserVideoService` 入口（同步基线路径）：直接写 `video_status` 基线，
    不新增 Outbox/消费行；**Redis current 保持在旧值**——同步路径不写缓存，这是既有语义而不是 bug。
 5. 在持有 vid 锁、并再次确认无 Outbox `0/1` 与 `process_status` `0/1` 后，只删除本测试 vid 的
    current Hash，再调用 `ensureInitialized` 从 DB 基线重建；断言 current 与 feed 热点分都等于基线、

@@ -1,8 +1,12 @@
-# T10 第一阶段：失败事件只读诊断与受审计确认已阅（已合入，T10 未完成）
+# T10 失败事件诊断、受审计确认已阅与 consumed status3 受控重放（第一阶段已合入；T10 未完成）
 
-> 状态：**第一阶段已合入主分支 `6fc5e7f`，T10 整项仍未完成**。DLQ 摄入/处置、
-> consumed status3 安全重放、批量处置仍待后续任务；只读对账已作为同一阶段的另一入口合入，
-> 见 `video-status-reconciliation.md`。本文不宣称生产验收。
+> 状态：**第一阶段（只读诊断 + 确认已阅 + 只读对账）已合入主分支 `6fc5e7f`**；
+> **T10-B1（consumed status3 单事件 proven-only 受控重放）为候选实现，等待父代理验收**。
+> T10 整项仍未完成：DLQ 摄入/处置、批量处置、刷库型 status3 修复与自动修复/收敛仍待后续。
+> 本文不宣称生产验收。
+>
+> status3 重放的完整协议、拒绝矩阵与安全边界见 `video-status-status3-replay.md`；
+> 只读对账见 `video-status-reconciliation.md`。
 
 ## 1. 为什么先做“只读 + 审计确认”
 
@@ -28,6 +32,7 @@
 | GET | `/api/admin/video-status/failures/{eventId}?source=OUTBOX` | 安全详情 |
 | GET | `/api/admin/video-status/failures/{eventId}/precheck?source=CONSUMED` | 处置预检查 |
 | POST | `/api/admin/video-status/failures/{eventId}/acknowledge?source=CONSUMED` | 受审计确认已阅 |
+| POST | `/api/admin/video-status/failures/{eventId}/replay?source=CONSUMED` | T10-B1 status3 受控重放（proven-only） |
 
 `source` 默认 `OUTBOX`、大小写不敏感；`afterId` 是上一页最后一条的 `id`（`>=0`）；
 `limit` 为 1..100、默认 20。服务端最多读 `limit+1` 行判断 `hasMore`，`nextAfterId` 仅在
@@ -65,6 +70,10 @@ consumed status0 表示事件已收到但还没有足够证据判断是否已应
 也不能被本接口领取、重发或转 status3。对 status0 调用 `acknowledge` 返回 409，且不写审计。
 其它 consumed 状态（1/2）同样拒绝确认。
 
+注意：`acknowledge` 与 `replay` 是**两个不同动作**。status3 可以确认已阅（只写审计），
+也可以单独调用 `POST .../replay?source=CONSUMED` 做受控重放；后者有自己的完整拒绝矩阵，
+不影响 confirm/acknowledge 的行为。
+
 ## 4. status3 预检查为什么不返回 SAFE
 
 对 `video_status_consumed_event.process_status=3`：
@@ -80,8 +89,29 @@ consumed status0 表示事件已收到但还没有足够证据判断是否已应
 - `CONSUMED_REDIS_EVIDENCE_MISSING_AND_OVER_SAFE_WINDOW`
 - `CONSUMED_REQUIRES_CONTROLLED_REPAIR`
 
-status0 只返回 `DIAGNOSTIC_ONLY_EVIDENCE_UNKNOWN`，且 `canAcknowledge=false`。Outbox 预检查同样
-永远返回 `REQUIRES_CONTROLLED_REPAIR`，不会因为计数未达预算或时间窗看起来正常就认证 SAFE。
+status0 只返回 `DIAGNOSTIC_ONLY_EVIDENCE_UNKNOWN`，且 `canAcknowledge=false`，`replay` 为 null。
+Outbox 预检查同样永远返回 `REQUIRES_CONTROLLED_REPAIR`，不会因为计数未达预算或时间窗看起来正常
+就认证 SAFE。
+
+### 4.1 status3 预检查的 `replay` 子结构（T10-B1）
+
+status3 的预检查额外返回 `replay` 字段，它与 `POST .../replay` **共用同一套判定**，因此读侧不会
+给出写侧会拒绝的“可重放”：
+
+| 字段 | 说明 |
+| --- | --- |
+| `decision` | `PROVEN_REPLAY_ELIGIBLE` 或 `REFUSED_CONTROLLED_REPAIR_ONLY` |
+| `eligible` | 当前证据是否满足重放条件；即使为 true 也仍需管理员显式 POST |
+| `refusalCode` | 拒绝时的稳定原因码（见 `video-status-status3-replay.md` 的拒绝矩阵） |
+| `redisAppliedEvidencePresent` | `redis_applied_at` 是否存在（存在即刷库型，直接拒绝） |
+| `withinSafeWindow` / `consumedAgeSeconds` | DB 时钟计算的年龄与安全窗口 |
+| `outboxStatus` | 同一 eventId 的 Outbox 行状态（重放要求 `2 SENT`） |
+| `processedTtlSeconds` | processed 幂等 Key 的剩余 TTL；null 表示缺失/不可判断 |
+| `replayAttempts` / `maxReplayAttempts` | 已有人工重放次数与上限 |
+
+预检查本身只读：不领取、不改状态、不发送消息，唯一的 I/O 是一次只读 Redis `GETEXPIRE`；
+Redis 读取异常返回 `CONSUMED_EVIDENCE_CHECK_FAILED`，绝不 fail-open。`decision` 仍不是 SAFE：
+`PROVEN_REPLAY_ELIGIBLE` 只表示“当前证据允许一次受控重放”。
 
 ## 5. 确认已阅的幂等与事务
 
@@ -119,7 +149,11 @@ status0 只返回 `DIAGNOSTIC_ONLY_EVIDENCE_UNKNOWN`，且 `canAcknowledge=false
 ## 7. 仍未完成
 
 - RabbitMQ DLQ 摄入、分页、处置、重放；
-- consumed status3 受控重放与安全证明（本阶段只允许确认已阅，不重放/不改状态）；
+- 刷库型 status3（`redis_applied_at` 非空）的修复：需要刷库重试或门闩内重建（T12），
+  **不能**通过重投处理（T10-B1 明确 409 拒绝）；
 - 批量操作与工单系统对接；
 - 自动修复与收敛证明（只读对账入口只展示非原子观测，不给出 SAFE）；
 - 需要强制重建时的维护流程（T12）。
+
+T10-B1 只完成了“单事件 + proven-only + 复用 Outbox relay 投递”的受控重放，
+不覆盖 DLQ、批量、无证据重放或任意 Redis 数据丢失。

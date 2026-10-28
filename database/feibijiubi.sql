@@ -7,6 +7,8 @@ USE `feibijiubi`;
 DROP TABLE IF EXISTS `user_follow`;
 DROP TABLE IF EXISTS `upload_temp_file`;
 DROP TABLE IF EXISTS `user_video`;
+DROP TABLE IF EXISTS `video_interaction_request`;
+DROP TABLE IF EXISTS `video_interaction_window`;
 DROP TABLE IF EXISTS `video_status`;
 DROP TABLE IF EXISTS `video`;
 DROP TABLE IF EXISTS `users`;
@@ -317,6 +319,7 @@ CREATE TABLE video_status_consumed_event (
     -- T10：失败/诊断列表的单状态有界分页索引，见 database/migrations/t10-video-status-failure-admin-indexes.sql
     KEY idx_video_status_consumed_status_id (process_status, id),
     -- T10：单视频对账事件窗口，见 database/migrations/t10-video-status-reconciliation-indexes.sql
+    -- T12-B：重建候选的 keyset 分页也复用本索引（vid 等值 + id 升序范围，无 filesort）
     KEY idx_video_status_consumed_vid_id (vid, id),
     KEY idx_video_status_consumed_recovery (process_status, last_attempt_at, id),
     KEY idx_video_status_consumed_compensation (process_status, last_attempt_at, id),
@@ -349,3 +352,53 @@ CREATE TABLE video_status_consumption_repair_log (
     KEY idx_video_status_repair_event (event_id, id),
     KEY idx_video_status_repair_pending (operation_status, id)
 );
+
+-- ============================================================================
+-- T15 第一阶段：交互请求幂等 + 滚动窗口限计（DB 核心）
+-- 迁移：database/migrations/t15-video-interaction-idempotency.sql（幂等，只新增表）
+-- HTTP 入口与 Redis 准入已在 T15 第二阶段接线（见 docs/api.md §7.1/§7.5）。
+-- 30 天保留期清理（默认关闭）的索引镜像在本文件里，独立迁移见
+-- database/migrations/t15-video-interaction-cleanup-indexes.sql（开启清理前必须先执行）。
+-- ============================================================================
+
+CREATE TABLE video_interaction_request (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    -- 大小写敏感：'abc' 与 'ABC' 是两个不同请求
+    request_key VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL
+        COMMENT '业务请求幂等键，大小写敏感',
+    actor_type VARCHAR(16) NOT NULL COMMENT 'USER / ANONYMOUS',
+    actor_hash CHAR(64) NOT NULL COMMENT '规范化小写 64 位十六进制 actor 标识哈希',
+    vid INT NOT NULL,
+    action VARCHAR(16) NOT NULL COMMENT 'PLAY / SHARE',
+    state TINYINT NOT NULL DEFAULT 0
+        COMMENT '0=PENDING,1=COUNTED,2=SUPPRESSED',
+    event_id VARCHAR(64) NULL COMMENT '异步计数路径的统计事件ID；同步路径为 NULL',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    completed_at DATETIME(3) NULL COMMENT '写入终态的 DB 时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_video_interaction_request_key (request_key),
+    -- T15 清理：state 单值 + 时间范围 + id 次序，服务候选查询与 ORDER BY。
+    -- 迁移：database/migrations/t15-video-interaction-cleanup-indexes.sql（清理的硬前置依赖）。
+    KEY idx_video_interaction_request_state_completed (state, completed_at, id),
+    CONSTRAINT fk_video_interaction_request_vid
+        FOREIGN KEY (vid) REFERENCES video (vid)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    COMMENT='T15 交互请求幂等表（30 天保留期内一个 request_key 只计一次；清理删除后同键按新请求处理）';
+
+CREATE TABLE video_interaction_window (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    actor_type VARCHAR(16) NOT NULL COMMENT 'USER / ANONYMOUS',
+    actor_hash CHAR(64) NOT NULL COMMENT '规范化小写 64 位十六进制 actor 标识哈希',
+    vid INT NOT NULL,
+    action VARCHAR(16) NOT NULL COMMENT 'PLAY / SHARE',
+    -- NULL = 从未计数。只由“真正计数”的那次事务推进，抑制不推进。
+    last_counted_at DATETIME(3) NULL COMMENT '最近一次真正计数的 DB 时间；NULL=从未计数',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_video_interaction_window_actor (actor_type, actor_hash, vid, action),
+    -- T15 清理：连续 N 天未计数的窗口行。NULL（从未计数）不在任何时间范围里，永不进入候选。
+    KEY idx_video_interaction_window_last_counted (last_counted_at, id),
+    CONSTRAINT fk_video_interaction_window_vid
+        FOREIGN KEY (vid) REFERENCES video (vid)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    COMMENT='T15 交互滚动窗口表（同一 actor+vid+action 30 分钟最多计一次）';

@@ -46,13 +46,24 @@ public interface VideoStatusStatus0CompensationService {
             LocalDateTime nextAttemptAt,
             LocalDateTime leaseUntil,
             boolean withinGrace,
+            /** 与 runOnce 的年龄判定同源（DB 年龄 + occurredAt 窗口），不是只看 DB 年龄。 */
             boolean withinSafeWindow,
             boolean leaseFree,
             boolean cooldownElapsed,
             boolean attemptsRemaining,
             boolean eligible,
             String evidenceStatus,
-            String decisionGate
+            String decisionGate,
+            /**
+             * 与 runOnce 相同的拒绝原因码；{@code null} 表示年龄/内容判定放行。
+             *
+             * <p>包含 {@code EVENT_OVER_NORMAL_REPLAY_WINDOW}（T14-S2 固定 30 天上界）、
+             * {@code STATUS0_OVER_SAFE_WINDOW}（可配置安全窗口）、
+             * {@code STATUS0_PAYLOAD_INVALID} / {@code STATUS0_EVENT_INVALID} /
+             * {@code STATUS0_EVENT_MISMATCH}。它<b>不</b>包含 Redis processed 证据类原因：
+             * preview 不访问 Redis。</p>
+             */
+            String refusalCode
     ) {
     }
 

@@ -6,6 +6,7 @@ import com.feibijiubi.backend.entity.VideoStatusConsumedEvent;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
 import com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper;
 import com.feibijiubi.backend.mq.VideoStatusEventPublisher;
+import com.feibijiubi.backend.service.video.videostatus.VideoStatusEventAgeGuard;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusEventFingerprintService;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusStatus0CompensationService;
 import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
@@ -114,6 +115,9 @@ public class VideoStatusStatus0CompensationServiceImpl
         int countCap = properties.getStatus0CompensationOverSafeWindowCountCap();
         long overSafeWindow = consumedEventMapper.countStatus0OverSafeWindow(
                 maxAge, countCap);
+        // occurredAt 与 runOnce 一样用 JVM 时钟比较（payload 由生产端 JVM 写入），
+        // 整轮只取一次时间，判定内部不再重复取。
+        LocalDateTime ageNow = LocalDateTime.now();
         List<PreviewItem> items = new ArrayList<>(rows.size());
         for (VideoStatusConsumedEvent row : rows) {
             Long age = row.getConsumedAgeSeconds();
@@ -123,7 +127,6 @@ public class VideoStatusStatus0CompensationServiceImpl
             boolean withinGrace = dbNowKnown && row.getLastAttemptAt() != null
                     && row.getLastAttemptAt().isBefore(now.minusSeconds(
                     properties.getStatus0CompensationMinAgeSeconds()));
-            boolean withinSafeWindow = age != null && age >= 0 && age < maxAge;
             boolean leaseFree = row.getCompensationLeaseUntil() == null
                     || (dbNowKnown
                     && !row.getCompensationLeaseUntil().isAfter(now));
@@ -134,6 +137,8 @@ public class VideoStatusStatus0CompensationServiceImpl
                     ? 0 : row.getCompensationAttempts();
             boolean attemptsRemaining =
                     attempts < properties.getStatus0CompensationMaxAttempts();
+            // 与 compensateOne 共用同一判定：preview 不给出写侧会拒绝的 eligible。
+            Status0Verdict verdict = evaluate(row, ageNow);
             items.add(new PreviewItem(
                     row.getEventId(),
                     row.getVid(),
@@ -145,14 +150,15 @@ public class VideoStatusStatus0CompensationServiceImpl
                     row.getCompensationNextAttemptAt(),
                     row.getCompensationLeaseUntil(),
                     withinGrace,
-                    withinSafeWindow,
+                    verdict.withinSafeWindow(),
                     leaseFree,
                     cooldownElapsed,
                     attemptsRemaining,
-                    withinGrace && withinSafeWindow && leaseFree
+                    withinGrace && verdict.eligible() && leaseFree
                             && cooldownElapsed && attemptsRemaining,
                     VideoStatusStatus0CompensationService.EVIDENCE_UNKNOWN,
-                    previewDecisionGate()
+                    previewDecisionGate(),
+                    verdict.refusalCode()
             ));
         }
         return new PreviewResult(
@@ -263,12 +269,13 @@ public class VideoStatusStatus0CompensationServiceImpl
     private Outcome compensateOne(VideoStatusConsumedEvent row) {
         String token = row.getCompensationLeaseToken();
         try {
-            VideoStatusChangedEvent event = parseAndMatch(row);
-            String violation = ageViolation(row, event);
-            if (violation != null) {
-                release(row, token, violation);
+            // 与 preview 共用同一判定：同一套拒绝原因码，且不在这里重复取时间。
+            Status0Verdict verdict = evaluate(row, LocalDateTime.now());
+            if (!verdict.eligible()) {
+                release(row, token, verdict.refusalCode());
                 return Outcome.RELEASED;
             }
+            VideoStatusChangedEvent event = verdict.event();
             String actualHash = fingerprintService.hash(event);
             if (!Objects.equals(actualHash, row.getPayloadHash())) {
                 release(row, token, REASON_FINGERPRINT_MISMATCH);
@@ -365,23 +372,54 @@ public class VideoStatusStatus0CompensationServiceImpl
         return event;
     }
 
-    /** 返回 null 表示年龄合法；否则返回可诊断的 reason code。 */
-    private String ageViolation(
-            VideoStatusConsumedEvent row,
-            VideoStatusChangedEvent event
-    ) {
+    /**
+     * parseAndMatch 只抛这三个固定安全码；任何其它文本（包括未来改动引入的异常消息）都不回显到
+     * preview 响应和 release 的 last_error，统一回落 {@link #REASON_EVENT_INVALID}。
+     */
+    private static String parseFailureReason(String message) {
+        if (REASON_PAYLOAD_INVALID.equals(message)
+                || REASON_EVENT_INVALID.equals(message)
+                || REASON_EVENT_MISMATCH.equals(message)) {
+            return message;
+        }
+        return REASON_EVENT_INVALID;
+    }
+
+    /**
+     * 唯一的年龄/内容判定：preview 与 runOnce 共用，读写两侧给同一个原因码。
+     *
+     * <p>只读：不领取租约、不写 DB、不写 Redis。判定顺序与既有写侧完全一致
+     * （payload/事件一致性 → DB 年龄 → occurredAt 未来/安全窗口 → 固定 30 天上界），
+     * 因此默认 7 天窗口下超龄事件仍然给出 {@code STATUS0_OVER_SAFE_WINDOW}，
+     * 新的固定上界只在运维把窗口调到 30 天以上时才生效。{@code now} 由调用方取一次
+     * （JVM 时钟，与既有 occurredAt 比较口径一致），本方法不再取时间。</p>
+     */
+    private Status0Verdict evaluate(VideoStatusConsumedEvent row, LocalDateTime now) {
         long maxAge = properties.getConsumerRecoveryAutoReplayMaxAgeSeconds();
         Long age = row.getConsumedAgeSeconds();
-        if (age == null || age < 0 || age >= maxAge) {
-            return REASON_OVER_SAFE_WINDOW;
+        boolean withinDbWindow = age != null && age >= 0 && age < maxAge;
+        VideoStatusChangedEvent event;
+        try {
+            event = parseAndMatch(row);
+        } catch (IllegalArgumentException e) {
+            // payload/账本内容无法验证时 occurredAt 也无从证明，因此 withinSafeWindow 必须为 false，
+            // 不能只凭 DB 年龄就声明“DB 年龄 + occurredAt 窗口都成立”（与接口/文档语义一致）。
+            return new Status0Verdict(false, null, parseFailureReason(e.getMessage()));
         }
-        LocalDateTime now = LocalDateTime.now();
+        if (!withinDbWindow) {
+            return new Status0Verdict(false, event, REASON_OVER_SAFE_WINDOW);
+        }
         LocalDateTime occurredAt = event.occurredAt();
         if (occurredAt.isAfter(now.plusSeconds(EVENT_FUTURE_TOLERANCE_SECONDS))
                 || !occurredAt.isAfter(now.minusSeconds(maxAge))) {
-            return REASON_OVER_SAFE_WINDOW;
+            return new Status0Verdict(false, event, REASON_OVER_SAFE_WINDOW);
         }
-        return null;
+        // T14-S2 固定政策上界（30 天）：maxAge 只要求小于 redisEventTtlDays，可以被调到
+        // 30 天以上；这里只兜底“窗口被调大”的场景，且在任何发布/状态写之前。
+        if (VideoStatusEventAgeGuard.isOutsideNormalReplayWindow(occurredAt, now)) {
+            return new Status0Verdict(false, event, VideoStatusEventAgeGuard.REFUSAL_CODE);
+        }
+        return new Status0Verdict(true, event, null);
     }
 
     private void release(
@@ -440,5 +478,22 @@ public class VideoStatusStatus0CompensationServiceImpl
         UNPROVEN_REPUBLISHED,
         NO_PROCESSED_EVIDENCE,
         RELEASED
+    }
+
+    /**
+     * 年龄/内容判定结果：preview 与 runOnce 共用。
+     *
+     * <p>{@code withinSafeWindow} 表示 DB 年龄与 occurredAt 都落在可配置安全窗口内；payload/账本内容
+     * 无法验证时为 {@code false}（此时 occurredAt 无从证明）。{@code refusalCode} 为 {@code null} 时
+     * {@code eligible()} 为真。{@code event} 只在内部用于指纹与发布，绝不进入 preview 响应。</p>
+     */
+    private record Status0Verdict(
+            boolean withinSafeWindow,
+            VideoStatusChangedEvent event,
+            String refusalCode
+    ) {
+        boolean eligible() {
+            return refusalCode == null;
+        }
     }
 }

@@ -36,6 +36,7 @@ class VideoStatusFailureAdminServiceTests {
     private VideoStatusFailureAdminMapper mapper;
     private VideoStatusFailureAdminServiceImpl service;
     private ObjectMapper objectMapper;
+    private VideoStatusStatus3ReplayService status3ReplayService;
 
     @BeforeEach
     void setUp() {
@@ -43,7 +44,10 @@ class VideoStatusFailureAdminServiceTests {
         objectMapper = new ObjectMapper().findAndRegisterModules();
         VideoStatusProperties properties = new VideoStatusProperties();
         properties.setConsumerRecoveryAutoReplayMaxAgeSeconds(600);
-        service = new VideoStatusFailureAdminServiceImpl(mapper, properties, objectMapper);
+        // status3 重放判定有自己的专用单元测试；这里只验证预检查把它透传。
+        status3ReplayService = mock(VideoStatusStatus3ReplayService.class);
+        service = new VideoStatusFailureAdminServiceImpl(
+                mapper, properties, objectMapper, status3ReplayService);
         when(mapper.selectIndexColumns(anyString(), anyString())).thenAnswer(invocation -> {
             String index = invocation.getArgument(1);
             if (VideoStatusFailureAdminServiceImpl.OUTBOX_FAILURE_LIST_INDEX.equals(index)) {
@@ -157,6 +161,28 @@ class VideoStatusFailureAdminServiceTests {
                 precheck.reasonCode());
         assertFalse(precheck.canAcknowledge(),
                 "status0 只读，不能通过确认接口改变处置状态");
+        assertNull(precheck.replay(), "status0 不适用 status3 重放预检查");
+        verify(status3ReplayService, never()).precheckStatus3Replay(anyString());
+    }
+
+    @Test
+    void status3PrecheckPropagatesTheSharedReplayEvaluation() {
+        ConsumedRow row = consumedRow(12L, "e12", 3, null, 10L);
+        when(mapper.selectDiagnosableConsumedByEventId("e12")).thenReturn(row);
+        VideoStatusFailureAdminService.ReplayPrecheck refusal =
+                new VideoStatusFailureAdminService.ReplayPrecheck(
+                        "REFUSED_CONTROLLED_REPAIR_ONLY", false,
+                        "CONSUMED_PROCESSED_EVIDENCE_MISSING", false, true, 10L, 2, -2L, 0, 3);
+        when(status3ReplayService.precheckStatus3Replay("e12")).thenReturn(refusal);
+
+        VideoStatusFailureAdminService.Precheck precheck = service.precheck("CONSUMED", "e12");
+
+        assertEquals(refusal, precheck.replay(),
+                "预检查必须原样透传与 POST replay 共用的判定结果");
+        assertEquals(3, precheck.replay().maxReplayAttempts());
+        assertFalse(precheck.replay().eligible());
+        // 即使重放判定拒绝，status3 仍可确认已阅：两者是不同动作。
+        assertTrue(precheck.canAcknowledge());
     }
 
     @Test

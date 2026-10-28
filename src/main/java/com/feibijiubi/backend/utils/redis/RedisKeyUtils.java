@@ -14,6 +14,20 @@ public class RedisKeyUtils {
         return RedisConstants.LOGIN_FAIL_PREFIX + username;
     }
 
+    /**
+     * T15 准入的单动作维度：同一 actor 对同一动作的每窗口请求数。
+     *
+     * <p>键里只有 actor 哈希与动作名，不含 uid、访客原文、IP 或 UA。</p>
+     */
+    public static String rateVideoInteractionAction(String actorHash, String action) {
+        return RedisConstants.RATE_VIDEO_INTERACTION_ACTION_PREFIX + actorHash + ":" + action;
+    }
+
+    /** T15 准入的合计维度：同一 actor 所有动作的每窗口请求数。 */
+    public static String rateVideoInteractionActor(String actorHash) {
+        return RedisConstants.RATE_VIDEO_INTERACTION_ACTOR_PREFIX + actorHash;
+    }
+
     public static String categoryTree() {
         return RedisConstants.CATEGORY_PREFIX;
     }

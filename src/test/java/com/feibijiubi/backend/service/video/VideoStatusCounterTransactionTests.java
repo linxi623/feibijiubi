@@ -14,6 +14,7 @@ import com.feibijiubi.backend.service.impl.user.UserServiceImpl;
 import com.feibijiubi.backend.service.impl.video.UserVideoServiceImpl;
 import com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusBatchFlushServiceImpl;
 import com.feibijiubi.backend.service.user.UserService;
+import com.feibijiubi.backend.service.video.PublishedVideoGuard;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusBatchFlushService;
 import com.feibijiubi.backend.vo.UserVO;
 import org.junit.jupiter.api.AfterEach;
@@ -85,6 +86,10 @@ class VideoStatusCounterTransactionTests {
      * <p>只有 {@code VideoStatusService}（outbox / MQ 入口）以 {@code null} 传入，
      * 因为 {@code asyncEnabled=false} 时 {@code recordStatus} 走同步分支，永远不会访问它；
      * 一旦有人把 async 打开，本类会因 NPE 立即失败，而不是偷偷写 outbox。</p>
+     *
+     * <p>T15 第二阶段：播放/分享入口现在由 {@code VideoInteractionAdmissionService} 编排，本类
+     * 不测它，所以传 {@code null}（一样是“谁调谁 NPE”的闸门，而不是静默绕开准入）。
+     * 但 {@code PublishedVideoGuard} 必须是真的：点赞/收藏/进度的 {@code validateVideo} 已经委派给它。</p>
      */
     @TestConfiguration(proxyBeanMethods = false)
     @EnableConfigurationProperties(VideoStatusProperties.class)
@@ -96,8 +101,9 @@ class VideoStatusCounterTransactionTests {
                                           UserVideoMapper userVideoMapper,
                                           UserMapper userMapper,
                                           VideoStatusProperties videoStatusProperties) {
-            return new UserVideoServiceImpl(videoMapper, videoStatusMapper, userVideoMapper,
-                    userMapper, null, videoStatusProperties);
+            return new UserVideoServiceImpl(videoStatusMapper, userVideoMapper,
+                    userMapper, null, videoStatusProperties,
+                    null, new PublishedVideoGuard(videoMapper));
         }
 
         @Bean

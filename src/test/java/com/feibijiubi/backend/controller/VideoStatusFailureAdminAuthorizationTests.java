@@ -5,9 +5,12 @@ import com.feibijiubi.backend.common.ApiResponse;
 import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.config.WebMvcConfig;
 import com.feibijiubi.backend.dto.VideoStatusFailureAcknowledgeDTO;
+import com.feibijiubi.backend.dto.VideoStatusStatus3ReplayDTO;
 import com.feibijiubi.backend.interceptor.AdminInterceptor;
 import com.feibijiubi.backend.interceptor.LoginInterceptor;
 import com.feibijiubi.backend.service.admin.VideoStatusFailureAdminService;
+import com.feibijiubi.backend.service.admin.VideoStatusStatus3ReplayService;
+import com.feibijiubi.backend.vo.VideoStatusStatus3ReplayVO;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -84,8 +87,8 @@ class VideoStatusFailureAdminAuthorizationTests {
                 .peek(m -> assertNotNull(m.getAnnotation(AdminOnly.class), m.getName()))
                 .flatMap(m -> Arrays.stream(m.getAnnotation(PostMapping.class).value()))
                 .toList();
-        assertEquals(List.of("/{eventId}/acknowledge"), writes,
-                "只提供确认已阅，不提供 ignore/status3 重放/DLQ POST");
+        assertEquals(List.of("/{eventId}/acknowledge", "/{eventId}/replay"), writes.stream().sorted().toList(),
+                "只提供确认已阅与 T10-B1 consumed status3 受控重放，不提供 ignore/DLQ 批量 POST");
         for (Method method : type.getDeclaredMethods()) {
             if (Modifier.isPublic(method.getModifiers()) && !method.isSynthetic()) {
                 assertEquals(ApiResponse.class, method.getReturnType(), method.getName());
@@ -153,8 +156,9 @@ class VideoStatusFailureAdminAuthorizationTests {
     @Test
     void acknowledgeRequiresLoginAndUsesCurrentUserIdAsOperator() {
         VideoStatusFailureAdminService service = mock(VideoStatusFailureAdminService.class);
+        VideoStatusStatus3ReplayService replayService = mock(VideoStatusStatus3ReplayService.class);
         VideoStatusFailureAdminController controller =
-                new VideoStatusFailureAdminController(service);
+                new VideoStatusFailureAdminController(service, replayService);
         VideoStatusFailureAcknowledgeDTO dto = request("op-1", "确认已阅");
 
         BusinessException missing = assertThrows(BusinessException.class,
@@ -176,15 +180,73 @@ class VideoStatusFailureAdminAuthorizationTests {
     }
 
     @Test
+    void status3ReplayRequiresLoginAndUsesCurrentUserIdAsOperator() {
+        VideoStatusFailureAdminService service = mock(VideoStatusFailureAdminService.class);
+        VideoStatusStatus3ReplayService replayService = mock(VideoStatusStatus3ReplayService.class);
+        VideoStatusFailureAdminController controller =
+                new VideoStatusFailureAdminController(service, replayService);
+        VideoStatusStatus3ReplayDTO dto = replayRequest("op-2", "受控重放");
+
+        BusinessException missing = assertThrows(BusinessException.class,
+                () -> controller.replayStatus3("e2", "CONSUMED", dto, new MockHttpServletRequest()));
+        assertEquals(401, missing.getCode());
+        verify(replayService, never()).replay(
+                anyString(), anyString(), anyString(), anyString(), anyString());
+
+        VideoStatusStatus3ReplayVO applied = new VideoStatusStatus3ReplayVO();
+        applied.setOperationId("op-2");
+        applied.setReplayApplied(true);
+        when(replayService.replay("CONSUMED", "e2", "op-2", "受控重放", "42"))
+                .thenReturn(applied);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setAttribute("currentUserId", 42);
+        assertEquals(applied, controller.replayStatus3("e2", "CONSUMED", dto, request).getData());
+        verify(replayService).replay("CONSUMED", "e2", "op-2", "受控重放", "42");
+    }
+
+    @Test
+    void status3ReplayDtoRequiresOperationIdAndReasonAndCannotForgeTargetOrOperator() {
+        for (Field field : VideoStatusStatus3ReplayDTO.class.getDeclaredFields()) {
+            assertFalse(field.getName().equalsIgnoreCase("operator"),
+                    "操作人只能来自 currentUserId");
+            assertFalse(field.getName().equalsIgnoreCase("eventId"),
+                    "目标只能来自 URL 路径，不能由请求体指定");
+            assertFalse(field.getName().equalsIgnoreCase("vid"),
+                    "目标视频只能来自数据库行，不能由请求体指定");
+            assertFalse(field.getName().equalsIgnoreCase("payload"),
+                    "事件内容只能来自数据库，不能由请求体构造");
+        }
+        VideoStatusStatus3ReplayDTO blank = new VideoStatusStatus3ReplayDTO();
+        assertEquals(2, validator.validate(blank).size());
+        VideoStatusStatus3ReplayDTO tooLong = new VideoStatusStatus3ReplayDTO();
+        tooLong.setOperationId("o".repeat(65));
+        tooLong.setReason("r");
+        assertEquals(1, validator.validate(tooLong).size());
+        VideoStatusStatus3ReplayDTO ok = new VideoStatusStatus3ReplayDTO();
+        ok.setOperationId("o".repeat(64));
+        ok.setReason("r".repeat(1000));
+        assertTrue(validator.validate(ok).isEmpty());
+    }
+
+    @Test
     void listRejectsInvalidPagingBeforeCallingService() {
         VideoStatusFailureAdminService service = mock(VideoStatusFailureAdminService.class);
+        VideoStatusStatus3ReplayService replayService = mock(VideoStatusStatus3ReplayService.class);
         VideoStatusFailureAdminController controller =
-                new VideoStatusFailureAdminController(service);
+                new VideoStatusFailureAdminController(service, replayService);
         assertEquals(400, assertThrows(BusinessException.class,
                 () -> controller.list("OUTBOX", 0L, 0)).getCode());
         assertEquals(400, assertThrows(BusinessException.class,
                 () -> controller.list("OUTBOX", -1L, 10)).getCode());
         verify(service, never()).list(anyString(), anyLong(), anyInt());
+    }
+
+    private static VideoStatusStatus3ReplayDTO replayRequest(String operationId, String reason) {
+        VideoStatusStatus3ReplayDTO dto = new VideoStatusStatus3ReplayDTO();
+        dto.setOperationId(operationId);
+        dto.setReason(reason);
+        return dto;
     }
 
     private static VideoStatusFailureAcknowledgeDTO request(String operationId, String reason) {

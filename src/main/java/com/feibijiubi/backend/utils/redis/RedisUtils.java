@@ -5,11 +5,14 @@ import com.feibijiubi.backend.common.RedisOperationException;
 import com.feibijiubi.backend.utils.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -88,6 +91,75 @@ public class RedisUtils {
     public boolean hasKey(String key) {
         return executeRedisOperation(() ->
                 Boolean.TRUE.equals(stringRedisTemplate.hasKey(key))
+        );
+    }
+
+    /**
+     * 有界批次 pipeline EXISTS：一次网络往返取回每个 key 的存在性，结果顺序与入参严格一致。
+     *
+     * <p>逐 key 结果不能被“存在的总数”替代，调用方必须按位置判定每条证据。
+     * 返回条数不符、元素为 null、或元素不是布尔/整型 0 或 1 时抛
+     * {@link RedisOperationException}，让调用方 fail closed（不发布缺证据的结果），
+     * 而不是把未知当成“不存在”。</p>
+     *
+     * @param keys 本批 key（调用方负责分批；空列表不发起 Redis 请求）
+     * @return 与 keys 等长、同序的存在性结果
+     */
+    public List<Boolean> hasKeys(List<String> keys) {
+        if (keys == null || keys.isEmpty()) {
+            return List.of();
+        }
+        List<Object> raw = executeRedisOperation(() ->
+                stringRedisTemplate.executePipelined(
+                        (RedisCallback<Object>) connection -> {
+                            for (String key : keys) {
+                                connection.keyCommands().exists(
+                                        key.getBytes(StandardCharsets.UTF_8)
+                                );
+                            }
+                            return null;
+                        }
+                )
+        );
+        if (raw == null || raw.size() != keys.size()) {
+            throw new RedisOperationException(
+                    "Redis pipeline EXISTS 返回条数与请求不一致: expected="
+                            + keys.size()
+                            + ", actual=" + (raw == null ? "null" : raw.size())
+            );
+        }
+        List<Boolean> results = new ArrayList<>(raw.size());
+        for (Object value : raw) {
+            results.add(existsResult(value));
+        }
+        return results;
+    }
+
+    /**
+     * 把单条 pipeline EXISTS 回复严格归一成布尔值。
+     *
+     * <p>Redis 对 EXISTS 只回整数 0/1，Lettuce 用 {@code Long} 承载；这里额外容忍
+     * {@code Boolean}（模板开启事务/比较器时的映射）和其余整型包装类，但值必须精确等于
+     * 0 或 1。浮点（含 0.5、1.9、NaN）、小数、以及会被 {@code longValue()} 截断到 0/1
+     * 的超范围整数（如 2^64+1 的 {@code BigInteger}）一律拒绝，绝不把未知结果猜成
+     * “不存在”。</p>
+     */
+    private Boolean existsResult(Object value) {
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        if (value instanceof Long || value instanceof Integer
+                || value instanceof Short || value instanceof Byte) {
+            long numeric = ((Number) value).longValue();
+            if (numeric == 0L) {
+                return Boolean.FALSE;
+            }
+            if (numeric == 1L) {
+                return Boolean.TRUE;
+            }
+        }
+        throw new RedisOperationException(
+                "Redis pipeline EXISTS 返回无法识别的结果: " + value
         );
     }
 

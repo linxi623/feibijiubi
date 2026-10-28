@@ -154,6 +154,64 @@ class VideoStatusRuntimePropertiesContextTests {
                 });
     }
 
+    @Test
+    void rebuildPagingBoundsAreBoundFromKebabCaseKeys() {
+        runner.withPropertyValues(
+                        "app.video-status.rebuild-candidate-page-size=500",
+                        "app.video-status.rebuild-max-candidates=200000",
+                        "app.video-status.rebuild-snapshot-budget-ms=2500")
+                .run(context -> {
+                    assertNull(context.getStartupFailure(), failureMessage(context));
+                    VideoStatusProperties properties = context.getBean(VideoStatusProperties.class);
+                    assertEquals(500, properties.getRebuildCandidatePageSize());
+                    assertEquals(200_000, properties.getRebuildMaxCandidates());
+                    assertEquals(2_500L, properties.getRebuildSnapshotBudgetMs());
+                });
+    }
+
+    @Test
+    void rebuildPagingBoundsDefaultToTheDocumentedUpperBound() {
+        runner.run(context -> {
+            assertNull(context.getStartupFailure(), failureMessage(context));
+            VideoStatusProperties properties = context.getBean(VideoStatusProperties.class);
+            assertEquals(VideoStatusProperties.MAX_REBUILD_CANDIDATE_PAGE_SIZE,
+                    properties.getRebuildCandidatePageSize());
+            assertEquals(100_000, properties.getRebuildMaxCandidates());
+            assertTrue(properties.getRebuildSnapshotBudgetMs() > 0);
+        });
+    }
+
+    @Test
+    void rebuildPageSizeAboveOneThousandFailsDuringPostConstruct() {
+        runner.withPropertyValues(
+                        "app.video-status.rebuild-candidate-page-size="
+                                + (VideoStatusProperties.MAX_REBUILD_CANDIDATE_PAGE_SIZE + 1))
+                .run(context -> {
+                    assertNotNull(context.getStartupFailure(), "页大小超过 1000 必须启动失败");
+                    String messages = failureMessage(context);
+                    assertTrue(messages.contains("app.video-status.rebuild-candidate-page-size"), messages);
+                    assertTrue(messages.contains("1001"), messages);
+                });
+    }
+
+    @Test
+    void rebuildMaxCandidatesAndBudgetMustBePositive() {
+        runner.withPropertyValues(
+                        "app.video-status.rebuild-max-candidates=0")
+                .run(context -> {
+                    assertNotNull(context.getStartupFailure(), "候选上限 0 必须启动失败");
+                    String messages = failureMessage(context);
+                    assertTrue(messages.contains("app.video-status.rebuild-max-candidates"), messages);
+                });
+        runner.withPropertyValues(
+                        "app.video-status.rebuild-snapshot-budget-ms=0")
+                .run(context -> {
+                    assertNotNull(context.getStartupFailure(), "预算 0 必须启动失败");
+                    String messages = failureMessage(context);
+                    assertTrue(messages.contains("app.video-status.rebuild-snapshot-budget-ms"), messages);
+                });
+    }
+
     // ------------------------------------------------------------ helpers
 
     /** 证明这个轻量上下文没有拉进任何数据库 / Redis / RabbitMQ 基础设施。 */

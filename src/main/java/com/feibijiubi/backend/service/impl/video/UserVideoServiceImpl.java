@@ -8,10 +8,13 @@ import com.feibijiubi.backend.entity.Video;
 import com.feibijiubi.backend.event.VideoStatusEventType;
 import com.feibijiubi.backend.mapper.UserMapper;
 import com.feibijiubi.backend.mapper.UserVideoMapper;
-import com.feibijiubi.backend.mapper.VideoMapper;
 import com.feibijiubi.backend.mapper.VideoStatusMapper;
+import com.feibijiubi.backend.service.video.PublishedVideoGuard;
 import com.feibijiubi.backend.service.video.UserVideoService;
+import com.feibijiubi.backend.service.video.interaction.VideoInteractionAction;
+import com.feibijiubi.backend.service.video.interaction.VideoInteractionAdmissionService;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusService;
+import com.feibijiubi.backend.vo.VideoInteractionVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +24,6 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class UserVideoServiceImpl implements UserVideoService {
-    private final VideoMapper videoMapper;
     private final VideoStatusMapper videoStatusMapper;
     private final UserVideoMapper userVideoMapper;
     private final UserMapper userMapper;
@@ -29,18 +31,21 @@ public class UserVideoServiceImpl implements UserVideoService {
     private final VideoStatusService videoStatusService;
     private final VideoStatusProperties videoStatusProperties;
 
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void increasePlayCount(Integer vid) {
-        validateVideo(vid);
+    /** T15 第二阶段：播放/分享的唯一入口编排（幂等 + 窗口 + Redis 准入）。 */
+    private final VideoInteractionAdmissionService interactionAdmissionService;
+    /** “视频是否可互动”的唯一判定处，与旧 validateVideo 同一份规则。 */
+    private final PublishedVideoGuard publishedVideoGuard;
 
-        recordStatus(vid, VideoStatusEventType.PLAY, 1,
-                () -> {
-                    int rows = videoStatusMapper.increasePlayTimes(vid);
-                    if(rows != 1) {
-                        throw new BusinessException(500, "播放量更新失败");
-                    }
-                });
+    /**
+     * 播放计数：<b>没有 {@code @Transactional}</b>，因为
+     * {@code VideoInteractionService#record} 要求调用方不在事务里（并发同键需要先整体回滚再读赢家）。
+     * 写事务由它自己的 {@code TransactionTemplate} 负责。
+     */
+    @Override
+    public VideoInteractionVO increasePlayCount(Integer currentUserId, Integer vid,
+                                                String requestKey, String visitorId) {
+        return interactionAdmissionService.record(
+                VideoInteractionAction.PLAY, currentUserId, vid, requestKey, visitorId);
     }
 
     @Override
@@ -173,18 +178,12 @@ public class UserVideoServiceImpl implements UserVideoService {
         );
     }
 
+    /** 分享计数：与播放同样的幂等/窗口/准入语义，同样不开外层事务。 */
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public void increaseShare(Integer vid) {
-        validateVideo(vid);
-
-        recordStatus(vid, VideoStatusEventType.SHARE, 1,
-                () -> {
-                    if (videoStatusMapper.increaseShareTimes(vid) != 1) {
-                        throw new BusinessException(500, "分享失败");
-                    }
-                }
-        );
+    public VideoInteractionVO increaseShare(Integer currentUserId, Integer vid,
+                                            String requestKey, String visitorId) {
+        return interactionAdmissionService.record(
+                VideoInteractionAction.SHARE, currentUserId, vid, requestKey, visitorId);
     }
 
     @Override
@@ -236,18 +235,9 @@ public class UserVideoServiceImpl implements UserVideoService {
     }
 
     private Video validateVideo(Integer vid) {
-        if (vid == null || vid <= 0) {
-            throw new BusinessException(400, "视频参数不合法");
-        }
-
-        Video video = videoMapper.selectPublishedByVid(vid);
-        if (video == null) {
-            throw new BusinessException(404, "视频不存在");
-        }
-        if (video.getDuration() == null || video.getDuration() <= 0) {
-            throw new BusinessException(500, "视频时长数据异常");
-        }
-        return video;
+        // 规则本体已抽到 PublishedVideoGuard（T15 第二阶段的新入口要复用同一份判定），
+        // 这里保留原私有方法名，让点赞/投币/收藏/进度的调用点与行为完全不变。
+        return publishedVideoGuard.requirePublishedPlayable(vid);
     }
 
     private void recordStatus(

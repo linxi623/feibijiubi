@@ -2,6 +2,7 @@ package com.feibijiubi.backend;
 
 import com.feibijiubi.backend.config.JwtProperties;
 import com.feibijiubi.backend.config.TencentCosProperties;
+import com.feibijiubi.backend.config.VideoInteractionProperties;
 import com.feibijiubi.backend.config.VideoStatusProperties;
 import com.feibijiubi.backend.interceptor.LoginInterceptor;
 import org.springframework.boot.SpringApplication;
@@ -10,7 +11,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @EnableScheduling
-@EnableConfigurationProperties({JwtProperties.class, TencentCosProperties.class, VideoStatusProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, TencentCosProperties.class,
+        VideoStatusProperties.class, VideoInteractionProperties.class})
 @SpringBootApplication
 public class BackendApplication {
 
