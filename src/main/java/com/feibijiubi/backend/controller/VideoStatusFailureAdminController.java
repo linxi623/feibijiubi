@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.controller;
 
-import com.feibijiubi.backend.annotation.AdminOnly;
+import com.feibijiubi.backend.auth.annotation.AdminOnly;
 import com.feibijiubi.backend.common.ApiResponse;
 import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.dto.VideoStatusFailureAcknowledgeDTO;

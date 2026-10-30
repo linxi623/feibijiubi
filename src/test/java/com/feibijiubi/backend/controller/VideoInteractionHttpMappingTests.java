@@ -1,11 +1,11 @@
 package com.feibijiubi.backend.controller;
 
-import com.feibijiubi.backend.annotation.OptionalLogin;
+import com.feibijiubi.backend.auth.annotation.OptionalLogin;
 import com.feibijiubi.backend.common.ApiResponse;
 import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.interceptor.LoginInterceptor;
-import com.feibijiubi.backend.mapper.UserMapper;
-import com.feibijiubi.backend.service.auth.TokenService;
+import com.feibijiubi.backend.auth.interceptor.LoginInterceptor;
+import com.feibijiubi.backend.user.mapper.UserMapper;
+import com.feibijiubi.backend.auth.service.TokenService;
 import com.feibijiubi.backend.service.impl.video.UserVideoServiceImpl;
 import com.feibijiubi.backend.service.video.UserVideoService;
 import com.feibijiubi.backend.vo.VideoInteractionVO;

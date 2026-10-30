@@ -1,8 +1,8 @@
 package com.feibijiubi.backend.config;
 
 
-import com.feibijiubi.backend.interceptor.AdminInterceptor;
-import com.feibijiubi.backend.interceptor.LoginInterceptor;
+import com.feibijiubi.backend.auth.interceptor.AdminInterceptor;
+import com.feibijiubi.backend.auth.interceptor.LoginInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;

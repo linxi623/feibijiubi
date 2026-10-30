@@ -1,0 +1,311 @@
+{
+  "batch": "R2",
+  "basePackage": "com.feibijiubi.backend",
+  "note": "One entry per migrated production/test Java file: old and new path and FQCN. Reviewers diff file-by-file against this list. Mapper XML keeps its physical src/main/resources/com/feibijiubi/backend/mapper/ location; only namespace/resultType/parameterType change. UserVideo/VideoInteraction stay in the interaction batch and web/global config stay in place.",
+  "files": [
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/annotation/AdminOnly.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/annotation/AdminOnly.java",
+      "oldFqcn": "com.feibijiubi.backend.annotation.AdminOnly",
+      "newFqcn": "com.feibijiubi.backend.auth.annotation.AdminOnly"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/annotation/AllowRevokedToken.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/annotation/AllowRevokedToken.java",
+      "oldFqcn": "com.feibijiubi.backend.annotation.AllowRevokedToken",
+      "newFqcn": "com.feibijiubi.backend.auth.annotation.AllowRevokedToken"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/annotation/OptionalLogin.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/annotation/OptionalLogin.java",
+      "oldFqcn": "com.feibijiubi.backend.annotation.OptionalLogin",
+      "newFqcn": "com.feibijiubi.backend.auth.annotation.OptionalLogin"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/interceptor/LoginInterceptor.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/interceptor/LoginInterceptor.java",
+      "oldFqcn": "com.feibijiubi.backend.interceptor.LoginInterceptor",
+      "newFqcn": "com.feibijiubi.backend.auth.interceptor.LoginInterceptor"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/interceptor/AdminInterceptor.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/interceptor/AdminInterceptor.java",
+      "oldFqcn": "com.feibijiubi.backend.interceptor.AdminInterceptor",
+      "newFqcn": "com.feibijiubi.backend.auth.interceptor.AdminInterceptor"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/config/JwtProperties.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/config/JwtProperties.java",
+      "oldFqcn": "com.feibijiubi.backend.config.JwtProperties",
+      "newFqcn": "com.feibijiubi.backend.auth.config.JwtProperties"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/utils/JwtUtils.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/util/JwtUtils.java",
+      "oldFqcn": "com.feibijiubi.backend.utils.JwtUtils",
+      "newFqcn": "com.feibijiubi.backend.auth.util.JwtUtils"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/auth/TokenService.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/service/TokenService.java",
+      "oldFqcn": "com.feibijiubi.backend.service.auth.TokenService",
+      "newFqcn": "com.feibijiubi.backend.auth.service.TokenService"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/auth/TokenContext.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/service/TokenContext.java",
+      "oldFqcn": "com.feibijiubi.backend.service.auth.TokenContext",
+      "newFqcn": "com.feibijiubi.backend.auth.service.TokenContext"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/user/UserAccountService.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/service/UserAccountService.java",
+      "oldFqcn": "com.feibijiubi.backend.service.user.UserAccountService",
+      "newFqcn": "com.feibijiubi.backend.auth.service.UserAccountService"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/auth/JwtTokenServiceImpl.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/service/impl/JwtTokenServiceImpl.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.auth.JwtTokenServiceImpl",
+      "newFqcn": "com.feibijiubi.backend.auth.service.impl.JwtTokenServiceImpl"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/user/UserAccountServiceImpl.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/service/impl/UserAccountServiceImpl.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.user.UserAccountServiceImpl",
+      "newFqcn": "com.feibijiubi.backend.auth.service.impl.UserAccountServiceImpl"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/controller/UserAccountController.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/controller/UserAccountController.java",
+      "oldFqcn": "com.feibijiubi.backend.controller.UserAccountController",
+      "newFqcn": "com.feibijiubi.backend.auth.controller.UserAccountController"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/dto/UserLoginDTO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/dto/UserLoginDTO.java",
+      "oldFqcn": "com.feibijiubi.backend.dto.UserLoginDTO",
+      "newFqcn": "com.feibijiubi.backend.auth.dto.UserLoginDTO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/dto/UserRegisterDTO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/dto/UserRegisterDTO.java",
+      "oldFqcn": "com.feibijiubi.backend.dto.UserRegisterDTO",
+      "newFqcn": "com.feibijiubi.backend.auth.dto.UserRegisterDTO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/UserLoginVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/auth/vo/UserLoginVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.UserLoginVO",
+      "newFqcn": "com.feibijiubi.backend.auth.vo.UserLoginVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/controller/UserController.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/user/controller/UserController.java",
+      "oldFqcn": "com.feibijiubi.backend.controller.UserController",
+      "newFqcn": "com.feibijiubi.backend.user.controller.UserController"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/user/UserService.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/user/service/UserService.java",
+      "oldFqcn": "com.feibijiubi.backend.service.user.UserService",
+      "newFqcn": "com.feibijiubi.backend.user.service.UserService"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/user/UserServiceImpl.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/user/service/impl/UserServiceImpl.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.user.UserServiceImpl",
+      "newFqcn": "com.feibijiubi.backend.user.service.impl.UserServiceImpl"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/entity/User.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/user/entity/User.java",
+      "oldFqcn": "com.feibijiubi.backend.entity.User",
+      "newFqcn": "com.feibijiubi.backend.user.entity.User"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/entity/UserFollow.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/user/entity/UserFollow.java",
+      "oldFqcn": "com.feibijiubi.backend.entity.UserFollow",
+      "newFqcn": "com.feibijiubi.backend.user.entity.UserFollow"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/mapper/UserMapper.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/user/mapper/UserMapper.java",
+      "oldFqcn": "com.feibijiubi.backend.mapper.UserMapper",
+      "newFqcn": "com.feibijiubi.backend.user.mapper.UserMapper"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/mapper/UserFollowMapper.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/user/mapper/UserFollowMapper.java",
+      "oldFqcn": "com.feibijiubi.backend.mapper.UserFollowMapper",
+      "newFqcn": "com.feibijiubi.backend.user.mapper.UserFollowMapper"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/converter/UserConverter.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/user/converter/UserConverter.java",
+      "oldFqcn": "com.feibijiubi.backend.converter.UserConverter",
+      "newFqcn": "com.feibijiubi.backend.user.converter.UserConverter"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/dto/UserProfileDTO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/user/dto/UserProfileDTO.java",
+      "oldFqcn": "com.feibijiubi.backend.dto.UserProfileDTO",
+      "newFqcn": "com.feibijiubi.backend.user.dto.UserProfileDTO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/dto/UserChangePasswordDTO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/user/dto/UserChangePasswordDTO.java",
+      "oldFqcn": "com.feibijiubi.backend.dto.UserChangePasswordDTO",
+      "newFqcn": "com.feibijiubi.backend.user.dto.UserChangePasswordDTO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/UserVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/user/vo/UserVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.UserVO",
+      "newFqcn": "com.feibijiubi.backend.user.vo.UserVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/UserCountVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/user/vo/UserCountVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.UserCountVO",
+      "newFqcn": "com.feibijiubi.backend.user.vo.UserCountVO"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/interceptor/LoginInterceptorTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/auth/interceptor/LoginInterceptorTests.java",
+      "oldFqcn": "com.feibijiubi.backend.interceptor.LoginInterceptorTests",
+      "newFqcn": "com.feibijiubi.backend.auth.interceptor.LoginInterceptorTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/impl/auth/JwtTokenServiceImplTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/auth/service/impl/JwtTokenServiceImplTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.auth.JwtTokenServiceImplTests",
+      "newFqcn": "com.feibijiubi.backend.auth.service.impl.JwtTokenServiceImplTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/impl/user/UserAccountServiceImplTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/auth/service/impl/UserAccountServiceImplTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.user.UserAccountServiceImplTests",
+      "newFqcn": "com.feibijiubi.backend.auth.service.impl.UserAccountServiceImplTests"
+    }
+  ],
+  "addedFiles": [
+    {
+      "path": "src/test/java/com/feibijiubi/backend/user/mapper/UserMapperBindingTests.java",
+      "fqcn": "com.feibijiubi.backend.user.mapper.UserMapperBindingTests",
+      "purpose": "DB-free MyBatis assembly: legacy XML path loads, namespace binds the migrated UserMapper, every MappedStatement exists, resultType/parameterType point at the migrated User entity, and the application mapper scan root still discovers both user mappers under the new package"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/user/mapper/UserFollowMapperBindingTests.java",
+      "fqcn": "com.feibijiubi.backend.user.mapper.UserFollowMapperBindingTests",
+      "purpose": "DB-free MyBatis assembly: legacy XML path loads, namespace binds the migrated UserFollowMapper, every MappedStatement exists with the expected resultType"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/auth/controller/AuthEndpointAuthorizationTests.java",
+      "fqcn": "com.feibijiubi.backend.auth.controller.AuthEndpointAuthorizationTests",
+      "purpose": "Auth assembly evidence after moving annotations/interceptors/controllers: relocated endpoints keep their paths and interception annotations, the real LoginInterceptor still honours the relocated @OptionalLogin (anonymous GET /api/users/{uid} passes, anonymous GET /api/users/me is 401), and WebMvcConfig still registers the real LoginInterceptor/AdminInterceptor on the same path patterns with the same auth exclusions"
+    }
+  ],
+  "nonMechanicalChanges": [
+    {
+      "path": "src/main/resources/com/feibijiubi/backend/mapper/UserMapper.xml",
+      "change": "namespace -> com.feibijiubi.backend.user.mapper.UserMapper; parameterType/resultType -> com.feibijiubi.backend.user.entity.User (physical XML path unchanged)"
+    },
+    {
+      "path": "src/main/resources/com/feibijiubi/backend/mapper/UserFollowMapper.xml",
+      "change": "namespace -> com.feibijiubi.backend.user.mapper.UserFollowMapper (physical XML path unchanged)"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusCounterTransactionTests.java",
+      "change": "added @MapperScan(\"com.feibijiubi.backend.user.mapper\") on transactionalTestBeans: UserMapper/UserFollowMapper left com.feibijiubi.backend.mapper, so the shared isolated TestApplication scan no longer registers them; old scan range untouched"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusIsolatedIntegrationTests.java",
+      "change": "@MapperScan kept its old range and explicitly added com.feibijiubi.backend.user.mapper because the imported UserVideoServiceImpl needs UserMapper"
+    },
+    {
+      "path": "src/main/java/com/feibijiubi/backend/auth/service/UserAccountService.java",
+      "change": "removed the import of TokenContext that became same-package after the move (no other edit)"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/converter/ResponseConverterTests.java",
+      "change": "deliberately not relocated: it covers both UserConverter (moved to user.converter) and VideoConverter (stays in converter), so it cannot move into one module without renaming/splitting the class; only its imports changed"
+    }
+  ],
+  "optInMapperScanAudit": {
+    "scope": "仍使用 @MapperScan(\"com.feibijiubi.backend.mapper\") 的 opt-in 测试上下文（需真实 MySQL/Redis，普通回归不执行）",
+    "needsUserMapperPackage": [
+      {
+        "path": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusCounterTransactionTests.java",
+        "reason": "@SpringBootTest(classes = {VideoStatusCounterIsolatedTests.TestApplication, TransactionalTestBeans}) 直接 new UserVideoServiceImpl/UserServiceImpl，构造函数需要 UserMapper/UserFollowMapper"
+      },
+      {
+        "path": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusIsolatedIntegrationTests.java",
+        "reason": "@Import(UserVideoServiceImpl) 需要 UserMapper；旧的 com.feibijiubi.backend.mapper 扫描范围保持原样，只追加新包"
+      }
+    ],
+    "oldScanSufficient": [
+      "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionAdmissionBaselineIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionAdmissionIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionCleanupIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionSyncIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusCounterIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusDirtyRecoveryFairnessIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusDirtyRecoveryRealConvergenceTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusOutboxLeaseTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusRebuildScaleIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusSqlBaselineTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusStatus0CompensationIsolatedIntegrationTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusStatus3ReplayIsolatedTests.java"
+    ],
+    "method": "先 grep 全仓 main 找出真正依赖被迁走 mapper 的类（UserVideoServiceImpl、VideoReviewImpl、VideoServiceImpl、UserServiceImpl、LoginInterceptor、UserAccountServiceImpl），再逐个核对这些 opt-in 上下文是否通过 @Import/@SpringBootTest(classes=...) 引入其中任一",
+    "verification": "静态核验；这些 opt-in 用例需要真实数据库/Redis，本轮未运行，未读 application.yml"
+  },
+  "unchangedByDecision": [
+    {
+      "path": "src/main/java/com/feibijiubi/backend/config/WebMvcConfig.java",
+      "reason": "global web assembly stays put; only the interceptor imports changed"
+    },
+    {
+      "path": "src/main/java/com/feibijiubi/backend/BackendApplication.java",
+      "reason": "startup class stays put; only JwtProperties import changed, startup behaviour untouched"
+    },
+    {
+      "path": "src/main/java/com/feibijiubi/backend/entity/UserVideo.java, src/main/java/com/feibijiubi/backend/mapper/UserVideoMapper.java, src/main/java/com/feibijiubi/backend/service/video/UserVideoService.java, src/main/java/com/feibijiubi/backend/controller/UserVideoController.java, src/main/java/com/feibijiubi/backend/service/impl/video/UserVideoServiceImpl.java",
+      "reason": "User-prefixed but owned by the interaction batch; not moved in R2"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.controller;
 
 
-import com.feibijiubi.backend.annotation.OptionalLogin;
+import com.feibijiubi.backend.auth.annotation.OptionalLogin;
 import com.feibijiubi.backend.common.ApiResponse;
 import com.feibijiubi.backend.dto.CursorDTO;
 import com.feibijiubi.backend.dto.VideoSubmitDTO;

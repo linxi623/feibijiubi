@@ -2,7 +2,7 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.feibijiubi.backend.mapper.UserFollowMapper">
+<mapper namespace="com.feibijiubi.backend.user.mapper.UserFollowMapper">
 
     <insert id="insert">
         INSERT INTO user_follow (

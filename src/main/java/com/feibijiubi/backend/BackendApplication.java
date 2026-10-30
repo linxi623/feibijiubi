@@ -1,10 +1,10 @@
 package com.feibijiubi.backend;
 
-import com.feibijiubi.backend.config.JwtProperties;
+import com.feibijiubi.backend.auth.config.JwtProperties;
 import com.feibijiubi.backend.config.TencentCosProperties;
 import com.feibijiubi.backend.config.VideoInteractionProperties;
 import com.feibijiubi.backend.config.VideoStatusProperties;
-import com.feibijiubi.backend.interceptor.LoginInterceptor;
+import com.feibijiubi.backend.auth.interceptor.LoginInterceptor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

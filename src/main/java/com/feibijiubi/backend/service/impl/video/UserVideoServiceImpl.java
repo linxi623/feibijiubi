@@ -2,11 +2,11 @@ package com.feibijiubi.backend.service.impl.video;
 
 import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.config.VideoStatusProperties;
-import com.feibijiubi.backend.entity.User;
+import com.feibijiubi.backend.user.entity.User;
 import com.feibijiubi.backend.entity.UserVideo;
 import com.feibijiubi.backend.entity.Video;
 import com.feibijiubi.backend.event.VideoStatusEventType;
-import com.feibijiubi.backend.mapper.UserMapper;
+import com.feibijiubi.backend.user.mapper.UserMapper;
 import com.feibijiubi.backend.mapper.UserVideoMapper;
 import com.feibijiubi.backend.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.service.video.PublishedVideoGuard;

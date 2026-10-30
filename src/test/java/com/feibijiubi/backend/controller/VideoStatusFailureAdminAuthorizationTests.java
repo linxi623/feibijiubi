@@ -1,13 +1,13 @@
 package com.feibijiubi.backend.controller;
 
-import com.feibijiubi.backend.annotation.AdminOnly;
+import com.feibijiubi.backend.auth.annotation.AdminOnly;
 import com.feibijiubi.backend.common.ApiResponse;
 import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.config.WebMvcConfig;
 import com.feibijiubi.backend.dto.VideoStatusFailureAcknowledgeDTO;
 import com.feibijiubi.backend.dto.VideoStatusStatus3ReplayDTO;
-import com.feibijiubi.backend.interceptor.AdminInterceptor;
-import com.feibijiubi.backend.interceptor.LoginInterceptor;
+import com.feibijiubi.backend.auth.interceptor.AdminInterceptor;
+import com.feibijiubi.backend.auth.interceptor.LoginInterceptor;
 import com.feibijiubi.backend.service.admin.VideoStatusFailureAdminService;
 import com.feibijiubi.backend.service.admin.VideoStatusStatus3ReplayService;
 import com.feibijiubi.backend.vo.VideoStatusStatus3ReplayVO;

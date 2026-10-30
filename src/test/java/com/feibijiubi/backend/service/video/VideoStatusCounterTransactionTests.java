@@ -3,26 +3,27 @@ package com.feibijiubi.backend.service.video;
 import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.common.RetryableMessageException;
 import com.feibijiubi.backend.config.VideoStatusProperties;
-import com.feibijiubi.backend.converter.UserConverter;
-import com.feibijiubi.backend.mapper.UserFollowMapper;
-import com.feibijiubi.backend.mapper.UserMapper;
+import com.feibijiubi.backend.user.converter.UserConverter;
+import com.feibijiubi.backend.user.mapper.UserFollowMapper;
+import com.feibijiubi.backend.user.mapper.UserMapper;
 import com.feibijiubi.backend.mapper.UserVideoMapper;
 import com.feibijiubi.backend.mapper.VideoMapper;
 import com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper;
 import com.feibijiubi.backend.mapper.VideoStatusMapper;
-import com.feibijiubi.backend.service.impl.user.UserServiceImpl;
+import com.feibijiubi.backend.user.service.impl.UserServiceImpl;
 import com.feibijiubi.backend.service.impl.video.UserVideoServiceImpl;
 import com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusBatchFlushServiceImpl;
-import com.feibijiubi.backend.service.user.UserService;
+import com.feibijiubi.backend.user.service.UserService;
 import com.feibijiubi.backend.service.video.PublishedVideoGuard;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusBatchFlushService;
-import com.feibijiubi.backend.vo.UserVO;
+import com.feibijiubi.backend.user.vo.UserVO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.mockito.AdditionalAnswers;
 import org.mockito.Mockito;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -93,6 +94,9 @@ class VideoStatusCounterTransactionTests {
      */
     @TestConfiguration(proxyBeanMethods = false)
     @EnableConfigurationProperties(VideoStatusProperties.class)
+    // R2：UserMapper 已迁到 com.feibijiubi.backend.user.mapper，不再落在 TestApplication 的
+    // @MapperScan("com.feibijiubi.backend.mapper") 范围内，这里显式补扫该包。
+    @MapperScan("com.feibijiubi.backend.user.mapper")
     static class TransactionalTestBeans {
 
         @Bean

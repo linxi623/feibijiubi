@@ -111,7 +111,9 @@ class VideoStatusIsolatedIntegrationTests {
     @Profile("video-status-isolated")
     @EnableAutoConfiguration(excludeName = "org.redisson.spring.starter.RedissonAutoConfigurationV2")
     @EnableConfigurationProperties({VideoStatusProperties.class, VideoInteractionProperties.class})
-    @MapperScan("com.feibijiubi.backend.mapper")
+    // R2：UserVideoServiceImpl 依赖的 UserMapper 已迁到 com.feibijiubi.backend.user.mapper，
+    // 旧扫描范围保持不变，显式补扫该包。
+    @MapperScan({"com.feibijiubi.backend.mapper", "com.feibijiubi.backend.user.mapper"})
     @EnableRabbit
     @Import({RedisScriptConfig.class, VideoStatusRabbitConfig.class,
             VideoStatusServiceImpl.class, VideoStatusConsumptionServiceImpl.class,

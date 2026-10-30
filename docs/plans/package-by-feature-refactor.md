@@ -43,8 +43,8 @@ Lua、测试fixture、SQL迁移路径不变。R6只有在不修改敏感配置�
 |---|---|---|---|---|
 | R0 | 基线、范围清单、风险清单 | 父级处理，无业务改动 | 干净提交、测试数字、敏感/产物排除 | 已完成 |
 | R1 | 外部视频源＋本地身份归位 | videosource及video.local；其他代码仅修受影响引用 | HTTP权限/响应不变、受限客户端语义、两Mapper绑定、旧包残留 | 已离线验收并合入29ff843 |
-| R2 | 用户与鉴权 | user/auth及必要引用；共享类不强行搬入某个业务 | Login/Admin拦截器装配、Token/用户接口、Bean名稳定 | R1已合入，准备派发 |
-| R3 | 视频、分类、审核、互动 | video/interaction及必要引用 | 发布可用性守卫、原事务/幂等/限流、Mapper绑定 | 待R2验收 |
+| R2 | 用户与鉴权 | user/auth及必要引用；共享类不强行搬入某个业务 | Login/Admin拦截器装配、Token/用户接口、Bean名稳定 | 父级离线验收通过，纳入本批本地提交（见R2验收记录） |
+| R3 | 视频、分类、审核、互动 | video/interaction及必要引用 | 发布可用性守卫、原事务/幂等/限流、Mapper绑定 | R2已验收，准备派发 |
 | R4 | 视频统计流水线 | videostats以及专属配置/事件/MQ/指标 | 队列名/消息序列化类型头、锁/事务/调度器Bean名、旧包兼容风险 | 待R3验收 |
 | R5 | 通用能力收口 | shared/infrastructure/全局装配 | 避免新的大杂烩、全局异常/脚本/存储Bean仍可装配 | 待R4验收 |
 | R6 | 全局扫描、目录说明、最终验收 | 空目录/残留引用/架构测试/文档 | 测试数量守恒、包路径一致、XML解析装配、打包和运行边界说明 | 待R5验收 |
@@ -113,3 +113,27 @@ MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o \
 - 父级`test-compile`通过（`/tmp/layout-r1-parent-compile.log`）；普通全回归1153项，0失败/错误，228跳过，925项执行通过（`/tmp/layout-r1-parent-full.log`）。
 - 父级进一步对照两侧Surefire XML中的类名/方法名和结果：1149项基线测试全部保留，0缺失、0结果变化，仅新增4项Mapper绑定测试；不是只比较总数。
 - 离线验收通过不代表真实应用启动/数据库/MQ/TLS验收；未读取application.yml，未执行迁移，未访问基础设施。R1现已完成本地集成；后续批次提交/合入已获用户授权，继续推进R2。
+
+### R2 执行记录（执行侧自验，非父级验收）
+
+- 工作树：`D:/feibijiubi/backend-layout-r2`，基线`ff93161`（detached），保留R1合入后的未提交R2改动，未reset/清理、未动主工作区。前一次执行进程17728以退出码3221226505结束且无结果，其遗留日志不作为验收证据；本节数字全部来自本次独立重跑。
+- 迁移范围：`auth`16个生产类（注解3、拦截器2、JwtProperties、JwtUtils、TokenService/TokenContext/UserAccountService及其实现、UserAccountController、登录DTO/VO）、`user`12个生产类（UserController/UserService(+impl)/User/UserFollow/UserMapper/UserFollowMapper/UserConverter/资料DTO/UserVO/UserCountVO）；测试随模块迁移3个（LoginInterceptorTests、JwtTokenServiceImplTests、UserAccountServiceImplTests）。共31个Java文件，逐文件与`git show ff93161:旧路径`在不计package/import行后正文完全一致。旧包目录为空且已无残留类，同一类只存在一份。
+- 映射清单：`docs/refactoring/r2-package-map.json`（31条迁移＋3个新增测试类＋6条非机械改动＋opt-in MapperScan审计）；审查可按该清单逐文件对照。
+- Mapper XML：`UserMapper.xml`（namespace/parameterType/resultType）与`UserFollowMapper.xml`（namespace）只改FQCN，物理路径仍在`src/main/resources/com/feibijiubi/backend/mapper/`。`@MapperScan`在主代码中不存在，靠`BackendApplication`包根的`@Mapper`自动扫描。
+- 新增DB-free装配测试9项：`UserMapperBindingTests`（3，含真实MyBatis解析XML→新namespace、逐方法MappedStatement、resultType/parameterType指向`user.entity.User`、根包扫描含两个user mapper且旧FQCN类不存在）、`UserFollowMapperBindingTests`（2）、`AuthEndpointAuthorizationTests`（4，控制器路径/`@OptionalLogin`/`@AllowRevokedToken`保留、真实`LoginInterceptor`对匿名的放行与401、`WebMvcConfig`拦截路径与免鉴权排除项不变）。均不连数据库、不启动Web容器。
+- opt-in测试路径：只有`VideoStatusCounterTransactionTests`（`@SpringBootTest(classes=...)`直接new UserVideoServiceImpl/UserServiceImpl）和`VideoStatusIsolatedIntegrationTests`（`@Import(UserVideoServiceImpl)`）需要新包；已分别追加`@MapperScan("com.feibijiubi.backend.user.mapper")`与在原有范围上追加该包，旧范围未改。其余13个仍扫旧包的opt-in上下文经静态核对不依赖被迁走的两Mapper，未改动。
+- 验证（离线、串行、未联网、未读application.yml、未启动应用/容器/数据库）：
+  - 离线`maven-clean-plugin`不可用，改为删除`target/`后强制全量编译：258个生产源文件＋124个测试源文件，BUILD SUCCESS；日志`/tmp/layout-r2-retry-compile-clean.log`。
+  - 相关测试17个类91项，0失败/错误/跳过；日志`/tmp/layout-r2-retry-related.log`。
+  - 普通回归1162项、0失败/错误、228跳过（934项执行通过），BUILD SUCCESS；日志`/tmp/layout-r2-retry-full.log`。与R1父级全回归1153项逐类对照（按映射把3个测试类FQCN换成新名后）：1153项全部保留、各类测试数与跳过数0变化，仅新增上述3类9项。
+- 未验证/限制：opt-in用例（需真实MySQL/Redis）与`VideoStatusCounterTransactionTests`/`VideoStatusIsolatedIntegrationTests`未运行；真实数据库、MQ、TLS、应用启动未验证；`application.yml`未读取。
+- 本次仅执行侧自验：不声称父级验收通过，未stage/commit/push。
+
+### R2 父级验收记录
+
+- 重试工作流`d8d76352-4cbe-47dd-86c0-a764a9919b0d`；执行`80905776-3871-4f6b-9e12-2153f238605a`、独立审查`9a407750-169c-41bf-8d6b-8e2fecdca38b`，均使用`my-cpa/cn:deepseek-v4.1-flash`。审查PASS，无阻塞项。
+- 父级逐项核验31条迁移：旧路径消失、package与新路径匹配，去除package/import后正文全部与ff93161一致；审阅全部其余源码差异及3个新增装配测试，XML仅修改FQCN。
+- 父级离线`test-compile`和普通全回归通过，日志`/tmp/layout-r2-parent-compile.log`、`/tmp/layout-r2-parent-full.log`；1162项，0失败/错误，228跳过，934项执行通过。对比R1与本批Surefire XML的类名/方法名/结果（规范化3个迁移测试类名），1153项原测试全部保留、结果不变，仅新增9项。
+- 历史失败补查：`layout-r2-worker-compile-1.log`为3个测试尚未迁包导致同包类无法解析；`compile-2.log`为ResponseConverterTests缺少迁移后的UserConverter import。候选已分别迁移测试包、补充import，父级核对修复位置；后续编译与回归成功。此前runner退出3221226505的运行故障原因仍未查明，不能由重试成功认定已根治。离线clean插件缺失记录保留，不宣称clean命令通过。父级审计脚本初次因Windows默认GBK读取UTF-8映射失败，显式UTF-8后完成，不涉及业务测试失败。
+- 审查备注处理：保留既有无用import及util命名，不夹带风格清理；`src/test/resources/video-status-isolated.properties`对旧mapper包的WARN日志配置未覆盖迁移后的user.mapper，留R6统一补齐并验证，真实opt-in运行仍未验收。
+- 本批仅离线验收，不代表应用启动、真实MySQL/Redis/RabbitMQ/TLS或生产验收；未读application.yml，未联网、未执行迁移。父级按用户授权单独本地提交本批并fast-forward集成，不推送远程。

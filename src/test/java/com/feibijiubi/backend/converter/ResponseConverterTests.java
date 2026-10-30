@@ -1,11 +1,12 @@
 package com.feibijiubi.backend.converter;
 
-import com.feibijiubi.backend.entity.User;
+import com.feibijiubi.backend.user.entity.User;
+import com.feibijiubi.backend.user.converter.UserConverter;
 import com.feibijiubi.backend.entity.Video;
 import com.feibijiubi.backend.entity.VideoStatus;
 import com.feibijiubi.backend.vo.AdminVideoDetailVO;
-import com.feibijiubi.backend.vo.UserCountVO;
-import com.feibijiubi.backend.vo.UserVO;
+import com.feibijiubi.backend.user.vo.UserCountVO;
+import com.feibijiubi.backend.user.vo.UserVO;
 import com.feibijiubi.backend.vo.VideoDetailVO;
 import org.junit.jupiter.api.Test;
 

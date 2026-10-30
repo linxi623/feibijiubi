@@ -2,12 +2,12 @@ package com.feibijiubi.backend.videosource.controller;
 
 import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.common.GlobalExceptionHandler;
-import com.feibijiubi.backend.entity.User;
-import com.feibijiubi.backend.interceptor.AdminInterceptor;
-import com.feibijiubi.backend.interceptor.LoginInterceptor;
-import com.feibijiubi.backend.mapper.UserMapper;
-import com.feibijiubi.backend.service.auth.TokenContext;
-import com.feibijiubi.backend.service.auth.TokenService;
+import com.feibijiubi.backend.user.entity.User;
+import com.feibijiubi.backend.auth.interceptor.AdminInterceptor;
+import com.feibijiubi.backend.auth.interceptor.LoginInterceptor;
+import com.feibijiubi.backend.user.mapper.UserMapper;
+import com.feibijiubi.backend.auth.service.TokenContext;
+import com.feibijiubi.backend.auth.service.TokenService;
 import com.feibijiubi.backend.videosource.service.ExternalVideoSourcePreviewService;
 import com.feibijiubi.backend.videosource.vo.ExternalVideoSourceCatalogVO;
 import com.feibijiubi.backend.videosource.vo.ExternalVideoSourceDetailVO;

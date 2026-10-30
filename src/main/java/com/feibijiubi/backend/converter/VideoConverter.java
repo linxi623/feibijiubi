@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.converter;
 
-import com.feibijiubi.backend.entity.User;
+import com.feibijiubi.backend.user.entity.User;
 import com.feibijiubi.backend.entity.UserVideo;
 import com.feibijiubi.backend.entity.Video;
 import com.feibijiubi.backend.entity.VideoStatus;

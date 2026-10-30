@@ -1,11 +1,11 @@
 package com.feibijiubi.backend.controller;
 
-import com.feibijiubi.backend.annotation.AdminOnly;
+import com.feibijiubi.backend.auth.annotation.AdminOnly;
 import com.feibijiubi.backend.common.ApiResponse;
 import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.config.WebMvcConfig;
-import com.feibijiubi.backend.interceptor.AdminInterceptor;
-import com.feibijiubi.backend.interceptor.LoginInterceptor;
+import com.feibijiubi.backend.auth.interceptor.AdminInterceptor;
+import com.feibijiubi.backend.auth.interceptor.LoginInterceptor;
 import com.feibijiubi.backend.metrics.VideoStatusBacklogSampler;
 import com.feibijiubi.backend.metrics.VideoStatusTelemetry;
 import com.feibijiubi.backend.utils.redis.RedisUtils;
