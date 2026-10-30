@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.interaction.controller;
 
 import com.feibijiubi.backend.auth.annotation.OptionalLogin;
-import com.feibijiubi.backend.common.ApiResponse;
+import com.feibijiubi.backend.shared.ApiResponse;
 import com.feibijiubi.backend.interaction.service.UserVideoService;
 import com.feibijiubi.backend.interaction.vo.VideoInteractionVO;
 import jakarta.servlet.http.HttpServletRequest;

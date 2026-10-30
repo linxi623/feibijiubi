@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.videostats.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.feibijiubi.backend.config.RedisScriptConfig;
+import com.feibijiubi.backend.infrastructure.redis.config.RedisScriptConfig;
 import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
 import com.feibijiubi.backend.videostats.config.VideoStatusRabbitConfig;
 import com.feibijiubi.backend.videostats.entity.VideoStatusConsumedEvent;
@@ -20,12 +20,12 @@ import com.feibijiubi.backend.videostats.service.impl.VideoStatusRebuildSnapshot
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusServiceImpl;
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusStatus0CompensationClaimService;
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusStatus0CompensationServiceImpl;
-import com.feibijiubi.backend.utils.JsonUtils;
+import com.feibijiubi.backend.shared.JsonUtils;
 import com.feibijiubi.backend.videostats.mq.RabbitConstants;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
-import com.feibijiubi.backend.utils.redis.RedisUtils;
-import com.feibijiubi.backend.utils.redis.operation.RedisHashOperations;
-import com.feibijiubi.backend.utils.redis.operation.RedisSetOperations;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisUtils;
+import com.feibijiubi.backend.infrastructure.redis.operation.RedisHashOperations;
+import com.feibijiubi.backend.infrastructure.redis.operation.RedisSetOperations;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

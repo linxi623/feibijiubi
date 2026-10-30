@@ -7,9 +7,9 @@ import com.feibijiubi.backend.videostats.entity.VideoStatusReconciliationRelatio
 import com.feibijiubi.backend.event.VideoStatusEventType;
 import com.feibijiubi.backend.videostats.mapper.VideoStatusReconciliationMapper;
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusReconciliationServiceImpl;
-import com.feibijiubi.backend.utils.JsonUtils;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
-import com.feibijiubi.backend.utils.redis.operation.RedisHashOperations;
+import com.feibijiubi.backend.shared.JsonUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.operation.RedisHashOperations;
 import com.feibijiubi.backend.videostats.vo.VideoStatusReconciliationVO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.video.service.impl;
 
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.video.converter.VideoConverter;
 import com.feibijiubi.backend.video.dto.CursorDTO;
 import com.feibijiubi.backend.video.dto.VideoSubmitDTO;
@@ -16,7 +16,7 @@ import com.feibijiubi.backend.user.mapper.UserMapper;
 import com.feibijiubi.backend.interaction.mapper.UserVideoMapper;
 import com.feibijiubi.backend.video.mapper.VideoMapper;
 import com.feibijiubi.backend.videostats.mapper.VideoStatusMapper;
-import com.feibijiubi.backend.service.storage.FileStorageService;
+import com.feibijiubi.backend.infrastructure.storage.service.FileStorageService;
 import com.feibijiubi.backend.video.service.VideoService;
 import com.feibijiubi.backend.video.vo.CursorPageVO;
 import com.feibijiubi.backend.video.vo.VideoDetailVO;

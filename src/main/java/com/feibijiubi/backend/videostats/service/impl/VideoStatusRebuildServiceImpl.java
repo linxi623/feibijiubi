@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.videostats.service.impl;
 
-import com.feibijiubi.backend.common.RedisOperationException;
+import com.feibijiubi.backend.infrastructure.redis.RedisOperationException;
 import com.feibijiubi.backend.videostats.exception.RetryableMessageException;
 import com.feibijiubi.backend.videostats.enums.VideoStatusConsumeProcessStatus;
 import com.feibijiubi.backend.event.VideoStatusDelta;
@@ -9,8 +9,8 @@ import com.feibijiubi.backend.videostats.service.VideoStatusRebuildService;
 import com.feibijiubi.backend.videostats.service.VideoStatusRebuildSnapshot;
 import com.feibijiubi.backend.videostats.service.VideoStatusRebuildSnapshotService;
 import com.feibijiubi.backend.videostats.service.VideoStatusVidMutex;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
-import com.feibijiubi.backend.utils.redis.RedisUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisUtils;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

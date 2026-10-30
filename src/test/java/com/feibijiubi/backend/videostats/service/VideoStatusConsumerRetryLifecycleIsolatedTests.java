@@ -4,7 +4,7 @@ import com.feibijiubi.backend.event.VideoStatusEventType;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
 import com.feibijiubi.backend.videostats.mq.VideoStatusConsumerRecoveryController;
 import com.feibijiubi.backend.videostats.mq.RabbitConstants;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;

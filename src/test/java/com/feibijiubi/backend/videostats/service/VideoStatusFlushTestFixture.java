@@ -8,7 +8,7 @@ import com.feibijiubi.backend.videostats.mapper.VideoStatusConsumedEventMapper;
 import com.feibijiubi.backend.videostats.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.videostats.mq.VideoStatusBatchFlushScheduler;
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusBatchFlushServiceImpl;
-import com.feibijiubi.backend.utils.redis.operation.RedisSetOperations;
+import com.feibijiubi.backend.infrastructure.redis.operation.RedisSetOperations;
 
 import java.time.Clock;
 import java.time.Instant;

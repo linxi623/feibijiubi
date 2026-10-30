@@ -43,7 +43,7 @@ public interface VideoInteractionService {
      * 记录一次交互计数请求：幂等重放历史结果，或（首次）在单个 DB 事务内完成
      * 占位 → 窗口判定 → 计数 → 终态。
      *
-     * @throws com.feibijiubi.backend.common.BusinessException 400 参数非法；
+     * @throws com.feibijiubi.backend.shared.BusinessException 400 参数非法；
      *         409 {@code requestKey} 被不同形状的请求占用或并发冲突无法读取结果；
      *         500 计数/写入影响行数异常（整事务回滚）
      */

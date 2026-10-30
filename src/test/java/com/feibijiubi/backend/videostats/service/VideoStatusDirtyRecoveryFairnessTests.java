@@ -3,8 +3,8 @@ package com.feibijiubi.backend.videostats.service;
 import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
 import com.feibijiubi.backend.videostats.mapper.VideoStatusConsumedEventMapper;
 import com.feibijiubi.backend.videostats.mq.VideoStatusDirtyRecoveryScheduler;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
-import com.feibijiubi.backend.utils.redis.operation.RedisSetOperations;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.operation.RedisSetOperations;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;

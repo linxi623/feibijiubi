@@ -1,10 +1,10 @@
 package com.feibijiubi.backend.interaction.service;
 
-import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.common.RedisOperationException;
+import com.feibijiubi.backend.shared.BusinessException;
+import com.feibijiubi.backend.infrastructure.redis.RedisOperationException;
 import com.feibijiubi.backend.interaction.config.VideoInteractionProperties;
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionRateLimitServiceImpl;
-import com.feibijiubi.backend.utils.redis.RedisUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.script.DefaultRedisScript;

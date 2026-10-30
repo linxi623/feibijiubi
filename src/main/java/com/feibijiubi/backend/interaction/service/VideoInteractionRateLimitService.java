@@ -21,8 +21,8 @@ public interface VideoInteractionRateLimitService {
      *
      * @param actorHash 规范化 64 hex actor 哈希（登录 uid 或匿名访客 UUID 的域分离哈希）
      * @param action    本次动作，决定“单动作”维度的键
-     * @throws com.feibijiubi.backend.common.BusinessException 429 超过任一维度上限
-     * @throws com.feibijiubi.backend.common.RedisOperationException Redis 异常或返回非法值（503）
+     * @throws com.feibijiubi.backend.shared.BusinessException 429 超过任一维度上限
+     * @throws com.feibijiubi.backend.infrastructure.redis.RedisOperationException Redis 异常或返回非法值（503）
      */
     void check(String actorHash, VideoInteractionAction action);
 }

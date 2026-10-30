@@ -45,9 +45,9 @@ Lua、测试fixture、SQL迁移路径不变。R6只有在不修改敏感配置�
 | R1 | 外部视频源＋本地身份归位 | videosource及video.local；其他代码仅修受影响引用 | HTTP权限/响应不变、受限客户端语义、两Mapper绑定、旧包残留 | 已离线验收并合入29ff843 |
 | R2 | 用户与鉴权 | user/auth及必要引用；共享类不强行搬入某个业务 | Login/Admin拦截器装配、Token/用户接口、Bean名稳定 | 父级离线验收通过，已本地提交`e451467`并fast-forward合入主工作区（未推送远程） |
 | R3 | 视频、分类、审核、互动 | video/interaction及必要引用 | 发布可用性守卫、原事务/幂等/限流、Mapper绑定 | 父级离线验收通过，本地提交`0215ce4`并fast-forward合入主工作区（见R3验收记录） |
-| R4 | 视频统计流水线 | videostats以及专属配置/MQ/指标 | 队列名/消息序列化类型头、锁/事务/调度器Bean名、旧包兼容风险 | 父级离线验收通过，纳入本批本地提交；`event`包按消息协议例外保留 |
-| R5 | 通用能力收口 | shared/infrastructure/全局装配 | 避免新的大杂烩、全局异常/脚本/存储Bean仍可装配 | R4已验收，准备派发 |
-| R6 | 全局扫描、目录说明、最终验收 | 空目录/残留引用/架构测试/文档 | 测试数量守恒、包路径一致、XML解析装配、打包和运行边界说明 | 待R5验收 |
+| R4 | 视频统计流水线 | videostats以及专属配置/MQ/指标 | 队列名/消息序列化类型头、锁/事务/调度器Bean名、旧包兼容风险 | 父级离线验收通过，本地提交`d566541`并fast-forward合入主工作区（未推送）；`event`包按消息协议例外保留 |
+| R5 | 通用能力收口 | shared/infrastructure/全局装配 | 避免新的大杂烩、全局异常/脚本/存储Bean仍可装配 | 父级离线验收通过，纳入本批本地提交 |
+| R6 | 全局扫描、目录说明、最终验收 | 空目录/残留引用/架构测试/文档 | 测试数量守恒、包路径一致、XML解析装配、打包和运行边界说明 | R5已验收，准备派发最终收口 |
 
 分批不是并行写入：R2+都须基于前一批父级接受后的结果，不从同一个旧HEAD并行迁移交叉引用。
 
@@ -81,6 +81,8 @@ Lua、测试fixture、SQL迁移路径不变。R6只有在不修改敏感配置�
 ## 6. 验证命令与环境限制
 
 使用Maven Wrapper、离线模式、串行、约束堆；不读application.yml，不启动应用/容器，不联网，不执行迁移。
+
+迁包后的复验必须使用无旧class残留的构建目录，否则旧FQCN不存在断言可能假失败。可在确认target仅为本工作树生成产物后清除target再编译；离线clean插件不可用时不要联网补依赖，不宣称clean命令通过。
 
 ```bash
 MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o -DskipTests test-compile
@@ -198,4 +200,40 @@ MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o \
 - 父级离线`test-compile`及普通回归通过：1183项、0失败/错误、228跳过，955项执行通过；日志`/tmp/layout-r4-parent-compile.log`、`/tmp/layout-r4-parent-full.log`。逐方法对照R3/R4 Surefire XML并规范化测试类名：1174项全部保留、结果不变，仅新增9项。
 - event三类FQCN保持，VideoStatusChangedEvent/VideoStatusEventType无变化，VideoStatusDelta仅import适配；Rabbit配置/常量/事件发布与消费正文保持。新增类型头回归通过。真实broker与滚动发布未验收，Spring自动配置将唯一converter装配到RabbitTemplate的结论仍为静态/字节码证据，未增加实际应用启动验证。
 - R6明确待办：教程`docs/tutorial/video-status-batch-aggregation-implementation.md`的旧实体FQCN、`service/video/baseline/*`交互测试归位、全部新mapper包的测试日志WARN覆盖；event兼容例外及XML集中物理路径不能被“零残留”清理掉。
-- 执行侧历史编译失败与修复记录继续保留。父级映射审计脚本首次误按数组遍历files对象而失败，修正分组遍历后完成143项核验；不涉及业务测试失败。按用户授权单独本地提交并fast-forward合入，不推送；真实基础设施、生产及应用启动未验收，未读application.yml。
+- 执行侧历史编译失败与修复记录继续保留。父级映射审计脚本首次误按数组遍历files对象而失败，修正分组遍历后完成143项核验；不涉及业务测试失败。按用户授权单独本地提交`d566541`并fast-forward合入，不推送；真实基础设施、生产及应用启动未验收，未读application.yml。
+
+### R5 执行记录（执行侧自验，非父级验收）
+
+- 工作树：`D:/feibijiubi/backend-layout-r5`，干净 detached 基线`d566541`（R4 父级提交，已合入主工作区）。本批只在该工作树写入，未 stage/commit/push，未改动主工作区与 R1–R4 工作树，未再委派，未读取 `application.yml`，未联网、未启动应用/容器/数据库/Redis/MQ/COS，未执行迁移。
+- 范围与映射：迁移22个生产Java＋3个测试Java；逐文件旧→新路径/FQCN、归属裁定、非机械改动、扫描/资源/反射审计、新测试与遗留项全部列在`docs/refactoring/r5-package-map.json`（先写映射再迁移，迁移后回填实际改动）。
+  - `shared`（4，平坦包）：`ApiResponse`、`BusinessException`、`GlobalExceptionHandler`、`JsonUtils`。
+  - `infrastructure.redis`（5＋3）：`RedisConstants`/`RedisKeyUtils`/`RedisUtils`/`RedisOperationException`＋`config.RedisScriptConfig`＋`operation.{RedisHashOperations,RedisSetOperations,RedisZSetOperations}`；`infrastructure.ratelimit.service(.impl)`（2）：`RateLimitService`/`RateLimitServiceImpl`；`infrastructure.storage`（4）：`config.{TencentCosConfig,TencentCosProperties}`＋`service.FileStorageService`＋`service.impl.TencentCosStorageServiceImpl`。
+  - `user.enums`（4）：`UserAuth`/`UserGender`/`UserRole`/`UserVip`。核实消费者后按真实领域归 user：前三者对应 User 实体的 auth/gender/vip 列且生产代码零消费者；`UserRole` 唯一消费者是 auth 的 `AdminInterceptor`，role 是用户账号列且 auth 已依赖 user，故没有把任何枚举塞进 shared 或 auth。`config.WebMvcConfig` 保留 config；`event` 三类按 R4 协议例外不迁。
+- 归属裁定要点：`GlobalExceptionHandler` 进 `shared`（它就是“共享异常→共享响应”的实现点，与所处理类型同包），`RedisOperationException` 进 `infrastructure.redis`（语义是 Redis 基础设施故障→503，避免把 Redis 概念带进通用层，shared→infrastructure 是唯一方向、无循环）；`JsonUtils` 进 shared 而非 infrastructure；存储实现→video 上传 DTO/实体/Mapper 的既有依赖按任务口径明确接受，未拆门面、未改存储签名。
+- 逐文件正文核对：22＋3个迁移文件与`git show d566541:旧路径`在不计 package/import 行后正文 25/25 完全一致；112个修改未迁移的 Java 文件里，非 import/非注释的改动行数为 0（只改 import 与 Javadoc 里的全限定名）。唯一通配 import 变更：`LocalEpisodeSourceAdminControllerTests` 的 `common.*` 拆包后失效，换成两条显式 import（未用 ApiResponse）。
+- Bean/扫描/资源审计：类名、`@Service`/`@Component`/`@Bean` 方法名不变，因此 bean 名（`globalExceptionHandler`、`jsonUtils`、`redisUtils`、`redisHashOperations`/`redisSetOperations`/`redisZSetOperations`、`rateLimitServiceImpl`、`tencentCosStorageServiceImpl`、`COSClient`、5个脚本 bean）全部保持；13处`@Qualifier`/`@Resource(name=...)`零改动；19处`@MapperScan`注解（含`basePackageClasses`，另有2处Javadoc引用）零改动（本批无 Mapper 迁移）；无反射包名依赖；`src/main/resources`（16 个 mapper XML、5 个 Lua、`application.yml.example`）与`src/test/resources`零改动；旧`common/enums/utils/service`目录已空并删除。
+- 新增DB-free装配测试4类11项（不连数据库/Redis/MQ/COS、不启动 Web 容器，也不加载`BackendApplication`）：
+  - `shared.GlobalExceptionHandlerWiringTests`（3）：shared 包扫描后 `globalExceptionHandler` 唯一；`ExceptionHandlerMethodResolver` 对 BusinessException/RedisOperationException/兜底 Exception 的映射不变；根包扫描只发现这一份 advice，旧 FQCN 不存在。
+  - `infrastructure.redis.config.RedisScriptConfigWiringTests`（3）：5个脚本 bean 的名字/结果类型/脚本文本逐一等于 classpath `lua/*.lua` 内容（证明路径与内容都没搬）；`@Primary` 仍只在 `fixedWindowRateLimitScript` 与 `videoStatusIncrementScript`；旧 `config.RedisScriptConfig`、旧 `utils.redis.RedisUtils` 不存在。
+  - `infrastructure.ratelimit.service.impl.RateLimitServiceWiringTests`（3）：按生产路径组件扫描后 `rateLimitServiceImpl` 唯一并实现 `RateLimitService`；注入的脚本与 `@Primary` 的 `fixedWindowRateLimitScript` 同一实例（泛型注入没被统计脚本抢走）；旧 `service/service.impl` FQCN 不存在。
+  - `infrastructure.storage.TencentCosStorageWiringTests`（2）：`tencent.cos.*` 仍绑定到 `TencentCosProperties`；`COSClient`/`tencentCosStorageServiceImpl` 按原名注册、`FileStorageService` 唯一实现；`Key2Url`/`Url2Key` 互逆且 URL 约定不变；`BackendApplication` 的 `@EnableConfigurationProperties` 仍登记搬包后的配置类、前缀仍为 `tencent.cos`。COSClient 只用假配置构造（构造期不解析 DNS/不联网），测试结束 `shutdown()`。
+  - 异常处理、限流、存储三类测试断言上下文中 DataSource/RedisConnectionFactory/RabbitMQ ConnectionFactory 计数为0；脚本配置测试仅导入没有外部连接依赖的RedisScriptConfig，不包含这三项计数断言。
+- 验证（离线、串行、约束堆；日志保留在`/tmp`）：
+  - `rm -rf target` 后全量 `test-compile`：258个生产源文件＋136个测试源文件（132基线＋4新增），BUILD SUCCESS；日志`/tmp/layout-r5-final-compile.log`。离线`maven-clean-plugin`仍不可用，用删除`target/`代替，不宣称 clean 命令通过。
+  - 相关测试619项（67个直接 import shared/infrastructure 的测试类），0失败/错误，184跳过；日志`/tmp/layout-r5-related.log`。
+  - 新增测试11项，0失败/错误/跳过；日志`/tmp/layout-r5-new-tests-2.log`。
+  - 普通回归1194项、0失败/错误、228跳过（966项执行通过），BUILD SUCCESS；日志`/tmp/layout-r5-final-full.log`。
+  - 与R4父级全回归1183项逐方法对照（只读`D:/feibijiubi/backend-layout-r4/target/surefire-reports`，按映射规范化3个迁移测试类FQCN）：1183项全部保留、0缺失、0结果变化，跳过数228不变，仅新增11项。
+- 历史失败与新测试修正（日志保留）：`/tmp/layout-r5-new-tests-1.log`为6失败＋1错误，全部来自新测试自身的错误假设——原以为只有`fixedWindowRateLimitScript`带`@Primary`（实际`videoStatusIncrementScript`迁移前也带）、`@Import(实现类)`注册的 bean 名是全限定名而非`@Service`驼峰名、扫描 shared 包时`JsonUtils`需要`ObjectMapper`。修正是改新测试（改为按生产路径组件扫描并断言两个既有`@Primary`、补一个空`ObjectMapper`），没有削弱或改写任何既有项目断言，也没有改生产代码。另两个新增配置扫描测试原用精确集合等式，但扫描包含测试自身嵌套Configuration，改为包含生产配置类的断言；该证据只证明生产配置可被发现，不证明集合仅有生产配置。`layout-r5-compile-1/2.log`、`layout-r5-related.log`、`layout-r5-full.log`为过程/首轮通过证据。
+- 未验证/限制：opt-in 隔离/集成用例（需真实 MySQL/Redis/RabbitMQ）未运行，其 import 只做静态核对；真实 Redis 脚本执行、broker 类型头收发、COS 上传、应用启动与打包未验证；候选工作树无application.yml，仅有.example；未读取主工作区或部署期真实配置，其按包名的配置（如`type-aliases-package`、`logging.level`）仍未核对（本批未改XML，XML全部使用FQCN）。
+- R6 交接（不扩大本批范围）：`src/test/resources/video-status-isolated.properties`的`logging.level`仍只覆盖旧 mapper 包；`docs/tutorial/video-status-batch-aggregation-implementation.md`的旧实体 FQCN；`src/test/java/.../service/video/baseline/*`交互基线测试与`converter/ResponseConverterTests`所在测试包归位；`event`三类与 mapper XML 集中物理路径不得被“零残留”清理掉。
+- 本批仅执行侧自验：不声称父级验收通过，未 stage/commit/push，未删除任何工作树。执行侧结论：READY_FOR_REVIEW。
+
+### R5 父级验收记录
+
+- 工作流`ee754733-6867-4c37-87ea-b2dfdbc42d3e`；执行`31367619-72e9-4b35-a0c9-d26e7905d5fd`、独立审查`e466eb04-0b38-46b4-9ce9-68671ca4094b`，均使用指定DeepSeek Flash 4.1；审查OK with notes。
+- 父级逐项核对25条迁移：旧路径消失、package匹配，忽略package/import后所有正文与d566541一致。112个未迁移Java文件的正文变化只有5个接口的Javadoc类型引用，其余仅import；event及XML/Lua资源未变。
+- 父级修正证据文字：19处MapperScan注解与2处Javadoc区分；基础设施不存在断言仅覆盖三类测试；脚本/COS新增扫描断言的调整及第四类失败原因明确披露。修正新增COS测试finally避免未启动上下文再次getBean掩盖原错误，脚本测试注释“其余四个”改为三个，无既有断言改动。
+- shared.GlobalExceptionHandler依赖infrastructure.redis.RedisOperationException，而infrastructure.redis.operation又依赖shared.JsonUtils，因此模块级仍双向依赖；已纠正映射中“无循环”表述，不做业务边界治理、不宣称解耦。
+- 父级清除本候选树生成的target后全量离线test-compile及普通回归通过：258生产/136测试源码；1194项、0失败/错误、228跳过，966项执行通过。日志`/tmp/layout-r5-parent-compile.log`、`/tmp/layout-r5-parent-full.log`；逐方法比较R4/R5 Surefire XML，1183项原测试全部保留、结果不变，仅新增11项。
+- 历史新增测试6失败＋1错误已对照日志及修正位置核查并保留，不以最终通过抹去；真实Redis/MQ/COS/数据库、完整应用启动/生产行为仍未验证。按用户授权单独本地提交并fast-forward集成，不推送远程。

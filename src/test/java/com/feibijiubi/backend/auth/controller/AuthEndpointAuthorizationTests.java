@@ -5,7 +5,7 @@ import com.feibijiubi.backend.auth.annotation.OptionalLogin;
 import com.feibijiubi.backend.auth.interceptor.AdminInterceptor;
 import com.feibijiubi.backend.auth.interceptor.LoginInterceptor;
 import com.feibijiubi.backend.auth.service.TokenService;
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.config.WebMvcConfig;
 import com.feibijiubi.backend.user.controller.UserController;
 import com.feibijiubi.backend.user.mapper.UserMapper;

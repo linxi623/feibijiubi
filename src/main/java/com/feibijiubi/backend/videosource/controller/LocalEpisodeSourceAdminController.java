@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.videosource.controller;
 
 import com.feibijiubi.backend.auth.annotation.AdminOnly;
-import com.feibijiubi.backend.common.ApiResponse;
+import com.feibijiubi.backend.shared.ApiResponse;
 import com.feibijiubi.backend.videosource.dto.LocalEpisodeSourceCaptureDTO;
 import com.feibijiubi.backend.videosource.dto.LocalEpisodeSourceConfirmDTO;
 import com.feibijiubi.backend.videosource.service.LocalEpisodeSourceService;

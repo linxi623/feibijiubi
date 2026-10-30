@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.video.controller;
 
 import com.feibijiubi.backend.auth.annotation.AdminOnly;
-import com.feibijiubi.backend.common.ApiResponse;
+import com.feibijiubi.backend.shared.ApiResponse;
 import com.feibijiubi.backend.video.dto.VideoReviewDTO;
 import com.feibijiubi.backend.video.service.VideoReviewService;
 import com.feibijiubi.backend.video.vo.AdminVideoDetailVO;

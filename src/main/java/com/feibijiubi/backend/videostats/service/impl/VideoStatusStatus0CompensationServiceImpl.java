@@ -9,7 +9,7 @@ import com.feibijiubi.backend.videostats.mq.VideoStatusEventPublisher;
 import com.feibijiubi.backend.videostats.service.VideoStatusEventAgeGuard;
 import com.feibijiubi.backend.videostats.service.VideoStatusEventFingerprintService;
 import com.feibijiubi.backend.videostats.service.VideoStatusStatus0CompensationService;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;

@@ -86,7 +86,7 @@ public interface ExternalVideoSourcePreviewService {
      * 当前可预览来源的安全摘要。
      *
      * @return 只有 code 与名称的列表；预览关闭时抛 503 而不是返回空列表
-     * @throws com.feibijiubi.backend.common.BusinessException 503 预览未启用
+     * @throws com.feibijiubi.backend.shared.BusinessException 503 预览未启用
      */
     List<ExternalVideoSourceVO> listAvailableSources();
 
@@ -98,7 +98,7 @@ public interface ExternalVideoSourcePreviewService {
      * @param page        页码，从 {@value #MIN_PAGE} 开始
      * @param categoryId  上游分类 ID，{@code null} 表示不过滤
      * @return 脱敏目录 VO（作品身份、标题、分类标识/名称与上游自报分页数字）
-     * @throws com.feibijiubi.backend.common.BusinessException 400/401/404/429/502/503，见类注释
+     * @throws com.feibijiubi.backend.shared.BusinessException 400/401/404/429/502/503，见类注释
      */
     ExternalVideoSourceCatalogVO catalog(Integer adminUserId, String sourceCode, int page, Integer categoryId);
 
@@ -109,7 +109,7 @@ public interface ExternalVideoSourcePreviewService {
      * @param sourceCode  部署白名单引用键
      * @param workId      上游作品 ID（规范十进制正整数，无前导零）
      * @return 脱敏详情 VO（作品元数据、线路/条目快照位置与标签，以及"是否有作品级时长提示"）
-     * @throws com.feibijiubi.backend.common.BusinessException 400/401/404/429/502/503，见类注释
+     * @throws com.feibijiubi.backend.shared.BusinessException 400/401/404/429/502/503，见类注释
      */
     ExternalVideoSourceDetailVO detail(Integer adminUserId, String sourceCode, String workId);
 }

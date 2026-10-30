@@ -2,7 +2,7 @@ package com.feibijiubi.backend.videostats.service;
 
 import com.feibijiubi.backend.videostats.exception.RetryableMessageException;
 import com.feibijiubi.backend.videostats.metrics.VideoStatusTelemetry;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
 import lombok.RequiredArgsConstructor;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;

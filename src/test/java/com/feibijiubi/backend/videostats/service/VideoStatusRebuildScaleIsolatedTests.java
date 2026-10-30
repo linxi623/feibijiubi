@@ -1,16 +1,16 @@
 package com.feibijiubi.backend.videostats.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.feibijiubi.backend.config.RedisScriptConfig;
+import com.feibijiubi.backend.infrastructure.redis.config.RedisScriptConfig;
 import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
 import com.feibijiubi.backend.videostats.enums.VideoStatusConsumeProcessStatus;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
 import com.feibijiubi.backend.event.VideoStatusEventType;
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusRebuildServiceImpl;
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusRebuildSnapshotServiceImpl;
-import com.feibijiubi.backend.utils.JsonUtils;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
-import com.feibijiubi.backend.utils.redis.RedisUtils;
+import com.feibijiubi.backend.shared.JsonUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

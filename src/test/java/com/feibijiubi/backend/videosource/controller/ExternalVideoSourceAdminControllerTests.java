@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.videosource.controller;
 
-import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.common.GlobalExceptionHandler;
+import com.feibijiubi.backend.shared.BusinessException;
+import com.feibijiubi.backend.shared.GlobalExceptionHandler;
 import com.feibijiubi.backend.user.entity.User;
 import com.feibijiubi.backend.auth.interceptor.AdminInterceptor;
 import com.feibijiubi.backend.auth.interceptor.LoginInterceptor;

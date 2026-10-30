@@ -1,13 +1,13 @@
 package com.feibijiubi.backend.videostats.service;
 
-import com.feibijiubi.backend.common.RedisOperationException;
+import com.feibijiubi.backend.infrastructure.redis.RedisOperationException;
 import com.feibijiubi.backend.videostats.exception.RetryableMessageException;
 import com.feibijiubi.backend.videostats.enums.VideoStatusConsumeProcessStatus;
 import com.feibijiubi.backend.event.VideoStatusDelta;
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusRebuildServiceImpl;
-import com.feibijiubi.backend.utils.redis.RedisConstants;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
-import com.feibijiubi.backend.utils.redis.RedisUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisConstants;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

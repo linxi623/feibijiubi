@@ -1,0 +1,402 @@
+{
+  "batch": "R5",
+  "module": "shared / infrastructure / 全局装配收口",
+  "worktree": "D:/feibijiubi/backend-layout-r5",
+  "baseCommit": "d566541",
+  "baseCommitSubject": "refactor: group video statistics while preserving event wire types（R4 父级提交，已合入主工作区）",
+  "state": "干净 detached 基线；本批只在该工作树写入，未 stage/commit/push，未改动主工作区与 R1–R4 工作树，未再委派；未读取 application.yml，未联网，未启动应用/容器/数据库/Redis/MQ/COS，未执行迁移",
+  "counts": {
+    "productionFilesMoved": 22,
+    "testFilesMoved": 3,
+    "newTestClasses": 4,
+    "newTestMethods": 11,
+    "productionJavaFiles": 258,
+    "testJavaFiles": 136,
+    "movedFileBodiesIdenticalModuloPackageAndImports": "25/25",
+    "modifiedButNotMovedJavaFiles": 112,
+    "nonImportOrCommentChangedLinesInModifiedFiles": 0
+  },
+  "files": {
+    "production": [
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/common/ApiResponse.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/shared/ApiResponse.java",
+        "oldFqcn": "com.feibijiubi.backend.common.ApiResponse",
+        "newFqcn": "com.feibijiubi.backend.shared.ApiResponse"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/common/BusinessException.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/shared/BusinessException.java",
+        "oldFqcn": "com.feibijiubi.backend.common.BusinessException",
+        "newFqcn": "com.feibijiubi.backend.shared.BusinessException"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/common/GlobalExceptionHandler.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/shared/GlobalExceptionHandler.java",
+        "oldFqcn": "com.feibijiubi.backend.common.GlobalExceptionHandler",
+        "newFqcn": "com.feibijiubi.backend.shared.GlobalExceptionHandler"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/utils/JsonUtils.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/shared/JsonUtils.java",
+        "oldFqcn": "com.feibijiubi.backend.utils.JsonUtils",
+        "newFqcn": "com.feibijiubi.backend.shared.JsonUtils"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/common/RedisOperationException.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/infrastructure/redis/RedisOperationException.java",
+        "oldFqcn": "com.feibijiubi.backend.common.RedisOperationException",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.redis.RedisOperationException"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/utils/redis/RedisConstants.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/infrastructure/redis/RedisConstants.java",
+        "oldFqcn": "com.feibijiubi.backend.utils.redis.RedisConstants",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.redis.RedisConstants"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/utils/redis/RedisKeyUtils.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/infrastructure/redis/RedisKeyUtils.java",
+        "oldFqcn": "com.feibijiubi.backend.utils.redis.RedisKeyUtils",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/utils/redis/RedisUtils.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/infrastructure/redis/RedisUtils.java",
+        "oldFqcn": "com.feibijiubi.backend.utils.redis.RedisUtils",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.redis.RedisUtils"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/utils/redis/operation/RedisHashOperations.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/infrastructure/redis/operation/RedisHashOperations.java",
+        "oldFqcn": "com.feibijiubi.backend.utils.redis.operation.RedisHashOperations",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.redis.operation.RedisHashOperations"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/utils/redis/operation/RedisSetOperations.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/infrastructure/redis/operation/RedisSetOperations.java",
+        "oldFqcn": "com.feibijiubi.backend.utils.redis.operation.RedisSetOperations",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.redis.operation.RedisSetOperations"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/utils/redis/operation/RedisZSetOperations.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/infrastructure/redis/operation/RedisZSetOperations.java",
+        "oldFqcn": "com.feibijiubi.backend.utils.redis.operation.RedisZSetOperations",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.redis.operation.RedisZSetOperations"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/config/RedisScriptConfig.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/infrastructure/redis/config/RedisScriptConfig.java",
+        "oldFqcn": "com.feibijiubi.backend.config.RedisScriptConfig",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.redis.config.RedisScriptConfig"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/ratelimit/RateLimitService.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/infrastructure/ratelimit/service/RateLimitService.java",
+        "oldFqcn": "com.feibijiubi.backend.service.ratelimit.RateLimitService",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.ratelimit.service.RateLimitService"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/ratelimit/RateLimitServiceImpl.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/infrastructure/ratelimit/service/impl/RateLimitServiceImpl.java",
+        "oldFqcn": "com.feibijiubi.backend.service.impl.ratelimit.RateLimitServiceImpl",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.ratelimit.service.impl.RateLimitServiceImpl"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/storage/FileStorageService.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/infrastructure/storage/service/FileStorageService.java",
+        "oldFqcn": "com.feibijiubi.backend.service.storage.FileStorageService",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.storage.service.FileStorageService"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/storage/TencentCosStorageServiceImpl.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/infrastructure/storage/service/impl/TencentCosStorageServiceImpl.java",
+        "oldFqcn": "com.feibijiubi.backend.service.impl.storage.TencentCosStorageServiceImpl",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.storage.service.impl.TencentCosStorageServiceImpl"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/config/TencentCosConfig.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/infrastructure/storage/config/TencentCosConfig.java",
+        "oldFqcn": "com.feibijiubi.backend.config.TencentCosConfig",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.storage.config.TencentCosConfig"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/config/TencentCosProperties.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/infrastructure/storage/config/TencentCosProperties.java",
+        "oldFqcn": "com.feibijiubi.backend.config.TencentCosProperties",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.storage.config.TencentCosProperties"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/enums/UserAuth.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/user/enums/UserAuth.java",
+        "oldFqcn": "com.feibijiubi.backend.enums.UserAuth",
+        "newFqcn": "com.feibijiubi.backend.user.enums.UserAuth"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/enums/UserGender.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/user/enums/UserGender.java",
+        "oldFqcn": "com.feibijiubi.backend.enums.UserGender",
+        "newFqcn": "com.feibijiubi.backend.user.enums.UserGender"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/enums/UserRole.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/user/enums/UserRole.java",
+        "oldFqcn": "com.feibijiubi.backend.enums.UserRole",
+        "newFqcn": "com.feibijiubi.backend.user.enums.UserRole"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/enums/UserVip.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/user/enums/UserVip.java",
+        "oldFqcn": "com.feibijiubi.backend.enums.UserVip",
+        "newFqcn": "com.feibijiubi.backend.user.enums.UserVip"
+      }
+    ],
+    "tests": [
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/common/GlobalExceptionHandlerTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/shared/GlobalExceptionHandlerTests.java",
+        "oldFqcn": "com.feibijiubi.backend.common.GlobalExceptionHandlerTests",
+        "newFqcn": "com.feibijiubi.backend.shared.GlobalExceptionHandlerTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/impl/ratelimit/RateLimitServiceImplTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/infrastructure/ratelimit/service/impl/RateLimitServiceImplTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.impl.ratelimit.RateLimitServiceImplTests",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.ratelimit.service.impl.RateLimitServiceImplTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/utils/redis/RedisUtilsTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/infrastructure/redis/RedisUtilsTests.java",
+        "oldFqcn": "com.feibijiubi.backend.utils.redis.RedisUtilsTests",
+        "newFqcn": "com.feibijiubi.backend.infrastructure.redis.RedisUtilsTests"
+      }
+    ]
+  },
+  "scopeDecisions": [
+    {
+      "target": "shared.{ApiResponse,BusinessException,GlobalExceptionHandler,JsonUtils}（平坦包，不再分子包）",
+      "reason": "这几类确实被 6 个业务模块同时使用：响应封装、业务异常、全局异常 advice、通用 JSON。只有 4 个类型，按计划“shared 只放少量跨模块类型”保持平坦，避免为一个类造一层子包；不引入新的包装/门面抽象，类名/方法/状态码全不变"
+    },
+    {
+      "target": "GlobalExceptionHandler 放 shared（不是 config）",
+      "reason": "它是“共享异常 → 共享响应”的唯一实现点：@RestControllerAdvice 覆盖 BusinessException/ApiResponse，并把 RedisOperationException 映射成 503。放在 shared 与它处理的类型同包；WebMvcConfig 因为是跨模块拦截器装配，按任务口径留在 config"
+    },
+    {
+      "target": "RedisOperationException → infrastructure.redis（不是 shared）",
+      "reason": "虽然它继承 RuntimeException 且被全局 advice 处理，但语义是“Redis 基础设施故障 → 503”，只在 Redis 工具/限流/统计路径抛出并捕获；放 shared 会把 Redis 概念带进通用层。shared → infrastructure 的这一处 import 是唯一方向，未引入循环"
+    },
+    {
+      "target": "infrastructure.redis.{RedisUtils,RedisKeyUtils,RedisConstants,RedisOperationException} + infrastructure.redis.operation.*",
+      "reason": "Redis 工具与 Hash/Set/ZSet 操作是通用能力，被 auth/video/interaction/videosource/videostats 共用；键前缀常量与 Lua 脚本 bean 不变，仍由真实 RedisScriptConfig 提供"
+    },
+    {
+      "target": "infrastructure.redis.config.RedisScriptConfig",
+      "reason": "五个 Lua 脚本 bean（fixedWindowRateLimitScript/videoStatusIncrementScript/videoStatusReleaseGateScript/videoStatusInitScript/videoStatusReplaceScript）是脚本配置而非业务逻辑；bean 名/@Bean 方法名/@Primary 一字未改，脚本物理路径 lua/*.lua 保留"
+    },
+    {
+      "target": "infrastructure.ratelimit.service.RateLimitService + infrastructure.ratelimit.service.impl.RateLimitServiceImpl",
+      "reason": "通用固定窗口限流（上传 token 配额、登录失败次数），不归属某个业务模块；保留 service/service.impl 分层与现有构造注入（DefaultRedisScript<Long> + RedisUtils）"
+    },
+    {
+      "target": "infrastructure.storage.{config.TencentCosConfig,config.TencentCosProperties,service.FileStorageService,service.impl.TencentCosStorageServiceImpl}",
+      "reason": "COS 客户端/配置/存储实现是通用存储能力。既有“存储实现 → video 上传 DTO/VO/UploadTempFile 实体与 Mapper”的依赖按任务口径明确接受并显式记录，本批不拆接口门面、不改存储签名"
+    },
+    {
+      "target": "user.enums.{UserAuth,UserGender,UserRole,UserVip}",
+      "reason": "按真实领域回 user，不硬塞 shared。核实消费者：UserAuth/UserGender/UserVip 在生产代码中零消费者，但三者都对应 User 实体列（auth/gender/vip）；UserRole 唯一消费者是 auth 的 AdminInterceptor，而 role 是用户账号列，且 auth 已经依赖 user（User/UserMapper/UserConverter），因此归 user.enums，没有把任何枚举移进 auth 或 shared"
+    },
+    {
+      "target": "config.WebMvcConfig 保留 config",
+      "reason": "跨模块拦截器装配（loginInterceptor/adminInterceptor 与 /api/**、/api/admin/** 路径），按任务口径不迁"
+    },
+    {
+      "target": "event.{VideoStatusChangedEvent,VideoStatusEventType,VideoStatusDelta} 不迁",
+      "reason": "R4 父级裁定的消息协议例外：__TypeId__ 为原 FQCN，本轮不加别名/idClassMapping、不改 converter/trustedPackages"
+    }
+  ],
+  "nonMechanicalChanges": [
+    {
+      "file": "src/test/java/com/feibijiubi/backend/videosource/controller/LocalEpisodeSourceAdminControllerTests.java",
+      "change": "通配 import com.feibijiubi.backend.common.* 拆包后失效，替换为两条显式 import：shared.BusinessException、shared.GlobalExceptionHandler（该文件未用 ApiResponse）"
+    },
+    {
+      "file": "src/main/java/com/feibijiubi/backend/shared/GlobalExceptionHandler.java",
+      "change": "新增 import infrastructure.redis.RedisOperationException（搬包后不再同包），注解/方法体/状态码未改"
+    },
+    {
+      "file": "src/test/java/com/feibijiubi/backend/shared/GlobalExceptionHandlerTests.java",
+      "change": "新增 import infrastructure.redis.RedisOperationException；测试方法与断言未改"
+    },
+    {
+      "file": "src/main/java/com/feibijiubi/backend/shared/JsonUtils.java",
+      "change": "删除搬包后变成同包的 BusinessException import；方法体未改"
+    },
+    {
+      "file": "src/main/java/com/feibijiubi/backend/infrastructure/redis/RedisUtils.java",
+      "change": "删除搬包后变成同包的 RedisOperationException import；JsonUtils 改为 shared；方法体未改"
+    },
+    {
+      "file": "src/test/java/com/feibijiubi/backend/infrastructure/redis/RedisUtilsTests.java",
+      "change": "同上：删除同包 RedisOperationException import；测试方法/断言未改"
+    },
+    {
+      "file": "src/main/java/com/feibijiubi/backend/infrastructure/ratelimit/service/impl/RateLimitServiceImpl.java",
+      "change": "RateLimitService 由同包变跨包，import 指向 infrastructure.ratelimit.service；业务方法与限流参数未改"
+    },
+    {
+      "file": "src/main/java/com/feibijiubi/backend/infrastructure/storage/service/impl/TencentCosStorageServiceImpl.java",
+      "change": "import 改为 infrastructure.storage.config.TencentCosProperties 与 infrastructure.storage.service.FileStorageService；存储方法体/签名未改"
+    },
+    {
+      "file": "其余 104 个已修改未迁移的 Java 文件（main 47 / test 57）",
+      "change": "只改 import 行，以及 Javadoc/@throws 里的全限定名（如 interaction/videosource 接口注释中的 BusinessException/RedisOperationException）；逐行核对：这些文件里非 import/非注释的改动行数为 0"
+    }
+  ],
+  "importAndScanAudit": {
+    "wildcardImports": "仅 1 处 common.* 通配（LocalEpisodeSourceAdminControllerTests），已换显式 import；两份 utils.redis.* / utils.redis.operation.* 通配（VideoStatusIsolatedIntegrationTests）随迁移改写为 infrastructure.redis.*",
+    "mapperScan": "本批没有 Mapper 迁移，src 下 19 处 @MapperScan 注解（含 basePackageClasses 形式，另有 2 处 Javadoc 引用）零改动，逐行 diff 为空",
+    "qualifiersAndNamedBeans": "13 处 @Qualifier/@Resource(name=...) 零改动；fixedWindowRateLimitScript、videoStatusIncrementScript、videoStatusReleaseGateScript、videoStatusInitScript、videoStatusReplaceScript 仍按名注入",
+    "reflection": "未发现 Class.forName/反射包名字符串依赖；新增测试用 Class.forName 断言旧 FQCN 不存在",
+    "resources": "src/main/resources（mapper XML、lua/*.lua、application.yml.example）与 src/test/resources 零改动；本批无 XML/namespace 变更",
+    "oldPackages": "迁移后 com.feibijiubi.backend.{common,enums,utils,service} 目录已空并删除；顶层只余 config（WebMvcConfig 与既有装配）与 event（R4 协议例外）",
+    "sensitive": "未读取 application.yml、未读取任何凭据；测试里只用假 secret-id/secret-key/region/bucket"
+  },
+  "assemblyEvidence": {
+    "principle": "四类新测试都使用 ApplicationContextRunner/组件扫描但只注册相关类，不加载 BackendApplication、不导入自动配置、不建 DataSource/Redis/RabbitMQ 连接",
+    "classes": [
+      {
+        "fqcn": "com.feibijiubi.backend.shared.GlobalExceptionHandlerWiringTests",
+        "tests": 3,
+        "covers": "shared 包扫描后 globalExceptionHandler 唯一存在；异常类型→处理方法映射不变（BusinessException/RedisOperationException/兜底 Exception）；根包扫描只发现这一份 advice 且旧 FQCN 已不存在"
+      },
+      {
+        "fqcn": "com.feibijiubi.backend.infrastructure.redis.config.RedisScriptConfigWiringTests",
+        "tests": 3,
+        "covers": "5 个脚本 bean 名/结果类型与 bean 内脚本文本逐一等于 classpath lua/*.lua 资源内容（证明路径与内容都没变）；@Primary 只保留在 fixedWindowRateLimitScript 与 videoStatusIncrementScript；扫描 infrastructure.redis 能发现生产脚本配置类（测试配置也可能被发现），旧 config/utils FQCN 不存在"
+      },
+      {
+        "fqcn": "com.feibijiubi.backend.infrastructure.ratelimit.service.impl.RateLimitServiceWiringTests",
+        "tests": 3,
+        "covers": "组件扫描后 rateLimitServiceImpl 唯一且实现 RateLimitService；注入的 redisScript 与 @Primary 的 fixedWindowRateLimitScript 同一实例（泛型注入没被统计脚本抢走）；旧 service/service.impl FQCN 不存在"
+      },
+      {
+        "fqcn": "com.feibijiubi.backend.infrastructure.storage.TencentCosStorageWiringTests",
+        "tests": 2,
+        "covers": "tencent.cos.* 仍绑定到 TencentCosProperties；COSClient 与 tencentCosStorageServiceImpl 按原名注册、FileStorageService 唯一实现；Key2Url/Url2Key 互逆且 URL 约定不变；BackendApplication 的 @EnableConfigurationProperties 仍登记搬包后的配置类、前缀仍为 tencent.cos；旧 config.TencentCosProperties、旧 service.storage.FileStorageService、旧 service.impl.storage.TencentCosStorageServiceImpl FQCN 不存在"
+      }
+    ],
+    "noRealInfrastructure": "异常处理、限流、存储三类测试断言 DataSource、RedisConnectionFactory、RabbitMQ ConnectionFactory 计数为 0；脚本测试仅导入无外部连接依赖的RedisScriptConfig；COSClient 只用假配置构造（构造期不解析 DNS/不联网），测试结束 shutdown()"
+  },
+  "dependencies": {
+    "sharedToInfrastructure": [
+      "GlobalExceptionHandler → infrastructure.redis.RedisOperationException；infrastructure.redis.operation 反向引用 shared.JsonUtils，因此模块级依赖仍为双向，不宣称无环或解耦"
+    ],
+    "infrastructureInternal": [
+      "redis.operation.* → redis.RedisOperationException + shared.JsonUtils",
+      "ratelimit.service.impl → ratelimit.service + redis.{RedisConstants,RedisKeyUtils,RedisUtils} + shared.BusinessException",
+      "storage.service.impl → video.dto.VideoUploadPrepareDTO / video.entity.UploadTempFile / video.mapper.UploadTempFileMapper / video.vo.VideoUploadPrepareVO（既有依赖，按任务口径明确接受，本批不拆门面）"
+    ],
+    "modulesToShared": "auth、video（含 video.local）、interaction、videosource、videostats、user 都 import shared.{ApiResponse,BusinessException,JsonUtils,GlobalExceptionHandler}",
+    "modulesToInfrastructure": "auth、video（含 category）、interaction、videosource、videostats 引用 Redis 工具/限流/存储；行级清单见 src 下 import 与 nonMechanicalChanges",
+    "note": "以上都是“显式归组后的既有依赖”，没有新增跨模块门面、没有改调用链，不能据此宣称架构已解耦"
+  },
+  "exceptions": [
+    {
+      "item": "com.feibijiubi.backend.event.{VideoStatusChangedEvent,VideoStatusEventType,VideoStatusDelta}",
+      "reason": "R4 消息协议例外：包名是 RabbitMQ __TypeId__ 的一部分，迁移会破坏在途消息；R5/R6 均不迁"
+    },
+    {
+      "item": "src/main/resources/com/feibijiubi/backend/mapper/*.xml 物理路径",
+      "reason": "按计划 R1–R6 保留集中存放，本批没有 XML 变更"
+    },
+    {
+      "item": "src/main/resources/lua/*.lua 路径",
+      "reason": "脚本内容与路径都不变，只搬加载它们的配置类"
+    },
+    {
+      "item": "config.WebMvcConfig",
+      "reason": "跨模块拦截器装配，按任务口径保留在 config"
+    },
+    {
+      "item": "src/test/java/.../service/video/baseline/*、converter/ResponseConverterTests 所在测试包",
+      "reason": "不属于本批模块；baseline 摘要测试与交互内容相关、converter 测试包是跨模块测试，留 R6 决定是否归位"
+    },
+    {
+      "item": "src/test/resources/video-status-isolated.properties 的 logging.level 只覆盖 com.feibijiubi.backend.mapper",
+      "reason": "R2–R4 遗留缺口，按约束留 R6 统一补齐并验证"
+    },
+    {
+      "item": "docs/tutorial/video-status-batch-aggregation-implementation.md 中的旧实体 FQCN",
+      "reason": "文档修订留 R6"
+    }
+  ],
+  "knownGaps": [
+    "opt-in 隔离/集成用例（真实 MySQL/Redis/RabbitMQ）未运行；其 import 只做静态核对",
+    "候选工作树无application.yml，仅有.example；未读取主工作区或部署期真实配置，其按包名的配置（如 type-aliases-package、logging.level）未核对；本批未改 XML，且 XML 全部使用 FQCN",
+    "真实 Redis 脚本执行、RabbitMQ 类型头收发、COS 上传、应用启动与打包未验证；离线回归只证明编译/装配/单测",
+    "COSClient 只在测试里用假配置构造过一次并 shutdown，未做任何网络调用"
+  ],
+  "verification": {
+    "commands": [
+      "MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o -DskipTests test-compile",
+      "MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o '-Dtest=*Tests,!BackendApplicationTests' -DvideoSourceLocalTls=false -DvideoStatusIT=false -DvideoStatusScale=false -DvideoStatusBaseline=false -DvideoStatusBenchmark=false '-DargLine=-Xms64m -Xmx512m -Djdk.attach.allowAttachSelf=true' test"
+    ],
+    "cleanCompile": {
+      "action": "rm -rf target 后全量 test-compile（离线 maven-clean-plugin 仍不可用，未联网下载，不宣称 clean 命令通过）",
+      "productionSources": 258,
+      "testSources": 136,
+      "result": "BUILD SUCCESS",
+      "log": "C:/Users/31984/AppData/Local/Temp/layout-r5-final-compile.log"
+    },
+    "relatedTests": {
+      "scope": "67 个直接 import shared/infrastructure 的测试类（auth/video/video.local/interaction/videosource/videostats/controller 授权测试等）",
+      "tests": 619,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 184,
+      "result": "BUILD SUCCESS",
+      "log": "C:/Users/31984/AppData/Local/Temp/layout-r5-related.log"
+    },
+    "newTests": {
+      "classes": 4,
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "log": "C:/Users/31984/AppData/Local/Temp/layout-r5-new-tests-2.log"
+    },
+    "fullRegression": {
+      "tests": 1194,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 228,
+      "executedPassed": 966,
+      "result": "BUILD SUCCESS",
+      "log": "C:/Users/31984/AppData/Local/Temp/layout-r5-final-full.log"
+    },
+    "comparisonWithR4": {
+      "baseline": "只读 D:/feibijiubi/backend-layout-r4/target/surefire-reports（1183 项，228 跳过）",
+      "method": "按 3 个迁移测试类的新 FQCN 规范化后，用 classname+method 逐项比对状态",
+      "missing": 0,
+      "statusChanged": 0,
+      "added": 11,
+      "skippedBaseline": 228,
+      "skippedNow": 228
+    },
+    "processLogs": [
+      "C:/Users/31984/AppData/Local/Temp/layout-r5-compile-1.log（迁移后首次 test-compile：258 生产 + 132 测试，通过）",
+      "C:/Users/31984/AppData/Local/Temp/layout-r5-compile-2.log（加入 4 个新测试类后：136 测试源，通过）",
+      "C:/Users/31984/AppData/Local/Temp/layout-r5-new-tests-1.log（失败：6 失败 + 1 错误，均为新测试自身假设错误，见下）",
+      "C:/Users/31984/AppData/Local/Temp/layout-r5-new-tests-2.log（修正新测试后 11 项全通过）",
+      "C:/Users/31984/AppData/Local/Temp/layout-r5-related.log、layout-r5-full.log（首轮相关/全回归，通过）",
+      "C:/Users/31984/AppData/Local/Temp/layout-r5-final-compile.log、layout-r5-final-full.log（rm -rf target 后的最终交付证据）"
+    ],
+    "newTestFailuresAndFixes": [
+      "断言过强：原以为只有 fixedWindowRateLimitScript 带 @Primary，实际 videoStatusIncrementScript 在迁移前也带 @Primary；修正为“两个 @Primary”的既有事实，未改生产代码",
+      "@Import(实现类) 注册的 bean 名是全限定名，不是 @Service 的驼峰名；改为按生产路径组件扫描后再断言 rateLimitServiceImpl/tencentCosStorageServiceImpl，装配证据更强",
+      "扫描 shared 包时 JsonUtils 需要 ObjectMapper；在该测试上下文补一个空 ObjectMapper bean（不连任何外部系统）",
+      "脚本/COS包扫描包含新测试自身的嵌套Configuration，两个新增断言由精确集合等式改为包含生产配置类；原有项目断言未变。该证据只说明生产配置可被发现，不证明扫描集合只有生产配置。",
+      "父级修正新增COS测试的finally：只有成功取得client后才shutdown，避免上下文启动失败时再次getBean掩盖原始失败。"
+    ]
+  }
+}

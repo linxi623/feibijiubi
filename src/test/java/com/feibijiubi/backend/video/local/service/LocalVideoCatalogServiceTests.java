@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.video.local.service;
 
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.video.local.dto.LocalVideoEpisodeCreateDTO;
 import com.feibijiubi.backend.video.local.dto.LocalVideoSeriesCreateDTO;
 import com.feibijiubi.backend.video.local.entity.LocalVideoEpisode;

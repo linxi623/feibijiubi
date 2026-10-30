@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.videostats.service.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
 import com.feibijiubi.backend.videostats.entity.VideoStatusConsumptionRepairLog;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
@@ -11,7 +11,7 @@ import com.feibijiubi.backend.videostats.service.admin.VideoStatusStatus3ReplayR
 import com.feibijiubi.backend.videostats.service.admin.VideoStatusStatus3ReplayRow.OutboxSource;
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusEventFingerprintServiceImpl;
 import com.feibijiubi.backend.videostats.service.VideoStatusEventAgeGuard;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
 import com.feibijiubi.backend.videostats.vo.VideoStatusStatus3ReplayVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

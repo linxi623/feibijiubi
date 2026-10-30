@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.video.controller;
 
 import com.feibijiubi.backend.auth.annotation.OptionalLogin;
-import com.feibijiubi.backend.common.ApiResponse;
+import com.feibijiubi.backend.shared.ApiResponse;
 import com.feibijiubi.backend.video.service.category.CategoryService;
 import com.feibijiubi.backend.video.vo.CategoryParentVO;
 import lombok.RequiredArgsConstructor;

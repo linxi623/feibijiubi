@@ -3,7 +3,7 @@ package com.feibijiubi.backend.auth.service.impl;
 import com.feibijiubi.backend.auth.config.JwtProperties;
 import com.feibijiubi.backend.auth.service.TokenContext;
 import com.feibijiubi.backend.user.entity.User;
-import com.feibijiubi.backend.utils.redis.RedisUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

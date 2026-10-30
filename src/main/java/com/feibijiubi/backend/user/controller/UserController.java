@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.user.controller;
 
 import com.feibijiubi.backend.auth.annotation.OptionalLogin;
-import com.feibijiubi.backend.common.ApiResponse;
+import com.feibijiubi.backend.shared.ApiResponse;
 import com.feibijiubi.backend.user.dto.UserChangePasswordDTO;
 import com.feibijiubi.backend.user.dto.UserProfileDTO;
 import com.feibijiubi.backend.user.service.UserService;

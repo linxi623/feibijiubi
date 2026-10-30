@@ -1,13 +1,13 @@
 package com.feibijiubi.backend.videostats.service;
 
-import com.feibijiubi.backend.common.RedisOperationException;
+import com.feibijiubi.backend.infrastructure.redis.RedisOperationException;
 import com.feibijiubi.backend.videostats.entity.VideoStatus;
 import com.feibijiubi.backend.videostats.entity.VideoStatusReconciliationEventRow;
 import com.feibijiubi.backend.videostats.entity.VideoStatusReconciliationRelationAggregate;
 import com.feibijiubi.backend.event.VideoStatusEventType;
 import com.feibijiubi.backend.videostats.mapper.VideoStatusReconciliationMapper;
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusReconciliationServiceImpl;
-import com.feibijiubi.backend.utils.redis.operation.RedisHashOperations;
+import com.feibijiubi.backend.infrastructure.redis.operation.RedisHashOperations;
 import com.feibijiubi.backend.videostats.vo.VideoStatusReconciliationVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -1,12 +1,12 @@
 package com.feibijiubi.backend.interaction.service.impl;
 
-import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.common.RedisOperationException;
+import com.feibijiubi.backend.shared.BusinessException;
+import com.feibijiubi.backend.infrastructure.redis.RedisOperationException;
 import com.feibijiubi.backend.interaction.config.VideoInteractionProperties;
 import com.feibijiubi.backend.interaction.service.VideoInteractionAction;
 import com.feibijiubi.backend.interaction.service.VideoInteractionRateLimitService;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
-import com.feibijiubi.backend.utils.redis.RedisUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;

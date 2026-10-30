@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.video.enums;
 
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.BusinessException;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.apache.coyote.BadRequestException;

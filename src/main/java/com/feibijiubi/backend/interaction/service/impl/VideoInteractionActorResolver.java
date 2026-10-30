@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.interaction.service.impl;
 
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.interaction.service.VideoInteractionActor;
 import com.feibijiubi.backend.interaction.service.VideoInteractionActorType;
 import org.springframework.stereotype.Component;

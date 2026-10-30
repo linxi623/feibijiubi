@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.videostats.service;
 
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.videostats.exception.RetryableMessageException;
 import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
 import com.feibijiubi.backend.user.converter.UserConverter;

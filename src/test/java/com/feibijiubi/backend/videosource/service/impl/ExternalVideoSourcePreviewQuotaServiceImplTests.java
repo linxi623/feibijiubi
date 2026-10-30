@@ -1,9 +1,9 @@
 package com.feibijiubi.backend.videosource.service.impl;
 
-import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.common.RedisOperationException;
+import com.feibijiubi.backend.shared.BusinessException;
+import com.feibijiubi.backend.infrastructure.redis.RedisOperationException;
 import com.feibijiubi.backend.videosource.config.ExternalVideoSourceProperties;
-import com.feibijiubi.backend.utils.redis.RedisUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 

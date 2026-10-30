@@ -1,16 +1,16 @@
 package com.feibijiubi.backend.interaction.service;
 
-import com.feibijiubi.backend.config.RedisScriptConfig;
+import com.feibijiubi.backend.infrastructure.redis.config.RedisScriptConfig;
 import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionServiceImpl;
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusRebuildServiceImpl;
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusRebuildSnapshotServiceImpl;
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusServiceImpl;
 import com.feibijiubi.backend.videostats.service.VideoStatusVidMutex;
-import com.feibijiubi.backend.utils.JsonUtils;
-import com.feibijiubi.backend.utils.redis.RedisUtils;
-import com.feibijiubi.backend.utils.redis.operation.RedisHashOperations;
-import com.feibijiubi.backend.utils.redis.operation.RedisSetOperations;
+import com.feibijiubi.backend.shared.JsonUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisUtils;
+import com.feibijiubi.backend.infrastructure.redis.operation.RedisHashOperations;
+import com.feibijiubi.backend.infrastructure.redis.operation.RedisSetOperations;
 import com.feibijiubi.backend.videostats.service.VideoStatusIsolatedIntegrationTests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

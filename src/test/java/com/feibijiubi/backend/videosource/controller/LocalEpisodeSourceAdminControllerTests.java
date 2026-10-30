@@ -1,7 +1,8 @@
 package com.feibijiubi.backend.videosource.controller;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.feibijiubi.backend.common.*;
+import com.feibijiubi.backend.shared.BusinessException;
+import com.feibijiubi.backend.shared.GlobalExceptionHandler;
 import com.feibijiubi.backend.videosource.dto.*;
 import com.feibijiubi.backend.user.entity.User;
 import com.feibijiubi.backend.auth.interceptor.*;

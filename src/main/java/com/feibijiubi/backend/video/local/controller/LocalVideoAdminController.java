@@ -1,8 +1,8 @@
 package com.feibijiubi.backend.video.local.controller;
 
 import com.feibijiubi.backend.auth.annotation.AdminOnly;
-import com.feibijiubi.backend.common.ApiResponse;
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.ApiResponse;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.video.local.dto.LocalVideoEpisodeCreateDTO;
 import com.feibijiubi.backend.video.local.dto.LocalVideoSeriesCreateDTO;
 import com.feibijiubi.backend.video.local.service.LocalVideoCatalogService;

@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.videosource.service.impl;
 
-import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.common.RedisOperationException;
+import com.feibijiubi.backend.shared.BusinessException;
+import com.feibijiubi.backend.infrastructure.redis.RedisOperationException;
 import com.feibijiubi.backend.videosource.config.ExternalVideoSourceProperties;
 import com.feibijiubi.backend.videosource.integration.ExternalVideoUrlPolicy;
 import com.feibijiubi.backend.videosource.integration.applecms.AppleCmsDetailSnapshot;

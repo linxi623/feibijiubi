@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.videostats.mq;
 
-import com.feibijiubi.backend.common.RedisOperationException;
+import com.feibijiubi.backend.infrastructure.redis.RedisOperationException;
 import com.feibijiubi.backend.videostats.exception.RetryableMessageException;
 import com.feibijiubi.backend.videostats.exception.VideoStatusFlushDataException;
 import com.feibijiubi.backend.videostats.exception.VideoStatusFlushDeferredException;
@@ -10,8 +10,8 @@ import com.feibijiubi.backend.videostats.mapper.VideoStatusConsumedEventMapper;
 import com.feibijiubi.backend.videostats.metrics.VideoStatusTelemetry;
 import com.feibijiubi.backend.videostats.service.VideoStatusBatchFlushService;
 import com.feibijiubi.backend.videostats.service.VideoStatusVidMutex;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
-import com.feibijiubi.backend.utils.redis.operation.RedisSetOperations;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.operation.RedisSetOperations;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;

@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.videostats.service.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
 import com.feibijiubi.backend.videostats.entity.VideoStatusConsumptionRepairLog;
 import com.feibijiubi.backend.videostats.entity.VideoStatusOutbox;

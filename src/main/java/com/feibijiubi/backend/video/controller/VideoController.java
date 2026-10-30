@@ -2,12 +2,12 @@ package com.feibijiubi.backend.video.controller;
 
 
 import com.feibijiubi.backend.auth.annotation.OptionalLogin;
-import com.feibijiubi.backend.common.ApiResponse;
+import com.feibijiubi.backend.shared.ApiResponse;
 import com.feibijiubi.backend.video.dto.CursorDTO;
 import com.feibijiubi.backend.video.dto.VideoSubmitDTO;
 import com.feibijiubi.backend.video.dto.VideoUploadPrepareDTO;
-import com.feibijiubi.backend.service.ratelimit.RateLimitService;
-import com.feibijiubi.backend.service.storage.FileStorageService;
+import com.feibijiubi.backend.infrastructure.ratelimit.service.RateLimitService;
+import com.feibijiubi.backend.infrastructure.storage.service.FileStorageService;
 import com.feibijiubi.backend.video.service.VideoService;
 import com.feibijiubi.backend.video.vo.CursorPageVO;
 import com.feibijiubi.backend.video.vo.VideoDetailVO;

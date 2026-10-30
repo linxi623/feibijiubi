@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.videosource.service.impl;
 
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.videosource.config.ExternalVideoSourceProperties;
 import com.feibijiubi.backend.videosource.dto.LocalEpisodeSourceCaptureDTO;
 import com.feibijiubi.backend.videosource.dto.LocalEpisodeSourceConfirmDTO;

@@ -6,7 +6,7 @@ import com.feibijiubi.backend.videostats.entity.VideoStatusOutbox;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
 import com.feibijiubi.backend.videostats.mapper.VideoStatusOutboxMapper;
 import com.feibijiubi.backend.videostats.metrics.VideoStatusTelemetry;
-import com.feibijiubi.backend.utils.JsonUtils;
+import com.feibijiubi.backend.shared.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

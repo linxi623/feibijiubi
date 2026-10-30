@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.video.service.impl;
 
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.video.converter.VideoConverter;
 import com.feibijiubi.backend.video.dto.VideoReviewDTO;
 import com.feibijiubi.backend.user.entity.User;

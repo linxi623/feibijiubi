@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.videostats.capacity;
 
-import com.feibijiubi.backend.utils.redis.RedisConstants;
+import com.feibijiubi.backend.infrastructure.redis.RedisConstants;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;

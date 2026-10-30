@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.auth.interceptor;
 
-import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.enums.UserRole;
+import com.feibijiubi.backend.shared.BusinessException;
+import com.feibijiubi.backend.user.enums.UserRole;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;

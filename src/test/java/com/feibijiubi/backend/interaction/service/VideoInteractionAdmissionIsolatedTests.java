@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.interaction.service;
 
-import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.config.RedisScriptConfig;
+import com.feibijiubi.backend.shared.BusinessException;
+import com.feibijiubi.backend.infrastructure.redis.config.RedisScriptConfig;
 import com.feibijiubi.backend.interaction.config.VideoInteractionProperties;
 import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
 import com.feibijiubi.backend.videostats.entity.VideoStatus;
@@ -13,9 +13,9 @@ import com.feibijiubi.backend.interaction.service.impl.VideoInteractionRateLimit
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionServiceImpl;
 import com.feibijiubi.backend.video.service.PublishedVideoGuard;
 import com.feibijiubi.backend.videostats.service.VideoStatusService;
-import com.feibijiubi.backend.utils.JsonUtils;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
-import com.feibijiubi.backend.utils.redis.RedisUtils;
+import com.feibijiubi.backend.shared.JsonUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisUtils;
 import com.feibijiubi.backend.interaction.vo.VideoInteractionVO;
 import com.feibijiubi.backend.videostats.service.VideoStatusIsolatedIntegrationTests;
 import org.junit.jupiter.api.AfterEach;

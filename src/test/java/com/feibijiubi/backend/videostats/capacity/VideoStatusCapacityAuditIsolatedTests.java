@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.videostats.capacity;
 
-import com.feibijiubi.backend.utils.redis.RedisConstants;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisConstants;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

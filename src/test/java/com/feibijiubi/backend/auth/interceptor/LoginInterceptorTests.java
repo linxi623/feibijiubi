@@ -3,7 +3,7 @@ package com.feibijiubi.backend.auth.interceptor;
 import com.feibijiubi.backend.auth.annotation.AllowRevokedToken;
 import com.feibijiubi.backend.auth.service.TokenContext;
 import com.feibijiubi.backend.auth.service.TokenService;
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.user.entity.User;
 import com.feibijiubi.backend.user.mapper.UserMapper;
 import org.junit.jupiter.api.BeforeEach;

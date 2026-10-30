@@ -1,7 +1,7 @@
 package com.feibijiubi.backend;
 
 import com.feibijiubi.backend.auth.config.JwtProperties;
-import com.feibijiubi.backend.config.TencentCosProperties;
+import com.feibijiubi.backend.infrastructure.storage.config.TencentCosProperties;
 import com.feibijiubi.backend.interaction.config.VideoInteractionProperties;
 import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
 import com.feibijiubi.backend.auth.interceptor.LoginInterceptor;

@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.videostats.service;
 
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
 import com.feibijiubi.backend.videostats.entity.VideoStatusOutbox;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
@@ -11,7 +11,7 @@ import com.feibijiubi.backend.videostats.mq.VideoStatusEventPublisher;
 import com.feibijiubi.backend.videostats.mq.VideoStatusOutboxClaimService;
 import com.feibijiubi.backend.videostats.mq.VideoStatusOutboxRelay;
 import com.feibijiubi.backend.videostats.mq.VideoStatusPublishException;
-import com.feibijiubi.backend.utils.JsonUtils;
+import com.feibijiubi.backend.shared.JsonUtils;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataAccessResourceFailureException;

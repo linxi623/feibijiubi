@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.videostats.service;
 
-import com.feibijiubi.backend.config.RedisScriptConfig;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.config.RedisScriptConfig;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
 import io.lettuce.core.AclSetuserArgs;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;

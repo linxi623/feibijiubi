@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.videosource.controller;
 
 import com.feibijiubi.backend.auth.annotation.AdminOnly;
-import com.feibijiubi.backend.common.ApiResponse;
+import com.feibijiubi.backend.shared.ApiResponse;
 import com.feibijiubi.backend.videosource.service.ExternalVideoSourcePreviewService;
 import com.feibijiubi.backend.videosource.vo.ExternalVideoSourceCatalogVO;
 import com.feibijiubi.backend.videosource.vo.ExternalVideoSourceDetailVO;

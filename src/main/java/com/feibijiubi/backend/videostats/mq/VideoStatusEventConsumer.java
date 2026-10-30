@@ -2,7 +2,7 @@ package com.feibijiubi.backend.videostats.mq;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feibijiubi.backend.videostats.exception.NonRetryableMessageException;
-import com.feibijiubi.backend.common.RedisOperationException;
+import com.feibijiubi.backend.infrastructure.redis.RedisOperationException;
 import com.feibijiubi.backend.videostats.exception.RepairRequiredMessageException;
 import com.feibijiubi.backend.videostats.exception.RetryableMessageException;
 import com.feibijiubi.backend.videostats.config.VideoStatusProperties;

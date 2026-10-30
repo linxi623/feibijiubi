@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.interaction.service;
 
-import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.common.RedisOperationException;
+import com.feibijiubi.backend.shared.BusinessException;
+import com.feibijiubi.backend.infrastructure.redis.RedisOperationException;
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionActorResolver;
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionAdmissionServiceImpl;
 import com.feibijiubi.backend.interaction.vo.VideoInteractionVO;

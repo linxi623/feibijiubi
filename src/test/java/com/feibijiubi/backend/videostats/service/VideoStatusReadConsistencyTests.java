@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.videostats.service;
 
-import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.common.RedisOperationException;
+import com.feibijiubi.backend.shared.BusinessException;
+import com.feibijiubi.backend.infrastructure.redis.RedisOperationException;
 import com.feibijiubi.backend.videostats.exception.VideoStatusCounterRangeException;
 import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
 import com.feibijiubi.backend.video.dto.CursorDTO;
@@ -19,11 +19,11 @@ import com.feibijiubi.backend.user.service.impl.UserServiceImpl;
 import com.feibijiubi.backend.video.service.impl.VideoReviewImpl;
 import com.feibijiubi.backend.video.service.impl.VideoServiceImpl;
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusServiceImpl;
-import com.feibijiubi.backend.service.storage.FileStorageService;
-import com.feibijiubi.backend.utils.JsonUtils;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
-import com.feibijiubi.backend.utils.redis.RedisUtils;
-import com.feibijiubi.backend.utils.redis.operation.RedisHashOperations;
+import com.feibijiubi.backend.infrastructure.storage.service.FileStorageService;
+import com.feibijiubi.backend.shared.JsonUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisUtils;
+import com.feibijiubi.backend.infrastructure.redis.operation.RedisHashOperations;
 import com.feibijiubi.backend.video.vo.AdminVideoDetailVO;
 import com.feibijiubi.backend.video.vo.CursorPageVO;
 import com.feibijiubi.backend.user.vo.UserVO;

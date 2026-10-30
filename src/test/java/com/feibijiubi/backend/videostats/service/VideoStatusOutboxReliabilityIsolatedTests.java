@@ -8,7 +8,7 @@ import com.feibijiubi.backend.videostats.mapper.VideoStatusOutboxMapper;
 import com.feibijiubi.backend.videostats.mq.VideoStatusBatchFlushScheduler;
 import com.feibijiubi.backend.videostats.mq.VideoStatusOutboxRelay;
 import com.feibijiubi.backend.videostats.mq.RabbitConstants;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;

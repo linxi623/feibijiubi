@@ -2,7 +2,7 @@ package com.feibijiubi.backend.auth.service.impl;
 
 import com.feibijiubi.backend.auth.service.TokenContext;
 import com.feibijiubi.backend.auth.service.TokenService;
-import com.feibijiubi.backend.service.ratelimit.RateLimitService;
+import com.feibijiubi.backend.infrastructure.ratelimit.service.RateLimitService;
 import com.feibijiubi.backend.user.mapper.UserMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

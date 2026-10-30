@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.interaction.service;
 
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionActorResolver;
 import org.junit.jupiter.api.Test;
 

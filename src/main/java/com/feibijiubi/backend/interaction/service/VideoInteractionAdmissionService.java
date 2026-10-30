@@ -31,10 +31,10 @@ public interface VideoInteractionAdmissionService {
      * @param vid           目标视频
      * @param requestKey    {@code Idempotency-Key} 请求头（1..64 个安全字符，大小写敏感）
      * @param visitorId     {@code X-Visitor-Id} 请求头；登录态下完全忽略
-     * @throws com.feibijiubi.backend.common.BusinessException 400 参数/身份头非法；
+     * @throws com.feibijiubi.backend.shared.BusinessException 400 参数/身份头非法；
      *         404 视频不存在；409 {@code requestKey} 形状冲突；
      *         429 准入超限；500 计数或写入异常
-     * @throws com.feibijiubi.backend.common.RedisOperationException 准入 Redis 异常（503，可重试）
+     * @throws com.feibijiubi.backend.infrastructure.redis.RedisOperationException 准入 Redis 异常（503，可重试）
      */
     VideoInteractionVO record(VideoInteractionAction action,
                               Integer currentUserId,

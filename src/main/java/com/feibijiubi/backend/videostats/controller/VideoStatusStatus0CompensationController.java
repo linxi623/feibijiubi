@@ -1,8 +1,8 @@
 package com.feibijiubi.backend.videostats.controller;
 
 import com.feibijiubi.backend.auth.annotation.AdminOnly;
-import com.feibijiubi.backend.common.ApiResponse;
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.ApiResponse;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.videostats.service.VideoStatusStatus0CompensationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

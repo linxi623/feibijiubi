@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.videostats.service.impl;
 
-import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.common.RedisOperationException;
+import com.feibijiubi.backend.shared.BusinessException;
+import com.feibijiubi.backend.infrastructure.redis.RedisOperationException;
 import com.feibijiubi.backend.videostats.support.VideoStatusCounterRange;
 import com.feibijiubi.backend.videostats.exception.VideoStatusCounterRangeException;
 import com.feibijiubi.backend.videostats.entity.VideoStatus;
@@ -10,8 +10,8 @@ import com.feibijiubi.backend.videostats.entity.VideoStatusReconciliationRelatio
 import com.feibijiubi.backend.event.VideoStatusEventType;
 import com.feibijiubi.backend.videostats.mapper.VideoStatusReconciliationMapper;
 import com.feibijiubi.backend.videostats.service.VideoStatusReconciliationService;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
-import com.feibijiubi.backend.utils.redis.operation.RedisHashOperations;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.operation.RedisHashOperations;
 import com.feibijiubi.backend.videostats.vo.VideoStatusReconciliationVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

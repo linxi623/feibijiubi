@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.videosource.config;
 
-import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.config.RedisScriptConfig;
+import com.feibijiubi.backend.shared.BusinessException;
+import com.feibijiubi.backend.infrastructure.redis.config.RedisScriptConfig;
 import com.feibijiubi.backend.videosource.controller.ExternalVideoSourceAdminController;
 import com.feibijiubi.backend.videosource.service.impl.AppleCmsExternalVideoSourceClientProvider;
 import com.feibijiubi.backend.videosource.service.impl.ExternalVideoSourcePreviewQuotaServiceImpl;
@@ -13,7 +13,7 @@ import com.feibijiubi.backend.videosource.service.ExternalVideoSourceDetailClien
 import com.feibijiubi.backend.videosource.service.ExternalVideoSourcePreviewQuotaService;
 import com.feibijiubi.backend.videosource.service.ExternalVideoSourcePreviewService;
 import com.feibijiubi.backend.videosource.service.ExternalVideoSourceRegistry;
-import com.feibijiubi.backend.utils.redis.RedisUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.listener.RabbitListenerContainerFactory;

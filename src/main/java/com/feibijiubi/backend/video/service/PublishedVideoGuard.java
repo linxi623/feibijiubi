@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.video.service;
 
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.video.entity.Video;
 import com.feibijiubi.backend.video.mapper.VideoMapper;
 import lombok.RequiredArgsConstructor;

@@ -5,7 +5,7 @@ import com.feibijiubi.backend.video.entity.Video;
 import com.feibijiubi.backend.videostats.entity.VideoStatus;
 import com.feibijiubi.backend.event.VideoStatusDelta;
 import com.feibijiubi.backend.videostats.mapper.VideoStatusMapper;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
 import com.feibijiubi.backend.video.vo.VideoDetailVO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

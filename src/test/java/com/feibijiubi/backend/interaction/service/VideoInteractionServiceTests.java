@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.interaction.service;
 
-import com.feibijiubi.backend.common.BusinessException;
+import com.feibijiubi.backend.shared.BusinessException;
 import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
 import com.feibijiubi.backend.interaction.entity.VideoInteractionRequest;
 import com.feibijiubi.backend.interaction.entity.VideoInteractionWindow;

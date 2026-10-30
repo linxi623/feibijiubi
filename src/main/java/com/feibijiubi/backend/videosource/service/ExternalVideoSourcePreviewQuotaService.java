@@ -24,8 +24,8 @@ public interface ExternalVideoSourcePreviewQuotaService {
      * 消耗一次配额并判定是否放行。
      *
      * @param adminUserId 登录态管理员 uid（只能来自 {@code currentUserId}，不能由客户端传入）
-     * @throws com.feibijiubi.backend.common.BusinessException 401 缺少 uid；429 超过本窗口配额
-     * @throws com.feibijiubi.backend.common.RedisOperationException Redis 故障或脚本返回非法值（映射为 503）
+     * @throws com.feibijiubi.backend.shared.BusinessException 401 缺少 uid；429 超过本窗口配额
+     * @throws com.feibijiubi.backend.infrastructure.redis.RedisOperationException Redis 故障或脚本返回非法值（映射为 503）
      */
     void checkAndConsume(Integer adminUserId);
 }

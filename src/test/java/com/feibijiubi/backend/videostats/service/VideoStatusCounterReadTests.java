@@ -8,10 +8,10 @@ import com.feibijiubi.backend.videostats.entity.VideoStatus;
 import com.feibijiubi.backend.videostats.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.videostats.mapper.VideoStatusOutboxMapper;
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusServiceImpl;
-import com.feibijiubi.backend.utils.JsonUtils;
-import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
-import com.feibijiubi.backend.utils.redis.RedisUtils;
-import com.feibijiubi.backend.utils.redis.operation.RedisHashOperations;
+import com.feibijiubi.backend.shared.JsonUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisKeyUtils;
+import com.feibijiubi.backend.infrastructure.redis.RedisUtils;
+import com.feibijiubi.backend.infrastructure.redis.operation.RedisHashOperations;
 import com.feibijiubi.backend.video.vo.VideoDetailVO;
 import org.junit.jupiter.api.Test;
 
