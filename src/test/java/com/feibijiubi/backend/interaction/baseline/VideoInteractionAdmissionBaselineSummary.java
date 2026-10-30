@@ -1,4 +1,4 @@
-package com.feibijiubi.backend.service.video.baseline;
+package com.feibijiubi.backend.interaction.baseline;
 
 import java.util.Arrays;
 import java.util.Locale;

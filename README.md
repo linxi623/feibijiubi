@@ -100,25 +100,32 @@ Docker Compose 会一次启动 MySQL、Redis、RabbitMQ 和 Spring Boot 后端�
 
 ```text
 feibijiubi/
-├── database/                      # 数据库脚本
+├── database/                      # 数据库脚本与迁移
 ├── docs/                          # API、设计与学习文档
 ├── src/main/java/com/feibijiubi/backend/
-│   ├── controller/                # HTTP 接口
-│   ├── service/                   # 业务逻辑
-│   ├── mapper/                    # MyBatis Mapper
-│   ├── dto/                       # 请求参数
-│   ├── vo/                        # 响应数据
-│   ├── entity/                    # 数据库实体
-│   ├── interceptor/               # 登录与权限校验
-│   ├── mq/                        # RabbitMQ 消息处理
-│   └── config/                    # 应用配置
+│   ├── BackendApplication.java    # 启动类（保持根包）
+│   ├── auth/                      # 登录、令牌、鉴权注解与拦截器
+│   ├── user/                      # 用户资料、账户资料、关注关系
+│   ├── video/                     # 视频、分类、审核、本地作品/剧集身份
+│   ├── interaction/               # 点赞/投币/收藏/播放/分享/进度与请求准入
+│   ├── videostats/                # 统计模型、Outbox、消费、落库、恢复、监控
+│   ├── videosource/               # 外部来源预览与草稿来源绑定
+│   ├── shared/                    # 跨模块复用的响应、异常、JSON 工具
+│   ├── infrastructure/            # 通用 Redis/限流/COS 基础能力
+│   ├── config/                    # 全应用装配（如 MVC 拦截器注册）
+│   └── event/                     # 统计消息事件（类名是 MQ 类型头的一部分，固定保留）
 ├── src/main/resources/
-│   ├── com/feibijiubi/backend/mapper/  # MyBatis XML
+│   ├── com/feibijiubi/backend/mapper/  # MyBatis XML（集中存放，namespace 指向各模块）
 │   ├── lua/                       # Redis Lua 脚本
 │   └── application.yml.example    # 配置示例
 ├── compose.yaml                   # Redis 与 RabbitMQ
 └── pom.xml
 ```
+
+按业务模块分包，模块内部按需保留 `controller`/`service`/`service/impl`/`mapper`/`entity`/`dto`/`vo` 等子包；
+不强制每个模块都齐全。Mapper XML 仍集中放在 `src/main/resources/com/feibijiubi/backend/mapper/`，
+由 `mybatis.mapper-locations` 统一加载，不随模块拆到各自的资源目录。分批重构与遗留例外见
+[`docs/plans/package-by-feature-refactor.md`](docs/plans/package-by-feature-refactor.md)。
 
 完整接口说明见 [`docs/api.md`](docs/api.md)，功能设计与学习记录见 [`docs/`](docs/)。
 

@@ -1,5 +1,14 @@
 # 菲比啾比：视频直传 COS 与临时文件处理开发步骤
 
+> **阅读提示（目录重构后）**：本文是**重构前**的设计示例/实现步骤记录，文中的
+> `src/main/java/com/feibijiubi/backend/{dto,vo,entity,service,mapper,controller}/…` 旧路径、
+> 局部包声明，以及文中出现但仓库里已不存在的类型（如 `TempFileVO`、`TempUploadCleanupService`）
+> **都不能直接照抄**。现行目录以 [`README.md`](../../README.md) 的「项目结构」与
+> [`docs/plans/package-by-feature-refactor.md`](../plans/package-by-feature-refactor.md) 为准：
+> 按业务模块分包（`video`、`videosource`、`videostats` 等），Mapper XML 仍集中放在
+> `src/main/resources/com/feibijiubi/backend/mapper/`。本文的流程/设计意图仍然有效，但落地时需要
+> 按现行包结构重写文件路径与类型名。
+
 这份文档不是让你一次性把所有代码写完，而是告诉你：如果要采用更标准的视频投稿流程，应该按什么顺序做，每一步写哪些文件、解决什么问题。
 
 目标流程是：

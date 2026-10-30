@@ -16,7 +16,7 @@ import com.feibijiubi.backend.interaction.service.impl.VideoInteractionAdmission
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionCleanupScheduler;
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionRateLimitServiceImpl;
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionServiceImpl;
-import com.feibijiubi.backend.service.video.baseline.VideoInteractionAdmissionBaselineSummary;
+import com.feibijiubi.backend.interaction.baseline.VideoInteractionAdmissionBaselineSummary;
 import com.feibijiubi.backend.videostats.service.VideoStatusService;
 import com.feibijiubi.backend.shared.JsonUtils;
 import com.feibijiubi.backend.infrastructure.redis.RedisUtils;

@@ -46,8 +46,8 @@ Lua、测试fixture、SQL迁移路径不变。R6只有在不修改敏感配置�
 | R2 | 用户与鉴权 | user/auth及必要引用；共享类不强行搬入某个业务 | Login/Admin拦截器装配、Token/用户接口、Bean名稳定 | 父级离线验收通过，已本地提交`e451467`并fast-forward合入主工作区（未推送远程） |
 | R3 | 视频、分类、审核、互动 | video/interaction及必要引用 | 发布可用性守卫、原事务/幂等/限流、Mapper绑定 | 父级离线验收通过，本地提交`0215ce4`并fast-forward合入主工作区（见R3验收记录） |
 | R4 | 视频统计流水线 | videostats以及专属配置/MQ/指标 | 队列名/消息序列化类型头、锁/事务/调度器Bean名、旧包兼容风险 | 父级离线验收通过，本地提交`d566541`并fast-forward合入主工作区（未推送）；`event`包按消息协议例外保留 |
-| R5 | 通用能力收口 | shared/infrastructure/全局装配 | 避免新的大杂烩、全局异常/脚本/存储Bean仍可装配 | 父级离线验收通过，纳入本批本地提交 |
-| R6 | 全局扫描、目录说明、最终验收 | 空目录/残留引用/架构测试/文档 | 测试数量守恒、包路径一致、XML解析装配、打包和运行边界说明 | R5已验收，准备派发最终收口 |
+| R5 | 通用能力收口 | shared/infrastructure/全局装配 | 避免新的大杂烩、全局异常/脚本/存储Bean仍可装配 | 父级离线验收通过，本地提交`ac7ad98`并合入主工作区 |
+| R6 | 全局扫描、目录说明、最终验收 | 空目录/残留引用/架构测试/文档 | 测试数量守恒、包路径一致、XML解析装配、打包和运行边界说明 | 已完成源码复审、父级回归、正式打包及JAR内容验收，随本批本地提交；真实运行不在本轮范围 |
 
 分批不是并行写入：R2+都须基于前一批父级接受后的结果，不从同一个旧HEAD并行迁移交叉引用。
 
@@ -237,3 +237,57 @@ MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o \
 - shared.GlobalExceptionHandler依赖infrastructure.redis.RedisOperationException，而infrastructure.redis.operation又依赖shared.JsonUtils，因此模块级仍双向依赖；已纠正映射中“无循环”表述，不做业务边界治理、不宣称解耦。
 - 父级清除本候选树生成的target后全量离线test-compile及普通回归通过：258生产/136测试源码；1194项、0失败/错误、228跳过，966项执行通过。日志`/tmp/layout-r5-parent-compile.log`、`/tmp/layout-r5-parent-full.log`；逐方法比较R4/R5 Surefire XML，1183项原测试全部保留、结果不变，仅新增11项。
 - 历史新增测试6失败＋1错误已对照日志及修正位置核查并保留，不以最终通过抹去；真实Redis/MQ/COS/数据库、完整应用启动/生产行为仍未验证。按用户授权单独本地提交并fast-forward集成，不推送远程。
+- R5本地提交：`ac7ad98`（`refactor: consolidate shared and infrastructure packages`），已fast-forward合入主工作区，未推送远程；R6即以该提交为detached基线。
+
+### R6 执行记录（执行侧自验，非父级验收）
+
+- 工作树：`D:/feibijiubi/backend-layout-r6`，干净 detached 基线`ac7ad98`（R5 父级提交，已合入主工作区）。本批只在该工作树写入，未 stage/commit/push，未改动主工作区与 R1–R5 工作树，未再委派，未读取 `application.yml`，未联网、未启动应用/容器/数据库/Redis/MQ/COS，未执行迁移。
+- 范围与映射：迁移3个测试Java、新增2个DB-free结构回归类（9项）、补齐隔离测试的 mapper 日志级别、同步现行文档；逐项旧→新路径/FQCN、归属裁定、脚本/资源/反射/扫描审计、跨模块依赖、协议与资源例外、遗留项全部列在`docs/refactoring/r6-package-map.json`（先写映射再迁移，迁移后回填实测证据）。
+  - `interaction.baseline`（测试作用域，2）：`VideoInteractionAdmissionBaselineSummary`及其`Tests`从已不存在的顶层`service/video/baseline`归位；沿用工程内已有的测试作用域子包先例`videostats.capacity`（同样是测量工具），不塞进`interaction.service`与 service 测试混排。`VideoInteractionAdmissionBaselineIsolatedTests`只跟着改一行 import。
+  - `contract`（根测试包，1）：`ResponseConverterTests`同时断言user/video/videostats三个模块的输出映射，不归任一单模块，移到根包下并保持类名/断言/反射辅助方法不变。
+  - 目录说明：README「项目结构」由旧技术分层改为按业务模块的现结构，并写清启动类、`event`例外、Mapper XML 集中路径；`docs/tutorial/video-status-batch-aggregation-implementation.md`的 XML 示例`resultType`与`docs/tutorial/video-status-capacity-audit.md`的工具目录同步为现路径；`docs/tutorial/video-upload-direct-cos-guide.md`仅在文首加“重构前设计示例、不可直接照抄”提示（正文未改写）。历史归档与 R1–R5 映射审计未批量改写。
+- 逐文件正文核对：3个迁移文件与`git show ac7ad98:旧路径`在不计package/import行后正文完全一致（101/125/155行逐行相同）；唯一非迁移改动是 `VideoInteractionAdmissionBaselineIsolatedTests` 的一行 import。生产Java零改动。
+- 日志级别补齐：`src/test/resources/video-status-isolated.properties`只新增`logging.level.com.feibijiubi.backend.{user.mapper,video.mapper,video.local.mapper,interaction.mapper,videosource.mapper,videostats.mapper,videostats.metrics}=WARN`（Maven 发现的7个 mapper 包逐包显式，因为`logging.level`是包前缀匹配，`video.mapper`不覆盖`video.local.mapper`），保留旧`...backend.mapper=WARN`（旧包已无接口）；其中`video.local.mapper`/`videosource.mapper`两行为审查反馈后补入；`spring.datasource`/`spring.data.redis`/`spring.rabbitmq`/`mybatis.*`/`app.video-status.*`逐字节未变。
+- 新增DB-free结构回归9项（不连数据库、不启动Spring容器、不读`application.yml`）：
+  - `architecture.PackageLayoutTests`（4）：全部生产与测试源文件的`package`声明逐个等于目录路径（本轮实测258/138个，数量不是硬编码断言）；包根集合严格等于8个批准模块＋`event`/`config`例外＋启动类；旧顶层技术分层目录在两侧源码根都不得出现。
+  - `architecture.MyBatisMapperResourceTests`（5）：用与`mybatis.mapper-locations`相同的`PathMatchingResourcePatternResolver`模式解析`classpath:com/feibijiubi/backend/mapper/*.xml`，16个XML的集合、URL路径后缀与逐字节内容都与`src/main/resources`一致；16个XML用真实`XMLMapperBuilder`解析进同一个`Configuration`，16个namespace全部注册成`@Mapper`接口、接口每个方法都有同名MappedStatement；逐statement校验namespace属于已解析集合、SQL source非空、resultMap/parameterMap类型已解析且不指向旧集中包；`@Mapper`扫描根找到的接口集合与XML namespace集合一一对应（16对16）；由XML namespace推导出的每个mapper包都必须在隔离测试配置里有显式`logging.level.<包>=WARN`（读仓库内测试资源，不读`application.yml`/外部配置）。
+  - 非空洞性验证（两项）：临时把`UserMapper.xml`的一个resultType改回旧包名后，结构测试2项失败（`Could not resolve type alias 'com.feibijiubi.backend.entity.User'`）；临时删掉`video.local.mapper`的WARN行后，`MyBatisMapperResourceTests`1项失败并点名缺失键。两次均按备份逐字节还原、`git status`确认资源无改动；日志`/tmp/layout-r6-mutation-probe.log`、`/tmp/layout-r6-fix-logger-probe.log`。
+- 验证（离线、串行、约束堆；日志在`/tmp`）：
+  - 本树开批时`target/`不存在（无旧class残留），全量`test-compile`：258个生产源文件＋138个测试源文件（136基线＋2新增），BUILD SUCCESS；日志`/tmp/layout-r6-compile-1.log`。
+  - 首轮新增测试8项，0失败/错误/跳过；日志`/tmp/layout-r6-new-tests-1.log`（修复轮又增1个方法，见下方修正记录）。
+  - 相关测试50项（16个XML对应的模块绑定测试＋迁移测试＋新结构测试），0失败/错误，3跳过（opt-in基线隔离用例）；日志`/tmp/layout-r6-related-1.log`。
+  - 普通回归1202项、0失败/错误、228跳过（974项执行通过），BUILD SUCCESS；日志`/tmp/layout-r6-full-1.log`。
+  - 与R5全回归1194项逐方法对照（只读`D:/feibijiubi/backend-layout-r5/target/surefire-reports`，规范化3个迁移测试类FQCN）：1194项全部保留、0缺失、0结果变化，跳过数228不变，首轮仅新增8项（修复轮累计9项）。
+  - 离线`-DskipTests package`**未完成**：本地仓库缺`maven-jar-plugin:3.4.2`（`Cannot access central ... has not been downloaded`）。按约束未联网下载、未修改pom规避、未重复重试，也不把package写成通过，日志`/tmp/layout-r6-package-1.log`。此前用JDK `jar` 从`target/classes`生成的临时jar只能说明目录里有16个XML/5个Lua，**不作为** package 验收证据；jar内容与运行时装配仍未验证，需在具备插件的环境另行执行正式package。
+- 跨模块依赖（如实记录，不断言无环）：`shared↔infrastructure`、`video↔interaction`、`video↔user`、`event↔videostats`等既有双向依赖保持原样；本批只搬测试包名与文档，不做服务边界治理，不宣称解耦。
+- 例外保持：`event`三类FQCN原样（RabbitMQ类型头），未加alias/`idClassMapping`/不改converter；16个Mapper XML物理路径集中保留；Lua/fixture/SQL路径未动。
+- 未验证/限制：opt-in隔离/集成用例（需真实MySQL/Redis/RabbitMQ）未运行；真实broker类型头收发、Redis脚本执行、COS、应用启动与jar打包均未验证；`application.yml`未读取；`docs/tutorial/video-upload-direct-cos-guide.md`正文仍留重构前`src`路径（已在其文首加“重构前设计示例、不可直接照抄”提示，未批量改写），`video-status-improvement-*.md`等历史交付/进度记录同样保留旧路径。
+- 本批仅执行侧自验：不声称父级验收通过，未 stage/commit/push，未删除任何工作树。执行侧结论：READY_FOR_REVIEW。
+
+### R6 审查反馈修正记录（执行侧自验，非父级验收）
+
+- 触发：独立审查结论 CHANGES_REQUIRED（1×P1 + 3×P2），修复仍在原工作树、原授权边界内进行；未读取 `application.yml`，未联网、未启动真实服务，未 stage/commit/push。
+- P1（隔离测试 mapper 日志只覆盖 7 个包中的 5 个）：`video-status-isolated.properties`追加`logging.level.com.feibijiubi.backend.video.local.mapper=WARN`与`...videosource.mapper=WARN`（仅日志，连接属性零改动），现覆盖 Maven 发现的全部 7 个 mapper 包；另新增 DB-free 回归`MyBatisMapperResourceTests#everyDiscoveredMapperPackageHasAnExplicitWarnLoggerInTheIsolatedTestProperties`，由 XML namespace 推导包集合并要求逐个显式 WARN（不读 `application.yml`/外部配置），现有结构断言一条未改、未削弱。
+- P2（映射里 `PackageLayoutTests` 方法名与实际不符 4/4、第4项描述错）：`docs/refactoring/r6-package-map.json` 按实际方法名重写 `newTests`，并明确 `legacyTopLevelDirectoriesAreGoneFromBothSourceRoots` 检查的是生产与测试**两侧**源码根的14个旧目录名、与 event/config 例外无关；同时实测更新计数（新增测试方法 8→9）并删除已闭合的日志覆盖缺口。
+- P2（结构测试硬编码当前规模）：两个结构测试类的 Javadoc 增「清单维护」段，写明这些清单是防回退护栏、新增模块/mapper 时应同步更新，而不是永久的业务限制。
+- P2（`video-upload-direct-cos-guide.md` 仍留旧路径）：仅在该文首加阅读提示（重构前设计示例、旧 `src` 路径与已不存在类型不可直接照抄、现行结构以 README 与重构计划为准），正文24处旧路径与功能设计未批量改写。
+- 打包证据（禁止用手工 jar 替代正式 package）：撤回以临时手工 jar 作打包验收证据的表述，明确 `-o -DskipTests package` 因离线缺 `maven-jar-plugin:3.4.2` 未完成；不联网、不改 pom、不重复尝试缺插件命令，jar 内容与运行时装配列为未验证。
+- 复验（按父级要求只串行跑相关结构测试，未复跑全回归）：`PackageLayoutTests`(4) + `MyBatisMapperResourceTests`(5) = **9项，0失败/错误/跳过，BUILD SUCCESS**；日志`/tmp/layout-r6-fix-structural-final.log`（首次`/tmp/layout-r6-fix-new-tests-1.log`）。全回归上一轮1202项/228跳过，本轮新增1个方法，预期1203项，由父级复跑确认。
+- 执行侧结论：**READY_FOR_REVIEW**（源码修复可审；`package` 仍缺离线插件依赖，未完成）。
+
+### R6 父级验证与环境阻塞历史（阻塞现已解除，见下节）
+
+- 首轮工作流`28f558cf-b7db-4d55-80e8-3b741cda9045`；修正/复审工作流`3a47bfcc-f0b6-43f2-87b7-d06fbafe93bb`。修正执行`752e269a-9e81-4269-a74e-487f899b79ab`，复审`1f166c69-fe53-4035-ba05-8aaede74aaec`；均为指定DeepSeek Flash 4.1。复审源码/目录PASS，正式打包NOT PASSED；未以复审通过覆盖首轮CHANGES_REQUIRED。
+- 父级逐文件核对3条测试迁移正文完全一致；README/现行教程/日志配置差异符合范围；生产Java、XML/Lua、database零改动。已核对两个新增结构测试，修正日志级别解释：包级日志配置可以被子包继承，但旧backend.mapper及video.mapper不覆盖兄弟路径video.local.mapper，不得误写成普遍的“父包不覆盖子包”。
+- 父级清除本候选树生成target后全量离线test-compile通过：258生产/138测试源码，日志`/tmp/layout-r6-parent-compile.log`；普通全回归1203项、0失败/错误、228跳过，975项执行通过，日志`/tmp/layout-r6-parent-full.log`；最终文字修正后再跑普通全回归仍为同一数字，日志`/tmp/layout-r6-parent-final-full.log`。按映射规范化类名后逐方法核对：R5的1194项全部保留、结果不变，仅新增9项；进一步累计核对R1的1153项全部保留、结果不变，新增50项。结合R1已核实的R0保留证据，总体1149→1203（新增54），228项跳过不变。
+- 父级亲自执行离线`-DskipTests package`仍失败：本地缺`maven-jar-plugin:3.4.2`，日志`/tmp/layout-r6-parent-package.log`。未联网补插件、未修改pom绕过、未把临时手工jar当作正式产物。R6源码/测试验证可接受，但打包门禁未通过，因此暂不stage/commit/合入，保留候选树全部改动，等待允许补齐打包依赖或提供离线依赖环境。
+- 父级累计映射审计脚本首次把非迁移条目当作FQCN映射而触发KeyError；过滤具备oldFqcn/newFqcn的条目后完成逐方法比对，不涉及业务测试失败。结构故意破坏探针失败记录保留，资源已恢复；先前R2 runner崩溃根因仍未查明。
+- 当时已提交并合入的后续板块：R2 `e451467`、R3 `0215ce4`、R4 `d566541`、R5 `ac7ad98`；R1既有提交`29ff843`。均未推送远程。真实MySQL/Redis/RabbitMQ/COS/TLS、应用启动与生产验收仍未执行；event消息类FQCN与XML物理路径继续保留兼容例外。
+
+### R6 打包阻塞解除与最终父级验收
+
+- 用户明确授权联网补齐Maven打包依赖后，父级执行`MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -DskipTests package`成功，日志`/tmp/layout-r6-parent-online-package.log`。联网范围仅为构建依赖解析，未启动应用/容器或连接真实数据库/Redis/MQ/COS，未读取application.yml，未推送远程。
+- 随后按第6节同一测试选择与opt-in关闭参数，串行执行离线`./mvnw -o ... package`（本次没有skipTests）：普通全回归1203项、0失败/错误、228跳过，975项执行通过，正式Maven JAR打包及Spring Boot repackage全部BUILD SUCCESS，日志`/tmp/layout-r6-parent-offline-package.log`。原先离线缺插件失败保留，不再是当前阻塞。
+- 正式产物：候选树`target/backend-0.0.1-SNAPSHOT.jar`。父级静态检查全部258个生产顶层class均存在且class major=61（Java 17目标）；16个Mapper XML、5个Lua在BOOT-INF/classes中与源码逐字节一致；原event消息FQCN保持、旧生产类目录及测试类未混入；Boot JarLauncher、启动类清单及BOOT-INF/lib依赖齐备。日志`/tmp/layout-r6-parent-jar-audit.log`。未运行JAR，不能据此宣称真实基础设施或生产验收通过。
+- 最终接受范围：R1–R6目录拆分、源码路径与包名、离线测试守恒、DB-free装配、文档同步、正式打包及产物内容。按用户授权R6单独本地提交并fast-forward集成；不删除保留工作树、不推送远程。
+- 保留的设计例外：event三类原FQCN用于消息兼容；Mapper XML集中物理路径用于部署配置兼容；少量全局config装配；已知跨模块双向依赖没有借机重构。真实服务、应用启动、外部部署配置、线上滚动兼容仍未验证。

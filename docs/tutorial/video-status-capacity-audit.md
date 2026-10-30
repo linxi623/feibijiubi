@@ -32,7 +32,7 @@ T14 的目标是“事件归档 + 幂等保留 + Redis 容量治理”。但清�
 
 | 项 | 内容 |
 |---|---|
-| 工具 | `src/test/java/com/feibijiubi/backend/service/video/capacity/`（测试作用域，非生产代码） |
+| 工具 | `src/test/java/com/feibijiubi/backend/videostats/capacity/`（测试作用域，非生产代码） |
 | `VideoStatusCapacityAudit` | 只读审计：`information_schema` 体积估算、终态窗口 dry-run、Redis 只读指标、有界 `SCAN`（**命令次数**上限）+ `MEMORY USAGE` 抽样（独立采样上限） |
 | `VideoStatusCapacityEstimator` | 纯计算：容量公式、区间、UNKNOWN 语义（无基础设施即可单测） |
 | `VideoStatusCapacityReport` | 报告模型与中文文本渲染（不含连接串/凭证/eventId/payload） |

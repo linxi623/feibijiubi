@@ -1,4 +1,4 @@
-package com.feibijiubi.backend.converter;
+package com.feibijiubi.backend.contract;
 
 import com.feibijiubi.backend.user.entity.User;
 import com.feibijiubi.backend.user.converter.UserConverter;

@@ -1,0 +1,550 @@
+{
+  "batch": "R6",
+  "parentAcceptance": {
+    "sourceAndOfflineTests": "PASS: 1203 tests, 0 failures/errors, 228 skipped; 975 executed passes",
+    "compile": "PASS: fresh target, 258 production / 138 test sources",
+    "comparison": "R5 all 1194 cases preserved with identical results, 9 added; cumulative R1 all 1153 cases preserved, 50 added",
+    "package": "PASS: user authorized dependency downloads; Maven package succeeded, then offline package with full regression succeeded (1203 tests, 0 failures/errors, 228 skipped). Previous offline missing-plugin failure retained below.",
+    "jarAudit": "PASS: final Maven Boot JAR contains all 258 production top-level classes (major version 61 / Java 17), 16 source-identical Mapper XML files and 5 source-identical Lua files; event FQCNs preserved, legacy class directories and test classes absent; Boot launcher and dependencies present. JAR not launched.",
+    "publication": "Parent accepted for separate local commit and fast-forward integration; no remote push or infrastructure access authorized/performed.",
+    "logs": ["/tmp/layout-r6-parent-compile.log", "/tmp/layout-r6-parent-full.log", "/tmp/layout-r6-parent-final-full.log", "/tmp/layout-r6-parent-package.log", "/tmp/layout-r6-parent-online-package.log", "/tmp/layout-r6-parent-offline-package.log", "/tmp/layout-r6-parent-jar-audit.log"]
+  },
+  "module": "全局扫描 / 目录说明 / 最终目录收口",
+  "worktree": "D:/feibijiubi/backend-layout-r6",
+  "baseCommit": "ac7ad98",
+  "baseCommitSubject": "refactor: consolidate shared and infrastructure packages（R5 父级提交，已合入主工作区）",
+  "state": "执行侧历史状态（当前父级验收见parentAcceptance）：干净 detached 基线；本批只在该工作树写入，未 stage/commit/push，未改动主工作区与 R1–R5 工作树，未再委派；未读取 application.yml，未联网，未启动应用/容器/数据库/Redis/MQ/COS，未执行迁移",
+  "counts": {
+    "testFilesMoved": 3,
+    "newTestClasses": 2,
+    "newTestMethods": 9,
+    "productionJavaFiles": 258,
+    "productionJavaFilesChanged": 0,
+    "testJavaFiles": 138,
+    "movedFileBodiesIdenticalModuloPackageAndImports": "3/3",
+    "movedFileNonPackageChanges": 0,
+    "referencesFollowedIntoNonMovedFiles": 1
+  },
+  "files": {
+    "tests": [
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/baseline/VideoInteractionAdmissionBaselineSummary.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/interaction/baseline/VideoInteractionAdmissionBaselineSummary.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.baseline.VideoInteractionAdmissionBaselineSummary",
+        "newFqcn": "com.feibijiubi.backend.interaction.baseline.VideoInteractionAdmissionBaselineSummary",
+        "reason": "R4/R5 交接项：这是 T16-B0 同步准入基线的纯计算分位数摘要（测试作用域辅助类），内容全属 interaction 的准入测量，却留在已不存在的顶层 service/video 目录下"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/baseline/VideoInteractionAdmissionBaselineSummaryTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/interaction/baseline/VideoInteractionAdmissionBaselineSummaryTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.baseline.VideoInteractionAdmissionBaselineSummaryTests",
+        "newFqcn": "com.feibijiubi.backend.interaction.baseline.VideoInteractionAdmissionBaselineSummaryTests",
+        "reason": "被测类同包迁移；类名、断言、用例数不变"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/converter/ResponseConverterTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/contract/ResponseConverterTests.java",
+        "oldFqcn": "com.feibijiubi.backend.converter.ResponseConverterTests",
+        "newFqcn": "com.feibijiubi.backend.contract.ResponseConverterTests",
+        "reason": "R3/R5 交接项：该测试同时断言 UserConverter（user）、VideoConverter（video）与 VideoStatus 相关的输出映射，不归属任一单模块，也不测 converter 实现本身；放根测试包 contract（= 跨模块对外输出契约）并保持类名、断言、私有反射辅助方法不变"
+      }
+    ],
+    "referencesFollowedIntoNonMovedFiles": [
+      {
+        "file": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionAdmissionBaselineIsolatedTests.java",
+        "change": "import com.feibijiubi.backend.service.video.baseline.VideoInteractionAdmissionBaselineSummary → com.feibijiubi.backend.interaction.baseline.VideoInteractionAdmissionBaselineSummary（唯一一行，正文其余不变）"
+      }
+    ]
+  },
+  "layoutDecisions": [
+    {
+      "target": "com.feibijiubi.backend.interaction.baseline（测试作用域）",
+      "reason": "交互基线测量工具只服务 interaction 的准入基线，既不是 service 实现也不是生产类；沿用工程内已有的“测试作用域子包”先例 videostats.capacity（同样是测量/审计工具），因此不放进 interaction.service 与 service 测试混排，也不新建生产包"
+    },
+    {
+      "target": "com.feibijiubi.backend.contract（根测试包）",
+      "reason": "跨模块输出契约：实体→VO 转换的字段映射（user/video/videostats 三个模块的输出形状）。放任一模块包都会让另一个模块成为“外部依赖”，因此落在根包下；不含架构/装配断言，避免与 architecture 混义"
+    },
+    {
+      "target": "com.feibijiubi.backend.architecture（根测试包，新增）",
+      "reason": "全局结构与装配断言：源码 package 声明与目录一致、根包下只允许批准的模块目录、旧生产目录不得复活、16 个 mapper XML 的 classpath 资源发现 + 真实 MyBatis 解析 + 接口注册 + 逐 MappedStatement + resultType/parameterType"
+    },
+    {
+      "target": "不做的事",
+      "reason": "不引入 ArchUnit 等新依赖、不断言模块无环、不为消除既有跨模块 Mapper 调用而改业务；目录归位不等于架构解耦"
+    }
+  ],
+  "resultingLayout": {
+    "productionRootSuffix": "com.feibijiubi.backend",
+    "productionTopLevel": {
+      "BackendApplication.java": "启动类，保持根包",
+      "auth": [
+        "annotation",
+        "config",
+        "controller",
+        "dto",
+        "interceptor",
+        "service",
+        "service.impl",
+        "util",
+        "vo"
+      ],
+      "user": [
+        "controller",
+        "converter",
+        "dto",
+        "entity",
+        "enums",
+        "mapper",
+        "service",
+        "service.impl",
+        "vo"
+      ],
+      "video": [
+        "controller",
+        "converter",
+        "dto",
+        "entity",
+        "enums",
+        "local{controller,dto,entity,mapper,service,service.impl,vo}",
+        "mapper",
+        "service",
+        "service.category",
+        "service.impl",
+        "service.impl.category",
+        "vo"
+      ],
+      "interaction": [
+        "config",
+        "controller",
+        "entity",
+        "mapper",
+        "service",
+        "service.impl",
+        "vo"
+      ],
+      "videostats": [
+        "config",
+        "controller",
+        "dto",
+        "entity",
+        "enums",
+        "exception",
+        "mapper",
+        "metrics",
+        "mq",
+        "service",
+        "service.admin",
+        "service.impl",
+        "support",
+        "vo"
+      ],
+      "videosource": [
+        "config",
+        "controller",
+        "dto",
+        "entity",
+        "integration",
+        "integration.applecms",
+        "integration.media",
+        "integration.transport",
+        "mapper",
+        "service",
+        "service.impl",
+        "vo"
+      ],
+      "shared": [
+        "平坦包：ApiResponse/BusinessException/GlobalExceptionHandler/JsonUtils"
+      ],
+      "infrastructure": [
+        "ratelimit.service",
+        "ratelimit.service.impl",
+        "redis",
+        "redis.config",
+        "redis.operation",
+        "storage.config",
+        "storage.service",
+        "storage.service.impl"
+      ],
+      "config": [
+        "WebMvcConfig（已知例外：全应用装配）"
+      ],
+      "event": [
+        "VideoStatusChangedEvent/VideoStatusEventType/VideoStatusDelta（已知例外：MQ 类型头，不可迁）"
+      ]
+    },
+    "testRootSuffix": "com.feibijiubi.backend",
+    "testTopLevel": {
+      "BackendApplicationTests.java": "启动类测试",
+      "architecture": [
+        "PackageLayoutTests",
+        "MyBatisMapperResourceTests"
+      ],
+      "contract": [
+        "ResponseConverterTests"
+      ],
+      "auth": [
+        "controller",
+        "interceptor",
+        "service.impl"
+      ],
+      "user": [
+        "mapper"
+      ],
+      "video": [
+        "local{controller,mapper,schema,service}",
+        "mapper"
+      ],
+      "interaction": [
+        "baseline{VideoInteractionAdmissionBaselineSummary,VideoInteractionAdmissionBaselineSummaryTests}",
+        "config",
+        "controller",
+        "mapper",
+        "service",
+        "service.impl"
+      ],
+      "videostats": [
+        "capacity",
+        "config",
+        "controller",
+        "mapper",
+        "metrics",
+        "mq",
+        "service",
+        "service.admin",
+        "support"
+      ],
+      "videosource": [
+        "config",
+        "controller",
+        "integration{applecms,media,transport}",
+        "mapper",
+        "schema",
+        "service",
+        "service.impl"
+      ],
+      "shared": [
+        "GlobalExceptionHandlerTests",
+        "GlobalExceptionHandlerWiringTests"
+      ],
+      "infrastructure": [
+        "ratelimit.service.impl",
+        "redis",
+        "redis.config",
+        "storage"
+      ]
+    }
+  },
+  "newTests": [
+    {
+      "class": "com.feibijiubi.backend.architecture.PackageLayoutTests",
+      "methods": [
+        "productionSourcesDeclareThePackageMatchingTheirDirectory：全部生产源文件（本轮实测258，数量非断言）逐个核对 package 声明 == 目录路径（含启动类锚点）",
+        "testSourcesDeclareThePackageMatchingTheirDirectory：全部测试源文件（本轮实测138，数量非断言）同上（含 BackendApplicationTests 锚点）",
+        "rootPackageHoldsOnlyTheApprovedModulesPlusTheEventAndConfigExceptions：生产包根集合严格等于 auth/user/video/interaction/videostats/videosource/shared/infrastructure + event/config 两个例外 + BackendApplication.java",
+        "legacyTopLevelDirectoriesAreGoneFromBothSourceRoots：14 个旧技术分层目录名（annotation/common/controller/converter/dto/entity/enums/integration/interceptor/mapper/mq/service/utils/vo）在生产与测试**两侧**源码根下都不得出现；本方法与 event/config 例外无关"
+      ]
+    },
+    {
+      "class": "com.feibijiubi.backend.architecture.MyBatisMapperResourceTests",
+      "methods": [
+        "allMapperXmlFilesAreDiscoverableAtTheConfiguredClasspathLocation：用与 mybatis.mapper-locations 相同的 PathMatchingResourcePatternResolver 模式解析 16 个 XML；集合与 src/main/resources 一致、URL 仍落在 com/feibijiubi/backend/mapper/ 下、逐字节相同",
+        "allMapperXmlFilesParseIntoOneMyBatisConfiguration：16 个 XML 用真实 XMLMapperBuilder 解析进同一个 Configuration，16 个 namespace 全部注册成接口",
+        "everyDeclaredStatementIsRegisteredWithResolvableTypes：逐 MappedStatement 校验 namespace、SQL source、resultMaps/parameterMap 类型已解析且不指向旧集中包（含 StrictMap 短名键单列校验）",
+        "mapperInterfacesUnderTheScanRootMatchTheXmlNamespacesOneToOne：@Mapper 扫描根找到的接口集合 == 16 个 XML namespace 集合，且旧包 FQCN 不存在",
+        "everyDiscoveredMapperPackageHasAnExplicitWarnLoggerInTheIsolatedTestProperties：由 XML namespace 推导出的每个 mapper 包，都必须在 src/test/resources/video-status-isolated.properties 里有一条显式 logging.level.<包>=WARN（只读仓库内测试资源，不读 application.yml/外部配置）"
+      ]
+    }
+  ],
+  "documentationSync": [
+    {
+      "file": "docs/tutorial/video-status-batch-aggregation-implementation.md",
+      "change": "§4 Mapper 查询示例的 resultType 由 com.feibijiubi.backend.entity.VideoStatusConsumedEvent 改为 com.feibijiubi.backend.videostats.entity.VideoStatusConsumedEvent（R4/R5 明确交接的旧 FQCN；示例本身可直接照抄进 XML）"
+    },
+    {
+      "file": "docs/tutorial/video-status-capacity-audit.md",
+      "change": "§2 交付物表的工具目录由 src/test/java/com/feibijiubi/backend/service/video/capacity/ 改为 .../videostats/capacity/（该工具真实位置，R4 已随 videostats 迁移；只改目录说明，不动容量公式/结论/实测数字）"
+    },
+    {
+      "file": "README.md",
+      "change": "「项目结构」目录说明由旧的顶层 controller/service/mapper/dto/vo/entity/interceptor/mq 改为按业务模块的现结构（auth/user/video/interaction/videostats/videosource/shared/infrastructure/config + event 例外），并保留 src/main/resources/com/feibijiubi/backend/mapper 与 lua 的既有物理路径说明"
+    },
+    {
+      "file": "docs/plans/package-by-feature-refactor.md",
+      "change": "记录 R5 本地提交 ac7ad98、更新批次表状态、补 R6 执行记录（执行侧自验，非父级最终接受）"
+    },
+    {
+      "file": "docs/tutorial/video-upload-direct-cos-guide.md",
+      "change": "仅在文首加阅读提示：本文是重构前的设计示例，旧 src 路径与仓库里已不存在的类型（TempFileVO、TempUploadCleanupService）不可直接照抄，现行结构以 README「项目结构」与重构计划为准；正文的 24 处旧路径与功能设计内容一律未批量改写"
+    },
+    {
+      "file": "不做批量改写的文档",
+      "change": "docs/history/*、docs/refactoring/r1..r5-package-map.json（旧→新映射审计本身必须保留旧路径才有意义）、docs/tutorial 下的实现进度/交接/基线记录（video-status-improvement-*.md 等）保持原样；video-status-outbox-lease-migration.md、video-status-read-consistency.md 的交付记录同样保留"
+    }
+  ],
+  "resourceAndConfigChanges": {
+    "testProperties": {
+      "file": "src/test/resources/video-status-isolated.properties",
+      "added": [
+        "logging.level.com.feibijiubi.backend.user.mapper=WARN",
+        "logging.level.com.feibijiubi.backend.video.mapper=WARN",
+        "logging.level.com.feibijiubi.backend.video.local.mapper=WARN",
+        "logging.level.com.feibijiubi.backend.interaction.mapper=WARN",
+        "logging.level.com.feibijiubi.backend.videosource.mapper=WARN",
+        "logging.level.com.feibijiubi.backend.videostats.mapper=WARN",
+        "logging.level.com.feibijiubi.backend.videostats.metrics=WARN"
+      ],
+      "kept": [
+        "logging.level.com.feibijiubi.backend.mapper=WARN（旧包已无接口，保留作兼容，不删除）"
+      ],
+      "untouched": "所有 spring.datasource/redis/rabbitmq、mybatis.mapper-locations、mybatis.configuration.*、app.video-status.* 行逐字节不变（未新增/修改/删除任何连接属性）",
+      "coverage": "Maven 发现的 7 个 mapper 包（user/video/video.local/interaction/videosource/videostats.mapper/videostats.metrics）各有显式 WARN；logging.level 是包前缀匹配，video.mapper 不覆盖 video.local.mapper，因此逐包显式是必须的，并由 MyBatisMapperResourceTests 的兼容性断言守住"
+    },
+    "mapperXml": "16 个 XML 物理路径全部保留在 src/main/resources/com/feibijiubi/backend/mapper/（父级 R6 裁定），本批 0 改动",
+    "lua": "src/main/resources/lua/*.lua 5 个脚本路径与内容不变",
+    "fixtures": "src/test/resources/videosource/applecms/* 不变",
+    "sql": "database/*.sql 与 database/migrations/*.sql 不变",
+    "applicationYml": "未读取、未修改 application.yml；XML 全部使用 FQCN，不依赖 type-aliases-package"
+  },
+  "importAndScanAudit": {
+    "scan": "grep 覆盖 src/main/java、src/test/java、src/main/resources、src/test/resources、src/test/docker、database、Dockerfile、compose*.yaml、pom.xml、README.md、docs/**（非敏感文件）；脚本侧只命中 src/test/docker/init-schema.sh 与 mvnw.cmd，二者都不引用任何包名或源码路径",
+    "fullQualifiedNames": "文档外无遗留：唯一的现行文档旧 FQCN 是 batch-aggregation 教程的 com.feibijiubi.backend.entity.VideoStatusConsumedEvent，已改；其余命中都是既有绑定/装配测试里“旧 FQCN 必须不存在”的负向断言，或故意不存在的假类名",
+    "intentionalLegacyReferences": [
+      "多个 *MapperBindingTests 里的 com.feibijiubi.backend.mapper.* —— Class.forName 负向断言（旧集中包不得残留同名接口）",
+      "RateLimitServiceWiringTests 里的 com.feibijiubi.backend.service.ratelimit.* / service.impl.ratelimit.* —— 同类负向断言",
+      "RedisScriptConfigWiringTests 里的 com.feibijiubi.backend.config.RedisScriptConfig、utils.redis.RedisUtils —— 同类负向断言",
+      "TencentCosStorageWiringTests 里的 config.TencentCosProperties、service.storage.* / service.impl.storage.* —— 同类负向断言",
+      "GlobalExceptionHandlerWiringTests 的 OLD_HANDLER_FQCN=com.feibijiubi.backend.common.GlobalExceptionHandler —— 同类负向断言",
+      "VideoStatusSchedulingIsolationTests 的 Javadoc 引用 com.feibijiubi.backend.config.SchedulingConfig —— 说明性文字（该类已不存在）",
+      "VideoStatusMetricsMapperBindingTests 的 Javadoc 引用 com.feibijiubi.backend.metrics —— 说明迁移来源",
+      "VideoStatusRabbitMessageTypeHeaderTests 的 com.feibijiubi.backend.legacy.VideoStatusChangedEvent —— 故意的“不存在的类名”用例（证明不可解析时仍然失败）",
+      "video-status-isolated.properties 的 logging.level.com.feibijiubi.backend.mapper=WARN —— 旧包已无接口，按兼容保留"
+    ],
+    "mapperScan": "主代码仍无 @MapperScan/@ComponentScan（只有 1 处 Javadoc 提及 @ConfigurationPropertiesScan 且是说明性文字）；测试里的 @MapperScan 字符串已在 R1–R4 同步，本批未改",
+    "reflection": "src/main/java 内无 Class.forName/getResources/getResourceAsStream 的包名依赖；测试里的 Class.forName 只用于断言旧 FQCN 不存在",
+    "sourcePaths": "测试与脚本按相对路径读取的资源只有 database/*.sql、database/migrations/*.sql、src/main/resources/com/feibijiubi/backend/mapper/*.xml（均未变）",
+    "beanReferences": "本批未改类名/注解/@Bean 方法名/@Qualifier，bean 名与调度/锁/重试绑定不变",
+    "oldDirectories": "src/main/java 下只剩 BackendApplication.java + 10 个批准目录；src/test/java 下 service/、converter/ 两个旧目录在本批清空后删除",
+    "staleDocsLeftIntentionally": {
+      "docs/tutorial/video-upload-direct-cos-guide.md": "24 处旧 src 路径（dto/vo/entity/service/mapper），并且引用了重构前就已不存在的类（TempFileVO、TempUploadCleanupService），属历史教学长文，未改写",
+      "docs/tutorial/video-status-improvement-{baseline,plan,session-progress}.md、video-status-outbox-lease-migration.md、video-status-read-consistency.md": "各 1–2 处旧路径，都是当时的交付/实测记录，改了就不再是证据",
+      "docs/history/*、docs/refactoring/r1..r5-package-map.json": "历史归档与旧→新映射审计，必须保留旧路径"
+    }
+  },
+  "dependencies": {
+    "principle": "只如实记录生产代码里既有的跨模块引用（按顶层模块统计 import 与全限定名），不宣称解耦、不断言无环",
+    "moduleEdges": {
+      "auth": [
+        "infrastructure",
+        "shared",
+        "user"
+      ],
+      "config": [
+        "auth"
+      ],
+      "event": [
+        "videostats"
+      ],
+      "infrastructure": [
+        "shared",
+        "video"
+      ],
+      "interaction": [
+        "auth",
+        "event",
+        "infrastructure",
+        "shared",
+        "user",
+        "video",
+        "videostats"
+      ],
+      "root(BackendApplication)": [
+        "auth",
+        "infrastructure",
+        "interaction",
+        "videostats"
+      ],
+      "shared": [
+        "infrastructure"
+      ],
+      "user": [
+        "auth",
+        "infrastructure",
+        "shared",
+        "video",
+        "videostats"
+      ],
+      "video": [
+        "auth",
+        "infrastructure",
+        "interaction",
+        "shared",
+        "user",
+        "videostats"
+      ],
+      "videosource": [
+        "auth",
+        "infrastructure",
+        "shared",
+        "video"
+      ],
+      "videostats": [
+        "auth",
+        "event",
+        "infrastructure",
+        "shared"
+      ]
+    },
+    "knownCycles": [
+      "shared ↔ infrastructure（shared.GlobalExceptionHandler → infrastructure.redis.RedisOperationException；infrastructure.redis.operation → shared.JsonUtils）",
+      "video ↔ interaction（video.service.impl → interaction.mapper/entity/service；interaction.service.impl → video.entity/service.PublishedVideoGuard）",
+      "video ↔ user（video.service.impl → user.mapper.UserMapper；user.service.impl → video.mapper.VideoMapper）",
+      "event ↔ videostats（videostats.mq → event.VideoStatusChangedEvent；event.VideoStatusDelta → videostats.entity.VideoStatusConsumedEvent）"
+    ],
+    "note": "user→videostats 与 videostats→auth 也是既有多向引用；这些都在重构前就存在，本重构只搬包名，不治理服务边界"
+  },
+  "exceptions": [
+    {
+      "item": "com.feibijiubi.backend.event.{VideoStatusChangedEvent,VideoStatusEventType,VideoStatusDelta}",
+      "reason": "R4 消息协议闸门结论（父级裁定 A）：类 FQCN 是 RabbitMQ __TypeId__ 的一部分，迁包会破坏在途/滚动期消息。R6 继续保留原包、原 FQCN；不加别名类、不加 idClassMapping、不改 converter/trustedPackages/队列。由 videostats.config.VideoStatusRabbitMessageTypeHeaderTests 断言出站类型头仍是原 FQCN 且在途消息仍可反序列化"
+    },
+    {
+      "item": "src/main/resources/com/feibijiubi/backend/mapper/*.xml（16 个）",
+      "reason": "父级 R6 裁定：全部 Mapper XML 继续集中存放在旧物理路径，以兼容部署期 mybatis.mapper-locations=classpath:com/feibijiubi/backend/mapper/*.xml。XML 物理目录不是业务边界；NewPackage 归组只体现在 namespace/resultType/parameterType 上。本批不尝试读取或修改 application.yml"
+    },
+    {
+      "item": "com.feibijiubi.backend.config.WebMvcConfig",
+      "reason": "全应用 MVC 装配（拦截器注册/跨模块路径），不属于单一业务模块；保留在 config"
+    },
+    {
+      "item": "src/main/resources/lua/、src/test/resources/videosource/、database/",
+      "reason": "Lua 脚本、测试 fixture、SQL 迁移路径均不变（任务口径），也不改脚本内容"
+    }
+  ],
+  "reviewFix": {
+    "round": "R6 审查后修复轮（独立审查 CHANGES_REQUIRED：1×P1 + 3×P2）",
+    "items": [
+      {
+        "review": "P1 隔离测试 mapper 日志只覆盖 7 个包中的 5 个",
+        "fix": "properties 追加 video.local.mapper 与 videosource.mapper 两行 WARN（仅日志；未动任何连接属性），并新增 DB-free 兼容性测试 everyDiscoveredMapperPackageHasAnExplicitWarnLoggerInTheIsolatedTestProperties；非空洞性用“删掉一行 WARN → 该测试失败”验证后逐字节还原"
+      },
+      {
+        "review": "P2 r6 映射里 PackageLayoutTests 方法名与实际不符（4/4）、第 4 项描述错（误称与 event/config 例外相关、漏记测试根）",
+        "fix": "按实际方法名与语义重写 newTests 条目，并明确第 4 项检查的是生产与测试两侧源码根的 14 个旧目录名"
+      },
+      {
+        "review": "P2 结构测试硬编码当前规模属维护耦合",
+        "fix": "两个结构测试类的 Javadoc 增加「清单维护」段：说明这些清单是防回退护栏、新增模块/mapper 时应同步更新，而不是永久的业务限制"
+      },
+      {
+        "review": "P2 video-upload-direct-cos-guide.md 仍留 24 处旧 src 路径",
+        "fix": "仅在文首加重构前提示（不可直接照抄、以 README 与计划为准），不批量改写历史功能设计正文"
+      },
+      {
+        "review": "打包证据不得用手工 jar 替代",
+        "fix": "删除以手工 jar 作为打包验收证据的表述；package 明确记为“因离线缺 maven-jar-plugin:3.4.2 未完成”，未联网、未改 pom、未重复尝试"
+      }
+    ]
+  },
+  "knownGaps": [
+    "原缺打包插件阻塞已在用户授权下载后解除，正式Maven打包与JAR静态内容核验通过；实际启动和运行时基础设施仍未验证。历史失败记录保留在verification.results.packaging。",
+    "opt-in 隔离/集成用例（需真实 MySQL/Redis/RabbitMQ）未运行；真实 broker 类型头收发、Redis 脚本执行、COS、应用启动均未验证",
+    "docs/tutorial/video-upload-direct-cos-guide.md 正文仍保留 24 处重构前 src 路径（顶部已加“重构前设计示例、不可直接照抄”的提示）；video-status-improvement-*.md 等历史交付/进度记录同样保留旧路径",
+    "application.yml 未读取；其按包名的配置（如 type-aliases-package、logging.level）未核对（XML 全部使用 FQCN）"
+  ],
+  "verification": {
+    "environment": "离线（-o）、串行、MAVEN_OPTS=-Xms64m -Xmx256m、测试 -Xms64m -Xmx512m -Djdk.attach.allowAttachSelf=true；不联网、不启动应用/容器/数据库、不执行迁移、不读 application.yml",
+    "commands": [
+      "rm -rf target",
+      "MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o -DskipTests test-compile",
+      "MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o -Dtest='...相关测试...' -DvideoStatusIT=false ... test",
+      "MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o '-Dtest=*Tests,!BackendApplicationTests' -DvideoSourceLocalTls=false -DvideoStatusIT=false -DvideoStatusScale=false -DvideoStatusBaseline=false -DvideoStatusBenchmark=false '-DargLine=-Xms64m -Xmx512m -Djdk.attach.allowAttachSelf=true' test",
+      "MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o -DskipTests package"
+    ],
+    "status": "见下方 results（执行后回填）",
+    "results": {
+      "scopeNote": "本文件记录两轮：round1 = 初次执行（全量 test-compile / 新测试 / 相关测试 / 普通回归 / 与 R5 逐方法对照）；fixRound = 审查修复轮（按父级要求只串行跑相关结构测试，全回归留给父级复跑）",
+      "round1": {
+        "cleanCompile": {
+          "note": "开批时本树无 target（无旧 class 残留）；离线 maven-clean-plugin 不可用，不宣称 clean 命令通过",
+          "productionSources": 258,
+          "testSources": 138,
+          "result": "BUILD SUCCESS",
+          "log": "/tmp/layout-r6-compile-1.log"
+        },
+        "newTests": {
+          "count": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "log": "/tmp/layout-r6-new-tests-1.log"
+        },
+        "relatedTests": {
+          "count": 50,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 3,
+          "scope": "16 个 XML 对应模块绑定测试 + 3 个迁移测试类 + 2 个新结构测试类",
+          "log": "/tmp/layout-r6-related-1.log"
+        },
+        "fullRegression": {
+          "count": 1202,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 228,
+          "executedPassing": 974,
+          "result": "BUILD SUCCESS",
+          "log": "/tmp/layout-r6-full-1.log"
+        },
+        "comparisonWithR5": {
+          "basis": "只读 D:/feibijiubi/backend-layout-r5/target/surefire-reports（R5 全回归 1194 项）",
+          "normalization": "按映射把 3 个迁移测试类 FQCN 规范化",
+          "missing": 0,
+          "statusChanged": 0,
+          "skippedR5": 228,
+          "skippedR6": 228,
+          "added": 8,
+          "script": "/tmp/r6_compare.py",
+          "note": "修复轮又新增 1 个测试方法，复跑全回归应为 1203 项；未在本轮复跑，由父级确认"
+        }
+      },
+      "fixRound": {
+        "structuralTests": {
+          "count": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "result": "BUILD SUCCESS",
+          "classes": "PackageLayoutTests(4) + MyBatisMapperResourceTests(5)",
+          "log": "/tmp/layout-r6-fix-structural-final.log",
+          "firstRunLog": "/tmp/layout-r6-fix-new-tests-1.log"
+        },
+        "loggerCoverageProbe": {
+          "purpose": "证明新增的日志覆盖测试不是空断言",
+          "change": "临时删除 logging.level.com.feibijiubi.backend.video.local.mapper=WARN 一行",
+          "observation": "MyBatisMapperResourceTests 5 项中 1 项失败，信息点名缺失键 logging.level.com.feibijiubi.backend.video.local.mapper",
+          "restored": "按备份逐字节还原，properties 现为 8 行新增（1 注释 + 7 个 mapper 包 WARN）",
+          "log": "/tmp/layout-r6-fix-logger-probe.log"
+        },
+        "mutationProbe": {
+          "purpose": "round1 已做的非空洞性验证，保留记录",
+          "observation": "把 UserMapper.xml 的一个 resultType 改回旧包名后 2 项失败：Could not resolve type alias 'com.feibijiubi.backend.entity.User'；随后逐字节还原",
+          "log": "/tmp/layout-r6-mutation-probe.log"
+        },
+        "notRerun": [
+          "全量 test-compile（修复轮只改测试源码/资源与文档，mvnw test 已重新编译 138 个测试源文件）",
+          "普通全回归 1202→1203",
+          "与 R5 的逐方法对照（差异仅为新增 1 个方法）"
+        ]
+      },
+      "packaging": {
+        "command": "MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o -DskipTests package",
+        "result": "未完成（插件缺失，不是代码/测试失败）",
+        "error": "Plugin org.apache.maven.plugins:maven-jar-plugin:3.4.2 ... Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact ... has not been downloaded from it before",
+        "action": "按约束未联网下载、未修改 pom 规避、未重复尝试；也**不**用手工临时 jar 作为 package 验收证据",
+        "log": "/tmp/layout-r6-package-1.log",
+        "unverified": "jar 内容、classpath 装配与运行时初始化均未验证；需在具备 maven-jar-plugin 的环境另行执行正式 package"
+      }
+    }
+  }
+}

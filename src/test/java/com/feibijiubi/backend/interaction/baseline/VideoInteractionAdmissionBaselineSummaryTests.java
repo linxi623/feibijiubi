@@ -1,4 +1,4 @@
-package com.feibijiubi.backend.service.video.baseline;
+package com.feibijiubi.backend.interaction.baseline;
 
 import org.junit.jupiter.api.Test;
 

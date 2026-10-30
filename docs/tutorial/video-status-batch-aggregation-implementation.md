@@ -86,7 +86,7 @@ CREATE TABLE video_status_consumed_event (
 
 ```xml
 <select id="selectPendingForUpdate"
-        resultType="com.feibijiubi.backend.entity.VideoStatusConsumedEvent">
+        resultType="com.feibijiubi.backend.videostats.entity.VideoStatusConsumedEvent">
     SELECT id, event_id, vid, event_type, delta, payload,
            payload_hash, process_status, consumer_retry_count,
            last_attempt_at, last_error, consumed_at,
