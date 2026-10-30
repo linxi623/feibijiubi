@@ -373,7 +373,7 @@ relay/consumer/flush 异步路径与同步基线路径演练覆盖。
 隔离套件最近一次**完整**运行（`/tmp/t15b-drill-it2.log`）是 `VideoStatusIsolatedIntegrationTests`
 **20 tests，1 failure，1 skipped，BUILD FAILURE**：`concurrentFlushAndConsumptionPreserveAllEvents`
 报 `condition did not converge in 30 seconds`（`/tmp/t15b-drill-it2.log:300-318`）。该用例只用自己的
-`applyAndMark(event())`，**不经过 T15 新入口**，与 AGENTS.md 已登记的未解决历史 flake 同名；之后单独补跑
+`applyAndMark(event())`，**不经过 T15 新入口**，与[历史上下文快照](../history/agent-context-before-slimming.md)已登记的未解决历史 flake 同名；之后单独补跑
 通过的日志是 `/tmp/t15b-drill-single.log`、`/tmp/t15b-drill-maintenance.log`，但根因从未定位或修复，
 所以本文**不得**把它写成已解决，也不存在“整套 opt-in IT 全绿”的可引用运行。
 

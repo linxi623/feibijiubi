@@ -1,0 +1,28 @@
+{
+  "code": 1,
+  "msg": "合成详情数据",
+  "page": 1,
+  "pagecount": 1,
+  "limit": 100,
+  "total": 1,
+  "list": [
+    {
+      "vod_id": 100001,
+      "vod_name": "合成作品甲",
+      "type_id": 21,
+      "type_name": "合成动画分类",
+      "vod_class": "合成标签甲",
+      "vod_duration": "",
+      "vod_total": 1,
+      "vod_remarks": "合成备注",
+      "vod_actor": "合成演员甲",
+      "vod_director": "合成导演甲",
+      "vod_area": "合成地区",
+      "vod_lang": "合成语言",
+      "vod_year": "1900",
+      "vod_content": "合成简介：解析器不读取该字段，也不会把它当 HTML 执行。",
+      "vod_play_from": "synthetic_m3u8$$$synthetic_hls_alt",
+      "vod_play_url": "第1集$https://media.example.invalid/a/1.m3u8?token=alpha&expires=1900000000#第2集$https://media.example.invalid/a/2.m3u8?token=beta#第3集$https://media.example.invalid/a/3.m3u8?token=g$amma$$$第1集$https://alt.example.invalid/b/1.m3u8?token=gamma#第2集$https://alt.example.invalid/b/2.m3u8#第3集$https://alt.example.invalid/b/3.m3u8?sign=b%2Fc"
+    }
+  ]
+}

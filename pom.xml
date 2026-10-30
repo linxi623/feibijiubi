@@ -99,6 +99,13 @@
             <artifactId>cos-sts_api</artifactId>
             <version>3.1.1</version>
         </dependency>
+        <!--受限 HTTPS 客户端（外部视频源传输层 E2-C2）：显式声明 COS 已传递带来的 4.5.13，
+            避免依赖传递版本漂移；不升级、也不代表该版本已通过安全审计-->
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.13</version>
+        </dependency>
         <!--分页器-->
         <dependency>
             <groupId>com.github.pagehelper</groupId>

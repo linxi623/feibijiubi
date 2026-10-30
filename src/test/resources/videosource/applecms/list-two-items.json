@@ -1,0 +1,43 @@
+{
+  "code": 1,
+  "msg": "合成数据列表",
+  "page": 1,
+  "pagecount": 1,
+  "limit": "100",
+  "total": 2,
+  "class": [
+    {"type_id": 21, "type_name": "合成动画分类"},
+    {"type_id": 22, "type_name": "合成纪录分类"}
+  ],
+  "list": [
+    {
+      "vod_id": 100001,
+      "vod_name": "合成作品甲",
+      "type_id": 21,
+      "type_name": "合成动画分类",
+      "vod_class": "合成标签甲,合成标签乙",
+      "vod_duration": "",
+      "vod_remarks": "合成备注",
+      "vod_actor": "合成演员甲",
+      "vod_director": "合成导演甲",
+      "vod_area": "合成地区",
+      "vod_lang": "合成语言",
+      "vod_year": "1900",
+      "vod_time": "1900-01-01 00:00:00",
+      "vod_play_from": "synthetic_m3u8",
+      "vod_play_url": "第1集$https://media.example.invalid/list/a/1.m3u8?token=list-alpha",
+      "vod_extra": {"nested": {"deep": [1, "x", true, null]}}
+    },
+    {
+      "vod_id": "100002",
+      "vod_name": "合成作品乙",
+      "type_id": "22",
+      "type_name": "合成纪录分类",
+      "vod_class": "",
+      "vod_duration": "45分钟",
+      "vod_remarks": "",
+      "vod_actor": "合成演员乙",
+      "vod_content": "合成简介：列表条目里的简介与演员字段不参与解析。"
+    }
+  ]
+}

@@ -14,6 +14,10 @@ public final class RedisConstants {
     public static final String RATE_VIDEO_INTERACTION_ACTOR_PREFIX =
             "rate:video-interaction:actor:";
 
+    // M3-B：管理员外部来源预览的每管理员固定窗口配额（与视频互动限流互不影响）
+    public static final String RATE_EXTERNAL_VIDEO_SOURCE_PREVIEW_PREFIX =
+            "rate:external-video-source:preview:admin:";
+
     // 分类
     public static final String CATEGORY_PREFIX = "category:tree:v1";
 

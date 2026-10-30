@@ -1,7 +1,15 @@
-# AGENTS.md
+# AGENTS 精简前的历史上下文快照
 
-This file provides guidance to coding agents (Claude Code and others) when working with code in this
-repository. It is kept identical to `CLAUDE.md`.
+> 本文仅为归档，不是当前任务指令，也不是持续维护的进度表。
+> 原 AGENTS.md 中的历史进度、验收证据及契约记录在此保留，以免精简时丢失信息。
+> 其中“与 CLAUDE.md 保持一致”“功能变更同步 AGENTS.md”等要求已经废止；CLAUDE.md 已删除。
+> 后续进度与证据更新对应功能计划/教程，API契约更新 docs/api.md；基本约束只见根目录 AGENTS.md。
+> 下文为当时内容，状态与“下一步”等描述可能过时，不构成新的授权或当前验收结论。
+
+## 项目长期约束（用户指定）
+
+- 使用 subagent 时，仅使用 cn、sg、global 提供的 `deepseekflash4.1`；如指定模型不可用，应报告，不擅自改用其他模型。本条不构成自动委派授权。
+- 不为迎合已有测试而强行改变实现方法。以正确的业务需求、设计契约与可维护性为准；测试与这些要求冲突时，应核实并修正过时或不合理的测试，不通过削弱有效断言掩盖实现缺陷。
 
 ## Project overview
 
@@ -1196,6 +1204,336 @@ cause of historical failures, a full-suite pass, or production acceptance.
   seeded videos remain zero. Do not repeat this successful measurement merely to resume work.
 - Guide: `docs/tutorial/video-interaction-test-baseline.md`. T15 cleanup IT/migration remain unrun;
   T10/T12/T14 and the remainder of T16 are not completed by this baseline.
+
+## E1-A external video source catalog (candidate, migration **not** executed)
+
+- Branch `feature/external-video-source` from `429bdbf`. E1-A is a **parent-approved narrow subset** of
+  the still-candidate E0 contract (`docs/tutorial/external-video-source-contract.md` §4.1/§4.2). The rest
+  of that contract and E1–E9 remain unapproved; do not treat this slice as E1 or E0 acceptance.
+- Scope: two new tables only — `video_source` (one upstream site) and `video_source_series` (one upstream
+  work group). No HTTP route, no production Java/mapper/config/scheduler, no caller, no schema change to
+  any existing table (in particular `video` is untouched: no `playback_source`, no relaxed NOT NULL).
+- `video_source`: `code VARCHAR(64)` `utf8mb4_bin` unique (case-sensitive, the deployment whitelist key);
+  `enabled TINYINT NOT NULL DEFAULT 0` (**disabled by default**); `credential_ref VARCHAR(128) NULL` is a
+  credential **reference name** only — the table stores no secret/password/token/key value column. It has
+  **no** `active_job_id` / `active_job_expire_at` (source lease deferred) and **no**
+  `uid` / `owner_uid` / `created_by` / `import_uid` ownership column.
+- `video_source_series`: identity `UNIQUE (source_id, upstream_series_id)` with `upstream_series_id`
+  `utf8mb4_bin`; an extra `UNIQUE (source_id, id)` exists only as the future composite-FK referenced key;
+  the only FK is `series → video_source(id)` with no `ON DELETE CASCADE`; **no** `import_uid` (ownership
+  belongs to the future import-job row, never to the catalog).
+- Identity columns are case-sensitive but **not byte-strict identity**: `utf8mb4_bin` is **PAD SPACE**, so
+  `'abc'` and `'abc '` are the same row on both unique keys (the second write gets an explicit 1062
+  duplicate-key error, not a silently merged identity). The future import must therefore **reject** a
+  source `code` / upstream series ID with leading or trailing whitespace (explicit error → manual
+  handling) and must **never silently trim and merge**. This slice changes no collation
+  (`utf8mb4_0900_bin` would change the table default and needs its own decision) and implements no such
+  validation code.
+- `CHECK (enabled IN (0,1))` / `CHECK (sync_state IN (0,1,2,3))` are declared, but MySQL **8.0.16+** is
+  required: older versions parse and silently ignore `CHECK`, so the application layer still has to
+  validate and `CHECK` must not be described as the only guard.
+- Files: `database/migrations/e1a-external-video-source-catalog.sql` (idempotent
+  `CREATE TABLE IF NOT EXISTS`), mirrored at the end of `database/feibijiubi.sql`. Re-running the
+  migration modifies no existing row, but `IF NOT EXISTS` **does not verify an existing table's shape**;
+  the read-only `information_schema.columns` query at the end of the migration checks **columns only**
+  (name/type/nullability/default). It does **not** read indexes or foreign keys — verify those separately
+  with `SHOW CREATE TABLE` or `information_schema.statistics` / `key_column_usage`.
+- Offline test `ExternalVideoSourceCatalogSchemaTests` reads the two `.sql` files only (no DB, no Spring,
+  no SQL execution): 11 cases pin the exact column sets and every column's type/NULL/default, the
+  single-column `id` primary key with `INT NOT NULL AUTO_INCREMENT`, `ENGINE=InnoDB` +
+  `utf8mb4_unicode_ci` table options, the `video_source`-before-`video_source_series` statement order, the
+  two unique keys **and their internal column order**, the single FK, both `CHECK` ranges (compared with
+  all whitespace removed, so `CHECK(...)` and `CHECK (...)` are equivalent), the absence of
+  lease/owner/credential-value columns, default-off, and migration↔mirror equality. Column declaration
+  order and SQL comments are deliberately **not** contracts. It is a static, finite text-structure check
+  of the two scripts, **not** proof of MySQL semantics: DDL acceptance, `CHECK` enforcement, unique-conflict
+  behaviour and index key length remain unverified. This fix round ran no Maven/Java/test, so the case
+  list has **not** been re-run since the earlier 8-case run (`/tmp/e1a-parent-verify.log`).
+- Not done and not claimed: the migration was **not executed** on any MySQL, no CHECK/unique behaviour was
+  verified on a server, no episode/line/address/import-job/audit tables, no unknown-duration semantics, no
+  playback/episode API, no CMS compatibility, no change to the existing upload/statistics pipelines.
+
+## E2-A external video URL syntax policy (offline slice accepted)
+
+- `integration/videosource/ExternalVideoUrlPolicy` is a pure, non-Spring helper with no business
+  caller, configuration loading, DNS/network access or logging. It accepts HTTPS URLs only against
+  an immutable, explicitly supplied exact ASCII host/port allowlist and preserves the original URI
+  path/query (including signed query ordering and encoding). It does not identify MP4/HLS by suffix.
+- Rejections contain fixed reason text and no raw URL or cause. IP shorthand may be rejected during
+  URI parsing as `AUTHORITY_INVALID` or during host checks as `HOST_IS_IP_LITERAL`. Conservative
+  restrictions include no userinfo/fragments/trailing-dot hosts and rejection of hex-like labels.
+- This is NOT complete SSRF protection: future HTTP callers must enforce connection IP validation,
+  DNS-rebinding and redirect controls, bounded responses/timeouts and deployment egress policy.
+  Browser-fetched HLS segments/keys are outside this helper. Its runtime exception must be translated
+  at the eventual service/API boundary; there is no new route or configuration property today.
+- Parent offline verification: URL tests 23 + catalog tests 11 = 34, zero failures/errors/skips,
+  `/tmp/e2a-parent-final.log`. Initial run had one overly narrow IP-shorthand reason assertion;
+  the parent corrected the test without changing production behavior, then fixed a missing test
+  assertion import after a test-compilation failure. Independent read-only review found no blocker.
+  This accepts only the syntax helper, not a CMS adapter, HTTP-client security or real playback.
+
+## E2-B Apple CMS JSON parser (offline slice accepted)
+
+- `integration/videosource/applecms/AppleCmsJsonAdapter` parses bounded byte arrays with a local
+  Jackson factory: list snapshots and exactly-one-work detail snapshots, with no network, Spring
+  registration, database writes or business callers. Numeric/string pagination is validated explicitly;
+  malformed/duplicate/trailing JSON and invalid line groups fail the whole response, not a partial page.
+- Limits: 512 KiB body, depth 32, 100 list items, 256 category entries (counted then skipped),
+  16 lines and 1000 entries per line. Separators are counted before array allocation. `$$$` and `#`
+  retain empty segments; the first `$` divides label/address without rewriting signed query text.
+- Immutable snapshots do not invent episode IDs or duration. Position is a snapshot ordinal only;
+  addresses pass the explicit URL policy but remain `UNVERIFIED`. Work duration text is only a hint.
+  Class dictionaries are not yet returned (E3 still needs them). Callers must match detail work ID to
+  the requested ID before binding, and must not persist directly constructed unchecked model objects.
+- Exceptions use fixed codes without raw content/cause. Snapshot `toString()` omits upstream text
+  and URLs. Synthetic fixtures use reserved example domains, not copied real-site content.
+- Parent verification after review fixes: 77 tests, zero failures/errors/skips
+  (34 adapter + 9 model + 23 URL + 11 catalog), `/tmp/e2b-parent-final.log`.
+  The original worker exceeded its no-execution boundary with diagnostic commands and stalled on
+  `python -v`; the parent interrupted it and took over verification. No database/network test occurred.
+  This accepts offline parsing only, not a full CMS client or end-to-end playback.
+
+## E2-C1 IP/DNS result policy (offline slice accepted)
+
+- `integration/videosource/transport/PublicAddressPolicy` classifies address bytes against fixed,
+  conservative IPv4 exclusions and IPv6 2000::/3 minus special ranges. It is not a complete or live
+  IANA registry and does not prove reachability. Mapped addresses converted by Java to four bytes
+  follow IPv4 rules; sixteen-byte mapped addresses are refused.
+- `ValidatedDnsResolver` has no default network lookup: it invokes an explicitly injected lookup
+  (which may access the network), clones the returned array before checking, and rejects the whole
+  result if empty, null-containing or containing any non-public candidate. Errors are fixed/redacted;
+  InterruptedException restores the interrupt flag, Error is not swallowed. No Spring/business caller.
+- This is not socket pinning, a URL allowlist replacement or a DNS timeout guarantee. Future HTTP
+  wiring must connect using these returned addresses, not perform an independent second resolution.
+- Parent final targeted regression: 100 tests, zero failures/errors/skips (23 new IP/DNS tests + 77
+  related tests), `/tmp/e2c1-parent-final.log`; independent read-only review accepted the limited layer.
+  Parent narrowed the CIDR mask to eight bits and corrected lookup-network wording before this run.
+  No HTTP requests, database changes or new dependencies in this slice.
+
+## E2-C2 restricted CMS HTTP client (offline slice accepted; socket verification pending)
+
+- `RestrictedCmsHttpClient` has fixed list/detail GET entry points for an approved HTTPS API base;
+  no arbitrary method/header/target passthrough, Spring registration, scheduler or business caller.
+  Base requires an explicit single-slash-leading path. Apache httpclient 4.5.13 is now explicitly
+  declared at the existing COS-transitive version; this is not a dependency security audit.
+- A fresh BasicHttpClientConnectionManager per request receives the validated DNS hook directly.
+  HTTPS uses default trust verification and strict hostname checks. Raw sockets use Proxy.NO_PROXY;
+  HTTP routes are direct. Redirects, implicit retries, cookies, authentication and decompression are
+  disabled. Only HTTP 200 and absent/single identity content encoding are accepted.
+- Body reads are capped at 512 KiB (+1 sentinel), independent of Content-Length. Connect/read waits
+  are 5/10 s; the 20 s monotonic budget is cooperative and cannot hard-interrupt DNS or blocked IO.
+  Failure cleanup orders abort -> client/manager close -> content/response close, avoiding premature
+  stream close that could drain an oversized response. Exceptions are fixed/redacted, including
+  runtime failures; local TLS initialization has CLIENT_INIT_FAILED.
+- Parent final offline verification: 141 tests, zero failures/errors/skips (33 client + 8 factory +
+  100 related), `/tmp/e2c2-parent-final-fixed.log`. Historical compile failures (nonexistent Apache
+  getters, missing test IOException declaration, wrong HttpContext import) were corrected; an earlier
+  repair worker was interrupted after running a prohibited Python command. No real network test.
+- Mock construction proves wiring only. Real socket destination, TLS/SNI, proxy bypass and close/drain
+  behavior still need controlled integration tests; no full SSRF or production acceptance claim.
+
+## E2-C3 local TLS transport verification (accepted, local test scope only)
+
+- Opt-in `RestrictedCmsHttpClientLocalTlsTests` (`-DvideoSourceLocalTls=true`) uses only random
+  127.0.0.1 ports, temporary keytool-generated certificates and a test-only SSLContext. No external
+  requests, system truststore changes, database or Docker. Factory withSslContext is package-private;
+  production INSTANCE retains default trust and strict hostname verification on the shared code path.
+- Parent final run: 150 tests, zero failures/errors/skips, including 9 real local TLS cases and 141
+  related tests, `/tmp/e2c3-parent-fixed.log`. Covers Host/SNI and fixed request, wrong hostname with
+  positive trust control, default trust rejecting the temporary certificate, no redirect following,
+  oversized chunked response followed by server write failure, gzip refusal, exact 512 KiB acceptance,
+  SOCKS trap receiving no connection, and explicit close of an accepted socket awaiting request data.
+- The initial 149-test pass had weak hostname-failure discrimination and incomplete accepted-socket
+  cleanup; both were fixed before acceptance. Helpers now close active sockets, verify thread exit,
+  check bounded keytool termination and restore proxy properties. DNS resolver is mocked to loopback:
+  this proves selected local transport behavior, NOT full DNS-rebinding/SSRF or production acceptance.
+  Slow total-budget behavior and real upstream browser playback remain unverified.
+
+## E2-D CMS client composition (accepted, offline scope only)
+
+- `AppleCmsSourceClient` composes restricted HTTP and parsing with exact response page, per-item
+  category (when requested), and detail workId matching. Mismatch rejects the entire response with
+  fixed safe codes; existing transport/parse exceptions propagate unchanged. No Spring registration,
+  database writes, pagination loop, retries, synthesized episode identity or duration.
+- Parent `/tmp/e2d-parent-first.log`: 154 tests, zero failures/errors/skips (13 new + 141 related).
+  TLS suite was not repeated. Review then corrected comments/test naming only: category 0 is a legal
+  numeric value, NOT a proven upstream 'uncategorized' convention; null means omit category filtering.
+  Parent-category expansion is unsupported; self-reported field agreement does not authenticate a
+  response and an empty page has no category evidence. No executable logic changed after this run.
+- Worker disclosed a prohibited read-only wc command before switching to file tools; no tests or
+  network were executed by that worker. This process violation is retained, not treated as permission.
+
+## Manual multi-source import and M1 duration parsing
+
+- User decision: administrators map multiple sources of the same content to one independent local
+  episode and one vid. Source-series rows are only upstream catalog; the old source-owned episode
+  proposal is superseded. No automatic title/order/URL merge or historical vid merge. Added sources
+  do not change the original owner or create new statistics; differing edits/timelines need review.
+- Duration workflow: system proposes per-line duration, administrator confirms/corrects a positive
+  finite local duration before import. No confirmed duration means no video creation. Plan:
+  `docs/tutorial/external-video-source-manual-import.md`; the rest of E0 is still candidate.
+- M1 accepted offline only: HlsMediaDurationParser performs bounded strict UTF-8 media-playlist parsing,
+  ENDLIST requirement, exact BigDecimal EXTINF sum and raw-byte SHA-256. No IO or caller. Master/live/
+  LL-HLS/unsupported tags are refused; metadata and URI lines are not playback validation. Limits:
+  512 KiB, 30000 lines, 8192 characters/line, 10000 segments, 32-character duration, 9 fractional digits.
+- Parent final `/tmp/m1-parent-fixed.log`: 190 tests, zero failures/errors/skips (36 M1 + 154 related).
+  Initial 188 pass preceded fixes for unreachable segment limit and CRLF boundary, plus candidate
+  double overflow/underflow validation. No network, TLS rerun, DB, migration or actual playback.
+
+## M2 restricted manifest fetch and duration probe (accepted, offline/local scope)
+
+- CMS and manifest clients share the package-private RestrictedGetExecutor: DNS/factory wiring,
+  strict TLS/NO_PROXY, fixed headers, HTTP 200/identity only, 512 KiB bounded reads, cooperative 20 s
+  budget and failure abort/close ordering. Package visibility is not a security sandbox.
+  RestrictedManifestHttpClient takes an explicitly supplied media URL policy; no automatic API-host
+  allowlist merge (callers must configure the appropriate policy; the Java type does not enforce it).
+- HlsDurationProbe fetches exactly one manifest and returns an unconfirmed M1 candidate. No recursive
+  master/segment/key requests, MP4 probe, Spring registration, routes, persistence or production caller.
+- Initial offline `/tmp/m2a-parent-first.log`: 214 passed. After review wording/test-budget cleanup,
+  parent `/tmp/m2-parent-local-final.log`: 225 tests, zero failures/errors/skips, including 11 real
+  loopback TLS cases (9 original + 2 manifest). Thus shared-executor extraction was actually rechecked,
+  not accepted using only the earlier E2-C3 result. New cases pin signed raw path/query, Host/SNI,
+  candidate sum and one request, and master refusal without following variants. Mock loopback DNS
+  still excludes complete SSRF/rebinding assurance. No external source or browser playback verified.
+- M2-B worker disclosed prohibited read-only shell inspection; no worker test/network execution.
+  This process violation is retained; it is not new command authorization.
+
+## M3-A approved-source configuration and registry (accepted offline)
+
+- ExternalVideoSourceProperties plus immutable ExternalVideoSourceRegistry/Descriptor are implemented,
+  but not registered as Spring beans: no HTTP route, network, DB read/write or new active application
+  behavior. sourceCode is a deployment string key, not a database id. Defaults: preview and sources off,
+  empty sources legal, at most 32 sources and 32 endpoints per allowlist. API/media policies are separate;
+  empty media list means unsupported, never API fallback. Limits for future concurrency/rate admission
+  are validated only, NOT enforced yet. Registry copies configuration; no runtime hot reload.
+- Parent initial offline run: 236 passed (22 new + 214 related), `/tmp/m3a-parent-first.log`.
+  Review tightened endpoint ports to reject leading zeroes and added default-source-off/null-list/
+  exactly-32-endpoint assertions; final targeted 22 passed, `/tmp/m3a-parent-fixed.log`. No TLS rerun.
+  Custom validation errors omit configuration values; framework binder errors are not claimed redacted.
+
+## M3-B admin source previews (accepted, offline application scope)
+
+- M3-A configuration/registry are now Spring-wired. ExternalVideoSourceAdminController exposes three
+  GETs under /api/admin/video-sources: root source summaries, /{sourceCode}/catalog (page default 1,
+  categoryId optional), /{sourceCode}/detail (required workId). Real login/admin interceptors apply.
+  Default preview-disabled returns 503, unknown/disabled source 404, invalid parameters 400,
+  missing login 401/non-admin 403, quota/concurrency 429, upstream transport/parse/mismatch 502.
+  Detail without an approved media policy returns 503; never falls back to API allowlists.
+- Service uses an instance-local nonblocking Semaphore and a shared-Redis per-admin 60 s quota
+  (default 2 concurrent / 30 requests). Validate first, acquire permit, spend quota, fetch once;
+  release in finally. Failed upstream requests do not refund quota. Redis errors fail closed 503.
+  Root list performs no upstream request or quota write. Read-only means business data unchanged,
+  NOT write-free: catalog/detail increment Redis quota keys. No DB table/migration use.
+- Responses exclude addresses, line keys, cover URLs and raw duration hints. Positions are snapshot
+  indices, not episode identities; titles/labels remain untrusted text requiring frontend escaping.
+  Controller sets Cache-Control:no-store before service calls; interceptor-level 401/403 are outside
+  that header guarantee. No mapping, probe/confirmation/write API, vid creation or playback change.
+- Parent final /tmp/m3b-parent-final.log: 273 tests, zero failures/errors/skips (37 M3-B + 236 related).
+  Includes real Login/AdminInterceptor MockMvc and DB-free actual service/quota/controller wiring
+  with mock RedisUtils, plus missing named-script refusal. No real Redis/upstream/DB/application run.
+  Earlier 258 run failed (one invalid quota-key assertion, mock-Throwable restubbing broke reporting);
+  corrected tests yielded 270 before final review additions. Worker disclosed prohibited unzip/javap/
+  sed inspections; no worker test/network execution. Retain this process violation, not new permission.
+
+## M4-A1 local content identity (accepted, static schema scope)
+
+- Adds only local_video_series and local_video_episode in
+  database/migrations/m4a1-local-video-identity.sql, mirrored in database/feibijiubi.sql.
+  Local identities are source-independent UUID placeholders; BIGINT local ids, signed INT users/video
+  references, nullable unique vid, nullable positive duration CHECK. No UUID-format/immutability DB
+  enforcement, no source binding, mapper, endpoint or video writes. Import concurrency still needs
+  M5 episode locking/CAS. IF NOT EXISTS does not verify existing table shape; MySQL 8.0.16+ required.
+- Parent static tests: 25 passed (14 new + 11 catalog), /tmp/m4a1-parent-final2.log. Review added actual
+  parent-column type assertions and precise mandatory IF NOT EXISTS checking; the first augmented run
+  failed because the test parser retained backticks on parent column names, then was corrected.
+  No SQL executed, no MySQL/FK/CHECK/concurrency drill. CHECK wording now explicitly does not replace
+  application Double.isFinite validation. A2+ remains candidate, including permanent evidence ownership,
+  cross-network operation fencing/recovery and sensitive signed-URL retention decisions.
+
+## M4-A2 capture and binding history (accepted, static schema only)
+
+- database/migrations/m4a2-external-capture-binding.sql adds four tables, mirrored in the initial
+  schema: external_capture_snapshot, external_capture_entry, external_episode_binding and
+  external_binding_revision. Composite FKs keep source/work scopes consistent; append-only business
+  revisions retain UNIQUE(evidence_entry_id) occupancy when bindings change or are revoked. Schema
+  alone does NOT prohibit deleting/updating history. No mapper, write API, task or real data writes.
+- Parent /tmp/m4a2-parent-final.log: 42 tests passed (17 A2 + 14 A1 + 11 catalog), zero failures/errors/
+  skips. Review strengthened table-option assertions and exact parent PRIMARY/UNIQUE-key matching,
+  rather than accepting arbitrary index prefixes. No MySQL execution or runtime constraint evidence.
+- ROW_FORMAT is not pinned; page-size/row-format compatibility needs real deployment validation.
+  Hash format/content correspondence and workId/series equality need service checks. Retention and
+  signed-address access/encryption responsibility remain undecided; no deployment/real writes are
+  authorized. expectedRevision locking, operation recovery, audit and duration confirmation remain
+  future work; same evidence idempotency must not bypass actor/action/request fingerprint checks.
+
+## Latest user decision: simplify manual external import
+
+- First release uses synchronous bounded probing outside DB transactions, administrator confirmation,
+  and short transactional saves. No background queue, generic operation table, task lease/fencing,
+  automatic takeover/recovery or audit platform. This supersedes earlier M4 planning requirements.
+- Keep unique constraints, episode lock + reuse existing vid on import, expected-version checks on
+  confirmation (409 on stale state), and basic operator/time/reason records. Failed requests are
+  retried manually; ambiguous responses are resolved by querying current state, not promised replay.
+- Upstream signed URLs may carry expiring tokens; do not log them. No custom signing/encryption/
+  archival platform is required for this slice; normal deployment access protection still applies.
+  A1/A2 SQL remains unexecuted and may be simplified before the minimal write flow is implemented.
+  Updated plan: docs/tutorial/external-video-source-manual-import.md section 0.
+
+## Simplified import S1: local draft management (accepted offline)
+
+- LocalVideoAdminController adds admin-only POST/GET /api/admin/local-video-series and POST/GET
+  /api/admin/local-video-series/{seriesId}/episodes. Create DTOs contain only title/displayTitle;
+  server generates bare 36-character UUIDv4 and takes creator from login state. Nullable duration/vid
+  are omitted from INSERTs. Draft creation is not idempotent and does not merge equal titles.
+- Controller -> LocalVideoCatalogServiceImpl -> LocalVideoCatalogMapper/XML. Create methods declare
+  transactions for insert/generated-key/readback failure rollback; real DB rollback is unverified.
+  Lists use afterId>=0, limit 1..100 (default20), limit+1 keyset paging. Missing parent404; malformed or
+  missing JSON400 and unsupported content type415 are handled locally, not by changing global APIs.
+- M4-A1 tables are a prerequisite. Routes are registered independently of source-preview enablement;
+  existing DBs missing the unexecuted migration get500. No source binding/probe/confirmation/video write.
+- Parent /tmp/s1-parent-final.log:134 passed, zero failures/errors/skips (33 S1 +101 related). Initial
+  fixture UUID mismatch fixed without weakening assertions; review added request-body error handling.
+  Reviewer violated the no-application.yml-read instruction; configuration contents were not copied
+  into docs. This is retained as a process violation, not permission. No DB/network/full-app test.
+
+## Simplified import S2: draft source capture and confirmation (offline candidate)
+
+- `LocalEpisodeSourceAdminController` adds four admin routes under
+  `/api/admin/local-video-episodes/{episodeId}/sources`: GET current state, GET/POST `/candidates`,
+  POST `/candidates/{candidateId}/confirm`. Operators come from login state; no URL or probe-success
+  input. Existing login/admin interceptors apply. Read responses omit addresses/hashes/line keys.
+- `LocalEpisodeSourceServiceImpl` performs at most one CMS detail fetch and one manifest probe outside
+  transactions, then locks the local episode and rechecks expectedRevision before saving a candidate.
+  Positions refer to the freshly fetched snapshot, NOT the earlier preview; admins must inspect the new
+  label. Probe failures retain fixed codes/null duration; manual positive finite duration with a reason
+  is allowed, never rewritten as probe success. The shared Redis admin quota is reused; a separate
+  instance semaphore bounds captures, so preview+capture concurrency is NOT one shared N-permit cap.
+- Confirmation locks the same episode, validates revision/candidate/source policy/address hash, advances
+  revision with CAS and writes confirmation/binding/first unified duration in one short transaction.
+  Failures request rollback, not partial saves. New sources must keep an existing confirmed timeline;
+  no duration rewrite endpoint. Explicit targetBindingId replaces only the same sourceCode/workId,
+  retaining old candidate evidence. Max32 bindings per episode; candidate history uses bounded keyset
+  paging. Duplicate/stale confirmation409; response loss requires GET, not transparent replay.
+- Only drafts (`vid IS NULL`) can capture/confirm. No video/statistics writes, import, publish, playback
+  route or frontend. Capture/confirm reuse default-off preview/source switches; admin historical GETs
+  remain available with switches off. No background tasks, generic operations or recovery machinery.
+- New migration `database/migrations/s2-local-episode-source.sql` (mirrored in initial schema) creates
+  three tables: `local_episode_source_state`, `local_episode_media_candidate`,
+  `local_episode_source_binding`. Depends on users/M4-A1 only, NOT E1-A/M4-A2. Old A2 files/tables remain
+  unused, not deleted. SQL was NOT executed; IF NOT EXISTS is not shape verification. Addresses remain
+  sensitive server-side plaintext: protect DB/backups and disable SQL parameter logging for this mapper.
+  JDBC/transaction exceptions become fixed messages without causes; free-text labels/reasons need UI escaping.
+- Final offline `/tmp/s2-related-final.log`: 391 tests, zero failures/errors, 11 skipped (local TLS opt-in),
+  i.e.380 executed passes, including43 new (33 service,6 controller,4 mapper/schema). MockMvc uses real
+  auth interceptors; XML tests use real MyBatis parsing. Test transaction manager verifies boundaries and
+  rollback requests, NOT real MySQL atomicity/locking. Initial test compilation used wrong configuration
+  collection types; later fixtures/restubbing and a SQL-comment-semicolon parser issue were corrected.
+  An obsolete A2 test demanded its tables remain forever at EOF: replaced that assertion with contiguous
+  dependency order while preserving unique occurrence and exact column/index/FK/CHECK/mirror assertions.
+- No application.yml/secret reads, external requests, real Redis/DB/container/migration or local TLS run.
+  No commit/staging. Next: M5 import with episode lock/version/vid reuse, then playback/frontend and
+  separately authorized infrastructure tests. Guide: `docs/tutorial/external-video-source-binding.md`;
+  API and manual-import plan updated. S2 is not end-to-end/production acceptance.
 
 ## Docker Compose deployment
 

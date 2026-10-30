@@ -28,6 +28,16 @@ public class RedisKeyUtils {
         return RedisConstants.RATE_VIDEO_INTERACTION_ACTOR_PREFIX + actorHash;
     }
 
+    /**
+     * M3-B 外部来源预览的每管理员配额：目录与详情两个预览端点共用同一个键。
+     *
+     * <p>键里只有登录态 uid，不含 sourceCode、作品 ID、请求地址或任何上游内容，因此键空间是
+     * 有界的（管理员数量级），不会被上游数据放大。</p>
+     */
+    public static String rateExternalVideoSourcePreview(Integer uid) {
+        return RedisConstants.RATE_EXTERNAL_VIDEO_SOURCE_PREVIEW_PREFIX + uid;
+    }
+
     public static String categoryTree() {
         return RedisConstants.CATEGORY_PREFIX;
     }

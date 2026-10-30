@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.feibijiubi.backend.mapper.LocalEpisodeSourceMapper">
+    <!-- Keep SQL parameter logging disabled: address is a server-only signed credential. -->
+    <select id="lockEpisode" resultType="com.feibijiubi.backend.entity.LocalVideoEpisode" timeout="3">
+        SELECT id, duration_seconds, vid FROM local_video_episode WHERE id = #{id} FOR UPDATE
+    </select>
+    <select id="selectRevision" resultType="java.lang.Long" timeout="3">
+        SELECT revision FROM local_episode_source_state WHERE episode_id = #{episodeId}
+    </select>
+    <insert id="initializeState" timeout="3">
+        INSERT INTO local_episode_source_state (episode_id, revision) VALUES (#{episodeId}, 0)
+        ON DUPLICATE KEY UPDATE revision = revision
+    </insert>
+    <update id="advanceRevision" timeout="3">
+        UPDATE local_episode_source_state SET revision = revision + 1
+        WHERE episode_id = #{episodeId} AND revision = #{expected} AND revision &lt; 9223372036854775807
+    </update>
+    <insert id="insertCandidate" useGeneratedKeys="true" keyProperty="id" timeout="3">
+        INSERT INTO local_episode_media_candidate
+        (episode_id, expected_revision, target_binding_id, source_code, work_id, line_ordinal, entry_ordinal,
+         label, address, address_hash, probe_status, candidate_seconds, manifest_hash, captured_by)
+        VALUES (#{episodeId}, #{expectedRevision}, #{targetBindingId}, #{sourceCode}, #{workId},
+         #{lineOrdinal}, #{entryOrdinal}, #{label}, #{address}, #{addressHash}, #{probeStatus},
+         #{candidateSeconds}, #{manifestHash}, #{capturedBy})
+    </insert>
+    <select id="selectCandidate" resultType="com.feibijiubi.backend.entity.LocalEpisodeMediaCandidate" timeout="3">
+        SELECT * FROM local_episode_media_candidate WHERE episode_id = #{episodeId} AND id = #{id}
+    </select>
+    <select id="selectCandidates" resultType="com.feibijiubi.backend.entity.LocalEpisodeMediaCandidate" timeout="3">
+        SELECT * FROM local_episode_media_candidate WHERE episode_id = #{episodeId} AND id &gt; #{afterId}
+        ORDER BY id LIMIT #{limit}
+    </select>
+    <select id="selectBindings" resultType="com.feibijiubi.backend.entity.LocalEpisodeSourceBinding" timeout="3">
+        SELECT id, episode_id, candidate_id FROM local_episode_source_binding
+        WHERE episode_id = #{episodeId} ORDER BY id LIMIT 33
+    </select>
+    <insert id="insertBinding" useGeneratedKeys="true" keyProperty="id" timeout="3">
+        INSERT INTO local_episode_source_binding (episode_id, candidate_id) VALUES (#{episodeId}, #{candidateId})
+    </insert>
+    <update id="replaceBinding" timeout="3">
+        UPDATE local_episode_source_binding SET candidate_id = #{candidateId}
+        WHERE episode_id = #{episodeId} AND id = #{id}
+    </update>
+    <update id="confirmCandidate" timeout="3">
+        UPDATE local_episode_media_candidate SET confirmed_seconds = #{seconds}, confirmed_by = #{adminId},
+            confirmed_at = NOW(3), confirmation_reason = #{reason}
+        WHERE episode_id = #{episodeId} AND id = #{id} AND confirmed_at IS NULL
+    </update>
+    <update id="setDuration" timeout="3">
+        UPDATE local_video_episode SET duration_seconds = #{seconds}
+        WHERE id = #{episodeId} AND vid IS NULL
+    </update>
+</mapper>

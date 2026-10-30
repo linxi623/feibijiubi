@@ -4,6 +4,28 @@
 >
 > 文档只描述当前已经存在的接口；代码发生变化后，应同步更新本文档。
 
+## S2 新增：本地剧集来源候选与确认（离线候选，迁移未执行）
+
+统一前缀：`/api/admin/local-video-episodes/{episodeId}/sources`。全部管理员专用；写操作的操作者只从登录态获取。前置为M4-A1及`database/migrations/s2-local-episode-source.sql`，不依赖未使用的M4-A2表。已有库缺表会500，不能直接启用。
+
+| 方法 | 相对路径 | 用途 |
+| --- | --- | --- |
+| GET | 空 | 当前`revision`、`durationSeconds`、`bindings[{id,candidate}]` |
+| POST | `/candidates` | 事务外同步取详情/探测，短事务保存候选 |
+| GET | `/candidates?afterId=0&limit=20` | 历史候选数组，limit 1..100，按id keyset分页 |
+| POST | `/candidates/{candidateId}/confirm` | 锁剧集并核对版本，确认时长、新增/替换来源关联 |
+
+抓取请求：`{"sourceCode":"demo","workId":"7","lineOrdinal":1,"entryOrdinal":1,"expectedRevision":0,"targetBindingId":null}`。
+`workId`为1..191位无前导零正整数字符串；位置范围1..16/1..1000，只对应**本次新抓取快照**，不是历史预览的持久身份。返回后须人工核对label。targetBindingId为空新增，非空明确替换已有来源关联（sourceCode/workId不能改变）。不接受客户端URL或探测成功声明。
+
+确认请求：`{"expectedRevision":0,"durationSeconds":1250.5,"reason":"已人工核验该集统一时长"}`。秒数有限且>0，reason非空白且最多500字符。只接受属于该剧集的服务端候选；探测失败可人工核验填写，但不改写原失败状态。首次确认设置统一时长，后续来源必须采用相同时长；不允许通过此接口变更已确认时间轴。每剧集最多32条关联，已导入（vid非空）禁止草稿抓取/确认。
+
+候选字段：`id/episodeId/expectedRevision/targetBindingId/sourceCode/workId/lineOrdinal/entryOrdinal/label/probeStatus/candidateSeconds/capturedAt/confirmedSeconds/confirmedBy/confirmedAt/reason`。probeStatus为`SUCCEEDED/UNSUPPORTED_MANIFEST/FETCH_FAILED/PROBE_REJECTED`，失败时candidateSeconds为null。无地址、地址摘要、清单摘要或线路键字段；label/reason是需前端转义的自由文本。
+
+确认后revision加1；版本冲突/旧候选/重复确认返回409，不承诺透明幂等重放。响应丢失先GET当前状态/候选列表。GET不联网，不消耗配额；POST抓取消费与预览共享的Redis管理员配额（不退还），使用独立实例内并发限制，最多一详情请求和一媒体请求。确认不联网。抓取/确认受默认关闭的preview-enabled及source enabled控制，历史查询不受此开关限制。
+
+错误HTTP与业务code一致：400参数/JSON、401/403鉴权、404不存在、409冲突、415内容类型、429配额/并发、503关闭/策略缺失/Redis故障、502上游、500持久化。控制器在服务调用前设置no-store，不覆盖拦截器及绑定前失败。本片**无video创建、无发布/播放地址、无真实数据库验收**。详细步骤及敏感地址部署注意事项：[S2教程](tutorial/external-video-source-binding.md)。
+
 ## 0. Docker Compose 启动
 
 在项目根目录执行以下命令，可一次启动 MySQL、Redis、RabbitMQ 和 Spring Boot 后端：
@@ -155,6 +177,136 @@ dry-run 仍 `NOT_AUTHORIZED_FOR_DELETION`；旧消费者仍会放行旧事件，
 细节见 [容量核查教程](tutorial/video-status-capacity-audit.md) §9.3.1—§9.3.2。
 
 细节、容量公式与 noeviction 安全恢复见 [容量核查教程](tutorial/video-status-capacity-audit.md)。
+
+#### 外部视频源基础表（E1-A：**没有新增 HTTP 接口**）
+
+E1-A 是外部视频源接入（E0 契约仍为候选）里父代理单独批准的最小切片，只交付**两张空表**的 DDL 与离线结构测试：
+
+- **没有新增或修改任何 `/api/**` 路由、请求/响应字段或状态码**，也没有生产 Java / mapper / 配置 / 调度器改动，
+  因此这两张表当前在代码里既没有读写方，也没有可调用的入口；本文其余章节不受影响。
+- `video_source`（来源站）：`code` 大小写敏感唯一（`utf8mb4_bin`）；`enabled TINYINT NOT NULL DEFAULT 0`（**默认停用**）；
+  只有 `credential_ref VARCHAR(128) NULL` 这个凭据**引用名**，**不存任何凭据值**；
+  **没有** `active_job_id` / `active_job_expire_at`（源级租约留给后续切片），也**没有** `uid` / `owner_uid` / `created_by` 等归属列。
+- `video_source_series`（上游作品目录）：作品身份 = `(source_id, upstream_series_id)` **大小写敏感**唯一；
+  额外 `(source_id, id)` 唯一键只为将来的复合外键提供被引用键；外键只有 `series → video_source`，无 `ON DELETE CASCADE`；
+  **没有** `import_uid`。
+- `utf8mb4_bin` **大小写敏感，但不等于字节严格身份**：它是 **PAD SPACE** 排序规则，比较时忽略尾部空格，
+  所以 `'abc'` 与 `'abc '` 在两个唯一键上是同一行（第二次写入得到显式 1062 冲突，不是静默合并）。
+  因此后续导入必须**拒绝**首尾带空白的来源编码 / 上游作品 ID（显式报错、进人工处理），
+  **不得静默 trim 后合并**；本轮不改 collation（换 `utf8mb4_0900_bin` 需单独决定），也不实现任何校验代码。
+- `enabled` / `sync_state` 的取值用 `CHECK` 限定，但 **MySQL 8.0.16+** 才真正强制；更低版本会解析后静默忽略，
+  因此部署前提是 8.0.16+，且不得把 `CHECK` 当作唯一防线。
+- 本轮**未执行**任何迁移、未连库、未启动基础设施；`CREATE TABLE IF NOT EXISTS` 重跑安全，但**不校验旧表形状**，
+  执行后请按迁移文件末尾的只读 `information_schema.columns` 查询核对**列**（列名 / 类型 / 可空 / 默认值）；
+  该查询**只查列**，索引与外键请另用 `SHOW CREATE TABLE` 或 `information_schema.statistics` / `key_column_usage` 核对。
+- 未实现、也不得据此宣称：剧集/线路/地址/导入任务/审计等其它表、未知时长语义、播放与选集接口、
+  任何 CMS 兼容性。E1 整体仍未通过。
+
+迁移：`database/migrations/e1a-external-video-source-catalog.sql`（已镜像到 `database/feibijiubi.sql` 末尾）；
+离线结构测试：`ExternalVideoSourceCatalogSchemaTests`（只读两份 `.sql` 文本，不执行 SQL）。
+它是一组静态、有限的文本结构检查：钉住列集合、每列的类型/NULL/默认值、单列主键
+`INT NOT NULL AUTO_INCREMENT`、唯一键内部列序、单个外键、两个 `CHECK` 取值范围（比较时去掉全部空白）、
+`ENGINE=InnoDB` + `utf8mb4_unicode_ci` 表选项、`video_source` 先于 `video_source_series` 的建表顺序，
+以及迁移↔镜像一致。它**不**证明 MySQL 语义：DDL 是否被接受、CHECK 是否被强制、唯一键冲突行为都未验证；
+列声明顺序与 SQL 注释刻意不作为契约。本轮修复后未执行任何 Maven/测试，需父代理复跑。
+
+#### 外部视频 URL 语法策略（E2-A：没有新增 HTTP 接口）
+
+新增 `ExternalVideoUrlPolicy` 纯函数组件，当前没有业务调用方、Spring 注册或配置项。
+仅校验 HTTPS 与显式传入的精确域名/端口允许列表，保留签名 URL 原串，拒绝信息不包含原始地址。
+它不访问网络、不做 DNS 或重定向处理，也不构成完整 SSRF 防护；后续接线时需将拒绝异常转换为适当业务错误。
+父级离线验证为 URL 23 项 + E1-A 11 项，共 34 项通过；不代表 CMS 兼容、网络安全或真实播放验收。
+
+#### 苹果 CMS 离线解析（E2-B：没有新增 HTTP 接口）
+
+`AppleCmsJsonAdapter` 提供列表及单作品详情的有界 JSON 解析，无网络、Spring 注册、数据库写入或业务调用方。
+解析出的线路地址仍为 `UNVERIFIED`，不生成剧集 ID 或单集时长；快照序号不是持久身份。
+任一非法条目使整份响应失败，不返回部分成功页。上游 `class` 当前只限量检查、不输出完整分类字典；调用方还需核对详情作品 ID 与请求 ID。
+父级定向离线验证共 77 项通过（解析34、模型9、URL23、基础表11），不是实际播放或完整 CMS 兼容验收。
+
+#### IP/DNS 结果校验（E2-C1：没有新增 HTTP 接口）
+
+新增保守 IP 字节分类与受信 lookup 结果整批校验，仍无 Spring 注册或业务调用方。
+lookup 实现由调用方注入，可能联网；组件没有默认网络实现，也不创建 socket。
+混合公网/非公网结果整批拒绝。父级相关离线回归100项通过，不代表已实现连接期地址固定或完整 SSRF 防护。
+
+#### 受限 CMS HTTP 客户端（E2-C2：没有新增 HTTP 接口）
+
+`RestrictedCmsHttpClient` 仅构造批准 API base 的固定目录/详情 GET；无 Spring 注册或业务调用方。
+DNS 校验钩子直接交给连接管理器；保留严格 TLS，底层使用 `Proxy.NO_PROXY`，禁自动重定向/重试/认证/解压。
+仅接受200，响应上限512KiB；20秒总预算是协作检查，不是DNS/阻塞IO的硬截止。
+父级141项离线测试通过；实际socket目标、TLS/SNI、代理与关闭行为未做集成验证，不能视为完整SSRF验收。
+
+#### 本机 TLS 验证（E2-C3：没有新增 HTTP 接口）
+
+用户授权后，以 `-DvideoSourceLocalTls=true` 运行回环随机端口、临时证书测试：9项本机TLS用例及141项相关回归，共150项通过。
+验证了本机Host/SNI、正确/错误信任及主机名、禁止跳转、超限关闭、SOCKS旁路和测试服务清理。
+没有修改系统信任库或访问外网。DNS分类器在此套件中被测试替身替换，因此不构成完整SSRF、上游稳定性或浏览器播放验收。
+
+#### CMS 组合客户端（E2-D：没有新增 HTTP 接口）
+
+`AppleCmsSourceClient` 组合受限请求与解析，校验自报页码、指定分类时每条的分类 ID、详情作品 ID 精确一致；错配整份拒绝，不返回过滤后的部分结果。无入库、自动翻页或重试。
+`categoryId=null` 才表示不指定分类；`0` 仅作为合法数值，不推断上游含义。父分类展开为子分类不受支持；字段一致不证明响应真实性，空页也不能证明上游应用了分类条件。
+父级154项离线测试通过（新增13项）；未重复本机TLS或外网验证。没有增加播放或管理路由。
+
+#### M1：候选时长解析基础（没有新增接口）
+
+离线 HLS 媒体清单解析生成候选秒数、分片数和原始内容指纹；不下载分片/密钥、不探测网络、不确认或导入视频。管理员确认后才能进入后续导入流程。跨来源同内容映射同一本地剧集/vid，来源只提供线路，不自动按标题合并。父级190项离线测试通过，管理端映射/探测/确认接口仍未实现。
+
+#### M2：受限清单请求与探测组合（没有新增接口）
+
+`RestrictedManifestHttpClient` 使用显式传入的媒体地址策略，与 CMS 共用受限 GET 执行器；`HlsDurationProbe` 单次获取清单后解析候选时长。无递归master/分片/密钥获取。M2本身不做确认或入库；S2现经RestrictedExternalMediaProbe调用，显式使用来源媒体策略，外层服务保存候选并接受人工确认。
+
+抽取后父级重新验证：225项通过，包括11项本机TLS，日志 `/tmp/m2-parent-local-final.log`。本机实测签名路径/查询参数保留、固定Host/SNI和master拒绝；未访问外部源，不构成完整SSRF或实际播放验收。
+
+#### M3-A：批准源注册表（没有新增接口）
+
+配置及不可变注册表已实现，尚未Spring注册；默认预览关闭。使用部署字符串 `sourceCode`，不是数据库ID。API/media白名单独立，空媒体白名单无回退；并发/频率参数当前仅校验，尚未执行限流。初跑236项通过，审查修复后针对22项通过，无联网、DB或本机TLS重跑。
+
+#### M3-B：管理员外部源预览（已实现，默认关闭）
+
+沿用 `ApiResponse<T>`，需要登录且具备管理员权限：
+
+| GET 路径 | 参数 | data |
+| --- | --- | --- |
+| `/api/admin/video-sources` | 无 | `[{code,name}]` |
+| `/api/admin/video-sources/{sourceCode}/catalog` | `page=1`（1..100000）、可选非负 `categoryId` | `sourceCode,page,pageCount,total,items[{workIdentity,title,categoryId,categoryName}]` |
+| `/api/admin/video-sources/{sourceCode}/detail` | 必填规范正整数 `workId` 字符串（无前导零，最多191字符） | `sourceCode,workIdentity,title,categoryId,categoryName,hasDurationHint,lines[{lineIndex,entries[{entryIndex,label}]}]` |
+
+`sourceCode` 是部署配置引用键，不是DB ID；页码、分类和作品身份按已有CMS约束核对。位置从1开始，仅为本次快照展示，不是持久剧集/线路ID。`hasDurationHint` 不表示时长可信。标题、分类名及label是不可信文本，前端必须转义；不返回播放地址、封面外链、线路键或时长提示原文，但不保证自由文本本身不含URL。
+
+HTTP错误：未登录401、非管理员403；参数缺失/格式/取值错误400；来源不存在、禁用或不是批准引用键统一404；默认关闭503 `PREVIEW_DISABLED`；详情缺媒体允许列表503 `MEDIA_POLICY_REQUIRED`；并发/配额429；Redis失败503；上游传输/解析/自报字段错配502（固定文案）。不回显上游错误原文或URL。
+
+配置 `app.external-video-source`：`preview-enabled=false`；来源也默认disabled，最多32个；`max-concurrent-requests=2`（1..8，本实例）、`per-admin-requests-per-minute=30`（1..120，Redis跨实例同管理员共享60秒窗口）。目录和详情共用额度；参数/来源检查后才申请并发许可和消费额度，超并发不排队，失败释放许可但不返还已花额度。根列表不访问上游且不消耗额度。
+
+所有路由不写业务库/不创建视频，但目录详情会写Redis配额计数。控制器执行后响应带 `Cache-Control:no-store`，包括服务拒绝；拦截器提前返回401/403和绑定前错误不在此保证内。这些M3路由没有写入口；新增草稿探测/确认见本文S2，导入仍未实现。父级273项离线测试通过（`/tmp/m3b-parent-final.log`），没有真实上游或Redis端到端验收。
+
+#### M4-A1：本地身份表文件（没有新增接口）
+
+新增 `local_video_series` / `local_video_episode` 迁移及初始化SQL镜像，为多来源共享本地剧集/vid提供结构基础。该表文件切片当时无业务接线；后续S1已接草稿Mapper及接口，S2已接来源确认，导入仍未实现；没有执行SQL。25项静态结构测试通过（`/tmp/m4a1-parent-final2.log`），不代表真实MySQL约束或并发验收。
+
+#### M4-A2：来源证据与绑定历史表文件（没有新增接口）
+
+四表迁移 `m4a2-external-capture-binding.sql` 与初始化SQL镜像已完成，仅静态验收：42项通过（A2 17+A1 14+目录11，`/tmp/m4a2-parent-final.log`）。历史revision持有证据唯一约束；不可变历史仍须未来业务层维护，不是数据库禁止UPDATE/DELETE。未执行SQL，A2四表仍没有业务调用方。S2采用另一套三表简化方案，不使用A2；签名地址按最新决定采用常规数据库/备份权限保护，不建设自定义加密归档平台。不得把静态验收当作真实部署授权。
+
+#### S1：管理员本地作品／剧集草稿（已实现，数据库前置未执行）
+
+四个接口均需登录管理员，返回ApiResponse；独立于来源预览开关。使用前必须具备M4-A1两张表，缺表返回500。本轮未执行迁移。
+
+| 方法/路径 | 请求 | data |
+| --- | --- | --- |
+| POST `/api/admin/local-video-series` | JSON `{"title":"作品标题"}` | 作品VO |
+| GET `/api/admin/local-video-series` | `afterId=0&limit=20` | 分页VO |
+| POST `/api/admin/local-video-series/{seriesId}/episodes` | JSON `{"displayTitle":"第1集"}`，可用`{}`不设标题 | 剧集VO |
+| GET `/api/admin/local-video-series/{seriesId}/episodes` | `afterId=0&limit=20` | 分页VO |
+
+作品VO：`id,localIdentity,title,createdBy,createdAt`；剧集VO：`id,localIdentity,seriesId,displayTitle,vid,durationSeconds,createdBy,createdAt`。新增剧集的vid/durationSeconds为空，不能由请求赋值。createdBy来自登录态，不等于未来首次导入video的作者；localIdentity是服务器生成的36字符小写UUIDv4，无`m:`前缀。
+
+title必填非空，原文最多200字符；displayTitle可省略/null，原文最多255字符，非null时trim后不能为空。标题存储前trim，展示须转义。seriesId为正数；afterId>=0，limit为1..100。分页返回`items,afterId,limit,hasMore,nextAfterId`，按id升序，多取一条判断hasMore，末页nextAfterId=null。BIGINT id以JSON数字输出，客户端超过2^53时须无损解析。
+
+创建不是幂等：重复POST可产生两个空草稿，不按标题合并，但不创建video。操作失败或响应丢失后应先查询，不承诺请求重放。非法参数/缺请求体/错误JSON400，不支持Content-Type415，未登录401，非管理员403，父作品不存在404，数据库/插入回读异常500；不统一改成409。控制器执行后的响应no-store，权限拦截等前置错误不保证该头。仅声明创建事务，未做真实DB回滚测试。
+
+S1历史离线验收134项通过（`/tmp/s1-parent-final.log`，新增33项）。后续来源关联/探测确认见S2；S2确认后剧集查询的durationSeconds可非null。视频导入仍未实现。
 
 ### 1.5 常见业务状态码
 

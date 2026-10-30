@@ -402,3 +402,247 @@ CREATE TABLE video_interaction_window (
         FOREIGN KEY (vid) REFERENCES video (vid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     COMMENT='T15 交互滚动窗口表（同一 actor+vid+action 30 分钟最多计一次）';
+
+-- ============================================================================
+-- E1-A 外部视频源接入：最小基础表（仅新增两张表，不改既有表、不回填数据）
+-- 迁移：database/migrations/e1a-external-video-source-catalog.sql（幂等，只 CREATE TABLE IF NOT EXISTS）
+-- 本阶段刻意不含源级租约列（active_job_*）、作者归属列（uid/owner_uid/import_uid）与凭据值列。
+-- enabled / sync_state 的 CHECK 需要 MySQL 8.0.16+ 才真正强制。
+-- ============================================================================
+
+CREATE TABLE video_source (
+    id INT NOT NULL AUTO_INCREMENT COMMENT '来源站ID',
+    code VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL
+        COMMENT '站内稳定编码，人工指定；部署白名单的引用键，大小写敏感',
+    name VARCHAR(100) NOT NULL COMMENT '展示名',
+    adapter_type VARCHAR(32) NOT NULL COMMENT '适配器标识；具体取值由适配器注册表定义',
+    base_url VARCHAR(500) NOT NULL COMMENT '上游根地址；仅服务端使用，不对外返回',
+    enabled TINYINT NOT NULL DEFAULT 0 COMMENT '0=停用 1=启用；默认停用，需显式启用',
+    credential_ref VARCHAR(128) NULL
+        COMMENT '凭据引用名（部署配置中的名字）；NULL=无需凭据；禁止写入凭据值',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_video_source_code (code),
+    CONSTRAINT ck_video_source_enabled CHECK (enabled IN (0, 1))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    COMMENT='外部视频来源站：默认停用，无租约列，无作者归属，只存凭据引用名';
+
+CREATE TABLE video_source_series (
+    id INT NOT NULL AUTO_INCREMENT COMMENT '上游作品分组ID',
+    source_id INT NOT NULL COMMENT '来源站ID',
+    upstream_series_id VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL
+        COMMENT '上游作品稳定身份，必须来自上游持久标识；禁止用标题/序号/下标生成',
+    title_snapshot VARCHAR(255) NULL COMMENT '上游标题快照；仅展示，不是身份，可变',
+    mc_id VARCHAR(20) NULL COMMENT '本地主分区ID；NULL=尚未映射',
+    sc_id VARCHAR(20) NULL COMMENT '本地子分区ID；NULL=尚未映射',
+    cover_url_external VARCHAR(500) NULL COMMENT '上游外链封面；只由同步写，认领接口不得清空',
+    sync_state TINYINT NOT NULL DEFAULT 0 COMMENT '0=未同步 1=同步中 2=已同步 3=同步失败',
+    last_synced_at DATETIME NULL COMMENT '最近一次完成同步时间；从未同步为 NULL',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_video_source_series_identity (source_id, upstream_series_id),
+    UNIQUE KEY uk_video_source_series_source_id (source_id, id),
+    CONSTRAINT fk_video_source_series_source FOREIGN KEY (source_id) REFERENCES video_source (id),
+    CONSTRAINT ck_video_source_series_sync_state CHECK (sync_state IN (0, 1, 2, 3))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    COMMENT='上游作品目录：稳定身份唯一，无 import_uid（归属只在将来的导入任务行）';
+
+-- ============================================================================
+-- M4-A1 本地视频身份：最小两表（仅新增两张表，不改既有表、不写既有数据）
+-- 迁移：database/migrations/m4a1-local-video-identity.sql（幂等，只 CREATE TABLE IF NOT EXISTS）
+-- 本阶段刻意不含来源绑定列（source_id / upstream_series_id）与导入状态列
+-- （import_state / block_reason / cover_* / approved_* / probe_*）；绑定属尚未批准的 M4-A2。
+-- created_by 引用 users.id、vid 引用 video.vid，二者都是既有 INT 主键，必须先存在。
+-- duration_seconds 的 CHECK 需要 MySQL 8.0.16+ 才真正强制。
+-- ============================================================================
+
+CREATE TABLE local_video_series (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    local_identity CHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL
+        COMMENT '服务端随机 UUIDv4，规范小写 8-4-4-4-12；写入后不得 UPDATE；不是 title/order/url',
+    title VARCHAR(200) NOT NULL COMMENT '本地展示标题（管理员输入）；不是身份',
+    created_by INT NOT NULL COMMENT '创建者（管理员 uid），不是来源目录的 import_uid',
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_local_video_series_identity (local_identity),
+    CONSTRAINT fk_local_video_series_created_by FOREIGN KEY (created_by) REFERENCES users (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE local_video_episode (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    series_id BIGINT NOT NULL COMMENT '本地作品，不是 video_source_series',
+    local_identity CHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL
+        COMMENT '服务端随机 UUIDv4；写入后不得 UPDATE；不得由上游 ID/序号/标题/URL 生成',
+    display_title VARCHAR(255) NULL COMMENT '本地展示用；可变，不参与身份与唯一键',
+    duration_seconds DOUBLE NULL COMMENT '管理员确认后的统一时长；NULL=未确认。A1 没有写入者',
+    vid INT NULL COMMENT '导入后才写；NULL=未导入。类型必须与 video.vid 一致',
+    created_by INT NOT NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_local_video_episode_identity (local_identity),
+    UNIQUE KEY uk_local_video_episode_vid (vid),
+    KEY idx_local_video_episode_series (series_id, id),
+    CONSTRAINT fk_local_video_episode_series FOREIGN KEY (series_id) REFERENCES local_video_series (id),
+    CONSTRAINT fk_local_video_episode_vid FOREIGN KEY (vid) REFERENCES video (vid),
+    CONSTRAINT fk_local_video_episode_created_by FOREIGN KEY (created_by) REFERENCES users (id),
+    CONSTRAINT ck_local_video_episode_duration
+        CHECK (duration_seconds IS NULL OR duration_seconds > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- M4-A2 有界抓取证据 + 稳定绑定 + append-only 版本：四张表（仅新增，不改既有表、不写既有数据）
+-- 迁移：database/migrations/m4a2-external-capture-binding.sql（幂等，只 CREATE TABLE IF NOT EXISTS）
+-- 前置：users、E1-A 的 video_source / video_source_series、M4-A1 的两张本地表必须先存在。
+-- 本阶段没有抓取任务、没有探测 / 确认、没有写接口，也没有 operation / audit 表；不创建 video /
+-- video_status，不写 vid。保留期、访问控制与静态加密责任未决策，因此不接真实写入、不部署。
+-- address 可能内含签名 token：不声称库里没有明文 token，也不声称已加密；不建 address / address_hash 索引。
+-- 证据占用由 append-only 的 external_binding_revision 承担（UNIQUE(evidence_entry_id)），
+-- 但它不是数据库强制：无触发器、无权限约束，直连 SQL 仍可删除或改写，只是业务层永不删除。
+-- CHECK 需要 MySQL 8.0.16+ 才真正强制；IF NOT EXISTS 不等于结构校验。
+-- ============================================================================
+
+CREATE TABLE external_capture_snapshot (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    source_id INT NOT NULL,
+    source_series_id INT NOT NULL,
+    work_identity VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL
+        COMMENT '上游自报 workId 快照；服务层还须核对它等于所引用 series 行的 upstream_series_id',
+    line_count SMALLINT NOT NULL COMMENT '本次线路数 1..16（解析器上限 16 线）',
+    entry_count INT NOT NULL COMMENT '本次实际落库条目数 1..16000；须与落库行数同事务核对',
+    entry_payload_hash CHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL
+        COMMENT '规范化条目集合的 SHA-256；不是签名，不是内容真实性证明',
+    captured_by INT NOT NULL COMMENT '发起抓取的管理员；不是 episode owner',
+    captured_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_external_capture_snapshot_scope (source_id, source_series_id, id),
+    CONSTRAINT fk_external_capture_snapshot_series FOREIGN KEY (source_id, source_series_id)
+        REFERENCES video_source_series (source_id, id),
+    CONSTRAINT fk_external_capture_snapshot_work FOREIGN KEY (source_id, work_identity)
+        REFERENCES video_source_series (source_id, upstream_series_id),
+    CONSTRAINT fk_external_capture_snapshot_by FOREIGN KEY (captured_by) REFERENCES users (id),
+    CONSTRAINT ck_external_capture_snapshot_line_count CHECK (line_count BETWEEN 1 AND 16),
+    CONSTRAINT ck_external_capture_snapshot_entry_count CHECK (entry_count BETWEEN 1 AND 16000)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE external_capture_entry (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    snapshot_id BIGINT NOT NULL,
+    source_id INT NOT NULL,
+    source_series_id INT NOT NULL,
+    line_ordinal SMALLINT NOT NULL COMMENT '本次快照内线路位置（1 起）；仅本次证据定位，不是跨快照身份',
+    entry_ordinal SMALLINT NOT NULL COMMENT '本线路内条目位置（1 起）；仅本次证据定位',
+    line_key VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL
+        COMMENT '上游线路键快照；宽度对齐 AppleCmsJsonAdapter.MAX_LINE_KEY_LENGTH=191；server-only',
+    label VARCHAR(255) NULL COMMENT '上游标签快照；对齐 MAX_EPISODE_LABEL_LENGTH=255；不可信文本，需转义',
+    address VARCHAR(2048) NOT NULL
+        COMMENT '原始地址，可能内含签名 token；宽度对齐 MAX_PLAY_ADDRESS_LENGTH=2048（字符不是字节）；server-only，不返前端/不写日志/不写 audit',
+    address_hash CHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    format VARCHAR(16) NULL COMMENT 'HLS / MP4 / UNKNOWN；不凭后缀判定',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_external_capture_entry_position (snapshot_id, line_ordinal, entry_ordinal),
+    UNIQUE KEY uk_external_capture_entry_scope (id, source_id, source_series_id),
+    CONSTRAINT fk_external_capture_entry_snapshot FOREIGN KEY (source_id, source_series_id, snapshot_id)
+        REFERENCES external_capture_snapshot (source_id, source_series_id, id),
+    CONSTRAINT ck_external_capture_entry_line_ordinal CHECK (line_ordinal BETWEEN 1 AND 16),
+    CONSTRAINT ck_external_capture_entry_entry_ordinal CHECK (entry_ordinal BETWEEN 1 AND 1000)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE external_episode_binding (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    binding_uid CHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL
+        COMMENT '服务端生成规范小写 UUIDv4；稳定 id；重指向不变；禁止 UPDATE',
+    local_episode_id BIGINT NOT NULL
+        COMMENT '归属本地剧集；写入后不得 UPDATE —— 换剧集必须新建 binding',
+    source_id INT NOT NULL,
+    source_series_id INT NOT NULL,
+    active TINYINT NOT NULL DEFAULT 1 COMMENT '1=当前有效 0=已撤销；撤销不删行、不释放证据占用',
+    bound_by INT NOT NULL,
+    bound_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_external_episode_binding_uid (binding_uid),
+    UNIQUE KEY uk_external_episode_binding_scope (id, source_id, source_series_id),
+    KEY idx_external_episode_binding_episode (local_episode_id, active, id),
+    CONSTRAINT fk_external_episode_binding_episode FOREIGN KEY (local_episode_id)
+        REFERENCES local_video_episode (id),
+    CONSTRAINT fk_external_episode_binding_series FOREIGN KEY (source_id, source_series_id)
+        REFERENCES video_source_series (source_id, id),
+    CONSTRAINT fk_external_episode_binding_by FOREIGN KEY (bound_by) REFERENCES users (id),
+    CONSTRAINT ck_external_episode_binding_active CHECK (active IN (0, 1))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE external_binding_revision (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    binding_id BIGINT NOT NULL,
+    revision_no INT NOT NULL COMMENT '1 起、按采用顺序递增；current = MAX(revision_no)',
+    source_id INT NOT NULL,
+    source_series_id INT NOT NULL,
+    evidence_entry_id BIGINT NOT NULL COMMENT '本版本采用的证据；全局 UNIQUE，即永久占用',
+    adopted_by INT NOT NULL,
+    adopted_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_external_binding_revision_no (binding_id, revision_no),
+    UNIQUE KEY uk_external_binding_revision_evidence (evidence_entry_id),
+    CONSTRAINT fk_external_binding_revision_binding FOREIGN KEY (binding_id, source_id, source_series_id)
+        REFERENCES external_episode_binding (id, source_id, source_series_id),
+    CONSTRAINT fk_external_binding_revision_entry FOREIGN KEY (evidence_entry_id, source_id, source_series_id)
+        REFERENCES external_capture_entry (id, source_id, source_series_id),
+    CONSTRAINT fk_external_binding_revision_by FOREIGN KEY (adopted_by) REFERENCES users (id),
+    CONSTRAINT ck_external_binding_revision_no CHECK (revision_no >= 1)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- S2 simplified synchronous draft binding; separate from unused M4-A2 history tables.
+CREATE TABLE IF NOT EXISTS local_episode_source_state (
+    episode_id BIGINT NOT NULL,
+    revision BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (episode_id),
+    CONSTRAINT fk_local_source_state_episode FOREIGN KEY (episode_id) REFERENCES local_video_episode (id),
+    CONSTRAINT ck_local_source_state_revision CHECK (revision >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS local_episode_media_candidate (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    episode_id BIGINT NOT NULL,
+    expected_revision BIGINT NOT NULL,
+    target_binding_id BIGINT NULL COMMENT 'Explicit replacement target; checked under episode lock, never inferred from position',
+    source_code VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    work_id VARCHAR(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    line_ordinal SMALLINT NOT NULL,
+    entry_ordinal SMALLINT NOT NULL,
+    label VARCHAR(255) NOT NULL,
+    address VARCHAR(2048) NOT NULL COMMENT 'Server-only original signed address; no logs/API exposure',
+    address_hash CHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    probe_status VARCHAR(32) NOT NULL,
+    candidate_seconds DOUBLE NULL,
+    manifest_hash CHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL,
+    captured_by INT NOT NULL,
+    captured_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    confirmed_seconds DOUBLE NULL,
+    confirmed_by INT NULL,
+    confirmed_at DATETIME(3) NULL,
+    confirmation_reason VARCHAR(500) NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_local_candidate_scope (episode_id, id),
+    CONSTRAINT fk_local_candidate_episode FOREIGN KEY (episode_id) REFERENCES local_video_episode (id),
+    CONSTRAINT fk_local_candidate_captured_by FOREIGN KEY (captured_by) REFERENCES users (id),
+    CONSTRAINT fk_local_candidate_confirmed_by FOREIGN KEY (confirmed_by) REFERENCES users (id),
+    CONSTRAINT ck_local_candidate_revision CHECK (expected_revision >= 0),
+    CONSTRAINT ck_local_candidate_position CHECK (line_ordinal BETWEEN 1 AND 16 AND entry_ordinal BETWEEN 1 AND 1000),
+    CONSTRAINT ck_local_candidate_seconds CHECK (candidate_seconds IS NULL OR candidate_seconds > 0),
+    CONSTRAINT ck_local_candidate_confirmation CHECK (confirmed_seconds IS NULL OR confirmed_seconds > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS local_episode_source_binding (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    episode_id BIGINT NOT NULL,
+    candidate_id BIGINT NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_local_binding_candidate (candidate_id),
+    KEY idx_local_binding_episode (episode_id, id),
+    CONSTRAINT fk_local_binding_candidate FOREIGN KEY (episode_id, candidate_id)
+        REFERENCES local_episode_media_candidate (episode_id, id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  S1：本地作品/剧集的最小读写 SQL（管理员同步创建 + keyset 分页）。
+
+  刻意保持的形态：
+    * 只有两条 INSERT 和五条 SELECT，没有 UPDATE / DELETE：本片没有修改、删除、导入、合并入口；
+    * INSERT 在列级省略 created_at / updated_at，由数据库 DEFAULT CURRENT_TIMESTAMP(3) 填写，
+      应用层不写时间戳，因此不需要（也不允许）用 JVM 时钟伪造创建时间；
+    * local_video_episode 的 INSERT 列清单里没有 duration_seconds 和 vid：两列由数据库 NULL 默认值决定，
+      服务层没有赋值入口，请求体也无法提供 —— 这是“当前恒为 NULL”的落地方式；
+    * 分页一律 id > #{afterId} ORDER BY id LIMIT #{limit}，剧集再加 series_id 等值条件，
+      不用 OFFSET，LIMIT 是绑定参数而不是拼接字符串；
+    * 不联表 video / video_status / 任何来源表，也不写统计账本。
+
+  唯一键（local_identity、vid）和外键（series_id → local_video_series.id）是最终防线。
+-->
+<mapper namespace="com.feibijiubi.backend.mapper.LocalVideoCatalogMapper">
+
+    <insert id="insertSeries" useGeneratedKeys="true" keyProperty="id" timeout="3">
+        INSERT INTO local_video_series(
+            local_identity,
+            title,
+            created_by
+        ) VALUES (
+            #{localIdentity},
+            #{title},
+            #{createdBy}
+        )
+    </insert>
+
+    <select id="selectSeriesById"
+            resultType="com.feibijiubi.backend.entity.LocalVideoSeries"
+            timeout="3">
+        SELECT id,
+               local_identity,
+               title,
+               created_by,
+               created_at,
+               updated_at
+        FROM local_video_series
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectSeriesAfter"
+            resultType="com.feibijiubi.backend.entity.LocalVideoSeries"
+            timeout="3">
+        SELECT id,
+               local_identity,
+               title,
+               created_by,
+               created_at,
+               updated_at
+        FROM local_video_series
+        WHERE id &gt; #{afterId}
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <insert id="insertEpisode" useGeneratedKeys="true" keyProperty="id" timeout="3">
+        INSERT INTO local_video_episode(
+            series_id,
+            local_identity,
+            display_title,
+            created_by
+        ) VALUES (
+            #{seriesId},
+            #{localIdentity},
+            #{displayTitle},
+            #{createdBy}
+        )
+    </insert>
+
+    <select id="selectEpisodeById"
+            resultType="com.feibijiubi.backend.entity.LocalVideoEpisode"
+            timeout="3">
+        SELECT id,
+               series_id,
+               local_identity,
+               display_title,
+               duration_seconds,
+               vid,
+               created_by,
+               created_at,
+               updated_at
+        FROM local_video_episode
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectEpisodesAfter"
+            resultType="com.feibijiubi.backend.entity.LocalVideoEpisode"
+            timeout="3">
+        SELECT id,
+               series_id,
+               local_identity,
+               display_title,
+               duration_seconds,
+               vid,
+               created_by,
+               created_at,
+               updated_at
+        FROM local_video_episode
+        WHERE series_id = #{seriesId}
+          AND id &gt; #{afterId}
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+</mapper>
