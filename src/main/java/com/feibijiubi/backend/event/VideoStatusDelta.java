@@ -1,6 +1,6 @@
 package com.feibijiubi.backend.event;
 
-import com.feibijiubi.backend.entity.VideoStatusConsumedEvent;
+import com.feibijiubi.backend.videostats.entity.VideoStatusConsumedEvent;
 
 public record VideoStatusDelta(
         long playDelta,

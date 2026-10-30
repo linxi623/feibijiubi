@@ -2,7 +2,7 @@ package com.feibijiubi.backend.user.service.impl;
 
 import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.video.mapper.VideoMapper;
-import com.feibijiubi.backend.mapper.VideoStatusMapper;
+import com.feibijiubi.backend.videostats.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.service.storage.FileStorageService;
 import com.feibijiubi.backend.user.converter.UserConverter;
 import com.feibijiubi.backend.user.dto.UserChangePasswordDTO;

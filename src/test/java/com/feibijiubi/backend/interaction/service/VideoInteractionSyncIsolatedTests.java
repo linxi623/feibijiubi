@@ -1,13 +1,13 @@
 package com.feibijiubi.backend.interaction.service;
 
 import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.config.VideoStatusProperties;
-import com.feibijiubi.backend.entity.VideoStatus;
+import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
+import com.feibijiubi.backend.videostats.entity.VideoStatus;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
 import com.feibijiubi.backend.event.VideoStatusEventType;
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionServiceImpl;
-import com.feibijiubi.backend.service.video.videostatus.VideoStatusService;
-import com.feibijiubi.backend.service.video.VideoStatusIsolatedIntegrationTests;
+import com.feibijiubi.backend.videostats.service.VideoStatusService;
+import com.feibijiubi.backend.videostats.service.VideoStatusIsolatedIntegrationTests;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -78,8 +78,10 @@ class VideoInteractionSyncIsolatedTests {
     @EnableAutoConfiguration(excludeName =
             "org.redisson.spring.starter.RedissonAutoConfigurationV2")
     @EnableConfigurationProperties(VideoStatusProperties.class)
-    // R3：交互 mapper 已迁到 com.feibijiubi.backend.interaction.mapper，旧扫描范围保持不变，只追加新包。
-    @MapperScan({"com.feibijiubi.backend.mapper", "com.feibijiubi.backend.interaction.mapper"})
+    // R3：交互 mapper 在 com.feibijiubi.backend.interaction.mapper。
+    // R4：统计 mapper 迁到 videostats.mapper，旧 com.feibijiubi.backend.mapper 已无接口，
+    // 该扫描项按等价集合改为 videostats.mapper（不是缩小扫描范围）。
+    @MapperScan({"com.feibijiubi.backend.videostats.mapper", "com.feibijiubi.backend.interaction.mapper"})
     @Import(VideoInteractionServiceImpl.class)
     static class TestApplication {
         /**

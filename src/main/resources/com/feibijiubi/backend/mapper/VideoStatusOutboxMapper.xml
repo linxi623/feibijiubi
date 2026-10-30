@@ -13,7 +13,7 @@
                            避免“每秒永久重投”同时不挤占发布/租约预算。
   T07：所有语句加 timeout=3（秒），慢 SQL 由 MyBatis 打断，不把调度线程挂在数据库上。
 -->
-<mapper namespace="com.feibijiubi.backend.mapper.VideoStatusOutboxMapper">
+<mapper namespace="com.feibijiubi.backend.videostats.mapper.VideoStatusOutboxMapper">
     <insert id="insert" useGeneratedKeys="true" keyProperty="id" timeout="3">
         INSERT INTO video_status_outbox(
             event_id,
@@ -35,7 +35,7 @@
     </insert>
 
     <select id="selectPendingForUpdate"
-            resultType="com.feibijiubi.backend.entity.VideoStatusOutbox"
+            resultType="com.feibijiubi.backend.videostats.entity.VideoStatusOutbox"
             timeout="3">
         SELECT id,
                event_id,

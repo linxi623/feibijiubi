@@ -2,26 +2,26 @@ package com.feibijiubi.backend.interaction.service;
 
 import com.feibijiubi.backend.config.RedisScriptConfig;
 import com.feibijiubi.backend.interaction.config.VideoInteractionProperties;
-import com.feibijiubi.backend.config.VideoStatusProperties;
-import com.feibijiubi.backend.entity.VideoStatus;
+import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
+import com.feibijiubi.backend.videostats.entity.VideoStatus;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
 import com.feibijiubi.backend.event.VideoStatusEventType;
-import com.feibijiubi.backend.mq.VideoStatusBatchFlushScheduler;
-import com.feibijiubi.backend.mq.VideoStatusDirtyRecoveryScheduler;
-import com.feibijiubi.backend.mq.VideoStatusEventConsumer;
-import com.feibijiubi.backend.mq.VideoStatusOutboxRelay;
-import com.feibijiubi.backend.mq.VideoStatusStatus0CompensationScheduler;
+import com.feibijiubi.backend.videostats.mq.VideoStatusBatchFlushScheduler;
+import com.feibijiubi.backend.videostats.mq.VideoStatusDirtyRecoveryScheduler;
+import com.feibijiubi.backend.videostats.mq.VideoStatusEventConsumer;
+import com.feibijiubi.backend.videostats.mq.VideoStatusOutboxRelay;
+import com.feibijiubi.backend.videostats.mq.VideoStatusStatus0CompensationScheduler;
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionActorResolver;
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionAdmissionServiceImpl;
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionCleanupScheduler;
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionRateLimitServiceImpl;
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionServiceImpl;
 import com.feibijiubi.backend.service.video.baseline.VideoInteractionAdmissionBaselineSummary;
-import com.feibijiubi.backend.service.video.videostatus.VideoStatusService;
+import com.feibijiubi.backend.videostats.service.VideoStatusService;
 import com.feibijiubi.backend.utils.JsonUtils;
 import com.feibijiubi.backend.utils.redis.RedisUtils;
 import com.feibijiubi.backend.interaction.vo.VideoInteractionVO;
-import com.feibijiubi.backend.service.video.VideoStatusIsolatedIntegrationTests;
+import com.feibijiubi.backend.videostats.service.VideoStatusIsolatedIntegrationTests;
 import com.feibijiubi.backend.video.service.PublishedVideoGuard;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -160,8 +160,10 @@ class VideoInteractionAdmissionBaselineIsolatedTests {
             "org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration"
     })
     @EnableConfigurationProperties({VideoStatusProperties.class, VideoInteractionProperties.class})
-    // R3：交互/视频 mapper 已按模块迁走，旧扫描范围保持不变，只追加新包。
-    @MapperScan({"com.feibijiubi.backend.mapper", "com.feibijiubi.backend.video.mapper",
+    // R3：交互/视频 mapper 已按模块迁走。
+    // R4：统计 mapper 迁到 videostats.mapper，旧 com.feibijiubi.backend.mapper 已无接口，
+    // 该扫描项按等价集合改为 videostats.mapper（不是缩小扫描范围）。
+    @MapperScan({"com.feibijiubi.backend.videostats.mapper", "com.feibijiubi.backend.video.mapper",
             "com.feibijiubi.backend.interaction.mapper"})
     @Import({RedisScriptConfig.class,
             PublishedVideoGuard.class,

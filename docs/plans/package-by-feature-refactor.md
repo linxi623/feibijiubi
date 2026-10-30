@@ -44,9 +44,9 @@ Lua、测试fixture、SQL迁移路径不变。R6只有在不修改敏感配置�
 | R0 | 基线、范围清单、风险清单 | 父级处理，无业务改动 | 干净提交、测试数字、敏感/产物排除 | 已完成 |
 | R1 | 外部视频源＋本地身份归位 | videosource及video.local；其他代码仅修受影响引用 | HTTP权限/响应不变、受限客户端语义、两Mapper绑定、旧包残留 | 已离线验收并合入29ff843 |
 | R2 | 用户与鉴权 | user/auth及必要引用；共享类不强行搬入某个业务 | Login/Admin拦截器装配、Token/用户接口、Bean名稳定 | 父级离线验收通过，已本地提交`e451467`并fast-forward合入主工作区（未推送远程） |
-| R3 | 视频、分类、审核、互动 | video/interaction及必要引用 | 发布可用性守卫、原事务/幂等/限流、Mapper绑定 | 父级离线验收通过，纳入本批本地提交（见R3验收记录） |
-| R4 | 视频统计流水线 | videostats以及专属配置/事件/MQ/指标 | 队列名/消息序列化类型头、锁/事务/调度器Bean名、旧包兼容风险 | R3已验收，准备派发；先过消息类型兼容闸门 |
-| R5 | 通用能力收口 | shared/infrastructure/全局装配 | 避免新的大杂烩、全局异常/脚本/存储Bean仍可装配 | 待R4验收 |
+| R3 | 视频、分类、审核、互动 | video/interaction及必要引用 | 发布可用性守卫、原事务/幂等/限流、Mapper绑定 | 父级离线验收通过，本地提交`0215ce4`并fast-forward合入主工作区（见R3验收记录） |
+| R4 | 视频统计流水线 | videostats以及专属配置/MQ/指标 | 队列名/消息序列化类型头、锁/事务/调度器Bean名、旧包兼容风险 | 父级离线验收通过，纳入本批本地提交；`event`包按消息协议例外保留 |
+| R5 | 通用能力收口 | shared/infrastructure/全局装配 | 避免新的大杂烩、全局异常/脚本/存储Bean仍可装配 | R4已验收，准备派发 |
 | R6 | 全局扫描、目录说明、最终验收 | 空目录/残留引用/架构测试/文档 | 测试数量守恒、包路径一致、XML解析装配、打包和运行边界说明 | 待R5验收 |
 
 分批不是并行写入：R2+都须基于前一批父级接受后的结果，不从同一个旧HEAD并行迁移交叉引用。
@@ -137,6 +137,7 @@ MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o \
 - 历史失败补查：`layout-r2-worker-compile-1.log`为3个测试尚未迁包导致同包类无法解析；`compile-2.log`为ResponseConverterTests缺少迁移后的UserConverter import。候选已分别迁移测试包、补充import，父级核对修复位置；后续编译与回归成功。此前runner退出3221226505的运行故障原因仍未查明，不能由重试成功认定已根治。离线clean插件缺失记录保留，不宣称clean命令通过。父级审计脚本初次因Windows默认GBK读取UTF-8映射失败，显式UTF-8后完成，不涉及业务测试失败。
 - 审查备注处理：保留既有无用import及util命名，不夹带风格清理；`src/test/resources/video-status-isolated.properties`对旧mapper包的WARN日志配置未覆盖迁移后的user.mapper，留R6统一补齐并验证，真实opt-in运行仍未验收。
 - 本批仅离线验收，不代表应用启动、真实MySQL/Redis/RabbitMQ/TLS或生产验收；未读application.yml，未联网、未执行迁移。父级按用户授权单独本地提交本批并fast-forward集成，不推送远程。
+- R3本地提交：`0215ce4`（`refactor: group video and interaction by feature`），已fast-forward合入主工作区，未推送远程；R4即以该提交为基线。
 
 ### R3 执行记录（执行侧自验，非父级验收）
 
@@ -166,3 +167,35 @@ MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o \
 - 父级复跑离线`test-compile`及普通回归通过：1174项、0失败/错误、228跳过，946项执行通过；日志`/tmp/layout-r3-parent-compile.log`、`/tmp/layout-r3-parent-full.log`。逐方法对比R2/R3 Surefire XML并规范化迁移类名：1162项原测试全部保留、结果不变，只新增12项。
 - 父级核查执行侧历史编译失败位置与对应import/跨包可见性修复。新增绑定测试曾错误要求updateVideo声明parameterType，实际XML未声明，删除该新增错误断言未修改任何既有断言；保留逐statement绑定验证，不额外把未声明类型固定为Object（当前解析结果为null）。历史失败日志保留，未以最终通过抹去失败。
 - 父级验收仅限离线；真实数据库/Redis/RabbitMQ/TLS、应用启动和生产行为未验证，不读取application.yml、不访问基础设施。按用户授权单独本地提交并fast-forward集成，不推送远程。
+
+### R4 执行记录（执行侧自验，非父级验收）
+
+- 工作树：`D:/feibijiubi/backend-layout-r4`，干净 detached 基线`0215ce4`（R3 父级提交，已合入主工作区）。本批只在该工作树写入，未 stage/commit/push，未改动主工作区与 R1–R3 工作树，未再委派，未读取 `application.yml`，未联网、未启动应用/容器/数据库/MQ、未执行迁移。
+- **消息协议闸门（先审计后迁移）**：`VideoStatusRabbitConfig#rabbitMessageConverter` 是应用内唯一 `MessageConverter`（`Jackson2JsonMessageConverter` + `DefaultJackson2JavaTypeMapper`，`setTrustedPackages("*")`，无 `idClassMapping`），Spring Boot `RabbitTemplateConfigurer` 用 `getIfUnique()` 把它装到自动配置的 `RabbitTemplate`，因此 `VideoStatusEventPublisher` 的 `convertAndSend` 会写入 `__TypeId__=com.feibijiubi.backend.event.VideoStatusChangedEvent`。消费端 `@RabbitListener` 的 `(org.springframework.amqp.core.Message, Channel)` 参数在容器适配器里不算 payload 参数（`isEligibleParameter` 排除），converter 因此按 `__TypeId__` 解析类；类不存在时实测抛 `MessageConversionException: failed to resolve class name. Class not found` → `ListenerExecutionFailedException`，业务 handler 不会被调用，配合 `defaultRequeueRejected=false` + 主队列 DLX 会被直接拒进死信。测试先行探针日志`/tmp/r4-probe2.log`。结论：迁移该 record 的包会改变出站类型头并破坏在途/滚动期消息。已按闸门要求上报证据与 A/B/C 方案，**父级裁定 A**：`event` 三个类（`VideoStatusChangedEvent`/`VideoStatusEventType`/`VideoStatusDelta`）保留原路径与 FQCN，本轮不迁、不加别名类、不加 `idClassMapping`、不改 converter/`trustedPackages`/队列、不排空或操作真实消息；R6 也保留该例外，后续协议迁移另行设计/授权。未选方案 B 关于 `idClassMapping` 反向映射的说法本轮未验证，不记为已证事实。
+- 范围与映射：迁移80个生产Java＋63个测试Java；逐文件旧→新路径/FQCN、归属裁定、非机械改动、`@MapperScan`/opt-in 审计、例外与遗留项全部列在`docs/refactoring/r4-package-map.json`（先写映射再迁移，迁移后回填实际改动）。
+  - `videostats`子包：`config`（5：`VideoStatusProperties`/`VideoStatusRabbitConfig`/`VideoStatusMetricsConfig`/`VideoStatusRuntimeRoles`/`VideoStatusSchedulingConfig`）、`controller`（5）、`dto`（3）、`entity`（6）、`enums`（2：`VideoStatusConsumeProcessStatus`/`RegistrationResult`）、`mapper`（6）、`metrics`（3，含只读`VideoStatusMetricsMapper`）、`mq`（10＋`RabbitConstants`）、`service`（11）、`service.impl`（9）、`service.admin`（6）、`vo`（6）、`support.VideoStatusCounterRange`、`exception`（6：3个`VideoStatus*`异常＋`RetryableMessageException`/`NonRetryableMessageException`/`RepairRequiredMessageException`）。
+  - 父级边界裁定执行：边界1 `RabbitConstants` 迁`videostats.mq`（常量值/队列/交换机/路由键/头名/监听器 id 一字未改）；边界2 三个消息异常经逐个核对引用（只服务统计消息解析、分类与重试/死信/人工修复语义，无跨业务消费者）后一并迁`videostats.exception`，未改继承、抛出/捕获、重试与错误处理行为；四个`VideoStatus`专属 support/exception 按拟定归属迁移。
+  - 测试随模块迁移并保持类名/断言/opt-in 条件：`config`3、`controller`5、`metrics`3、`mq`4、`service.admin`3、`service`37、`capacity`7（统计容量审计工具，测试专用）、`support`1；两个同名`VideoStatusSchedulingIsolationTests`分别落在`videostats.config`与`videostats.service`，不重命名、不合并。
+- 逐文件正文核对：80＋63个迁移文件与`git show 0215ce4:旧路径`在不计 package/import 行后正文一致；唯一例外是13个文件中的扫描范围/namespace 字面量/Javadoc FQCN（已在映射文件逐条列明），另加2处因拆包新增的同包→跨包 import（`VideoStatusCounterRange`与其测试）。改动但未迁移的16个 Java 文件里，10个只改 import；1个只改 Javadoc（`interaction/config/VideoInteractionCleanupSchedulingConfig` 的 `VideoStatusSchedulingConfig` FQCN）；5个改 import、`@MapperScan` 扫描项与注释（互动隔离测试）。
+- Mapper XML：7个统计 XML 只改 namespace/resultType/resultMap type，物理路径仍在`src/main/resources/com/feibijiubi/backend/mapper/`；`mybatis.mapper-locations`（`application.yml.example` 中可见，未读 `application.yml`）因此保持有效；已审计的非敏感源码与示例配置未发现`type-aliases-package`（未读取真实application.yml），XML 全部使用 FQCN。SQL 文本、语句 id、resultMap 结构未改。
+- 扫描/反射审计：主代码无`@MapperScan`，mapper 由 `@SpringBootApplication` 根包的 `@Mapper` 自动扫描注册（`videostats.mapper` 仍在根包下）；R4 后旧包`com.feibijiubi.backend.mapper`已无任何接口，空目录已删除。15处字符串 `@MapperScan` 更新（14处把旧包项按等价集合改为`videostats.mapper`，1处`VideoStatusCounterTransactionTests`追加该包），4处`basePackageClasses`按接口引用自动跟随；无`Class.forName`/反射包名依赖。5个互动隔离测试对`VideoStatusIsolatedIntegrationTests`的引用与互动调度配置 Javadoc 的 FQCN 已同步（R3 验收记录的必备项）。
+- 新增DB-free测试9项（不连数据库、不启动Web容器/broker）：`videostats.mapper.VideoStatusMapperBindingTests`（3：真实 MyBatis 解析6个XML→新namespace、逐方法 MappedStatement、resultType/resultMap 指向迁移后实体与 admin 行类型、根包扫描含6个统计 mapper 且旧 FQCN 类不存在）、`videostats.metrics.VideoStatusMetricsMapperBindingTests`（2：namespace/语句/`resultType`仍为 Integer/Long）、`videostats.config.VideoStatusRabbitMessageTypeHeaderTests`（4：出站`__TypeId__`固定为原 FQCN、携带原 FQCN 的在途消息仍能反序列化回事件对象、不存在的类名仍失败、converter 未新增 idClassMapping 且消息体不含包名）。
+- 验证（离线、串行、约束堆；日志保留在`/tmp`）：
+  - `rm -rf target` 后全量 `test-compile`：258个生产源文件＋132个测试源文件（129基线＋3新增），BUILD SUCCESS；日志`/tmp/layout-r4-final-compile.log`。离线`maven-clean-plugin`仍不可用，用删除`target/`代替，不宣称 clean 命令通过。
+  - 相关测试820项，0失败/错误，217跳过；日志`/tmp/layout-r4-final-related.log`。
+  - 新增测试9项，0失败/错误/跳过；日志`/tmp/layout-r4-new-tests-1.log`。
+  - 普通回归1183项、0失败/错误、228跳过（955项执行通过），BUILD SUCCESS；日志`/tmp/layout-r4-final-full.log`。
+  - 与R3父级全回归1174项逐方法对照（只读R3 `target/surefire-reports`，按映射把63个迁移测试类 FQCN 规范化）：1174项全部保留、0缺失、0结果变化，跳过数228不变，仅新增9项。
+  - 过程失败日志全部保留：`layout-r4-compile-1..5.log`（拆包后 `VideoStatusCounterRange` 缺 import → 通配 import 未随迁移更新 → 改写后丢 `RedisScriptConfig` 引用），最终通过日志`layout-r4-compile-6.log`/`layout-r4-final-compile.log`；协议审计探针`r4-probe.log`、`r4-probe2.log`。
+- 未验证/限制：opt-in 隔离/集成用例（需真实 MySQL/Redis/RabbitMQ）未运行，其 `@MapperScan` 变更只做静态核对；真实 broker 的类型头收发、滚动发布、DLQ 重放、应用启动/打包未验证；`application.yml` 未读取；`video-status-isolated.properties` 的 `logging.level.com.feibijiubi.backend.mapper=WARN` 已不覆盖迁移后的统计 mapper 包，按约束留R6统一补齐；`docs/tutorial/video-status-batch-aggregation-implementation.md` 第89行的示例 FQCN 与测试树`service/video/baseline/*`（交互内容）留R6处理。
+- 本批仅执行侧自验：不声称父级验收通过，未 stage/commit/push，未删除任何工作树。
+
+### R4 父级验收记录
+
+- 工作流`2ad5db2e-f7b7-45ee-a47b-097e50dc5534`；执行`9981d581-745c-45ca-a488-a679b6c57098`、独立审查`c1d15168-1880-458f-b483-01b9f4a588e2`，均使用指定DeepSeek Flash 4.1；独立审查OK with notes，无阻塞问题。
+- 父级逐文件核对143条映射：旧路径消失、新package符合路径；剔除package/import后的14处正文差异均为扫描范围、类型/namespace引用、Javadoc或空行，业务正文未变。核对全部16个未迁移Java差异及7个XML，XML按映射规范化后与基线完全一致。
+- 审查计数纠偏：实际videostats生产类为80，不是审查正文一处所写83；未迁移修改Java为16（10个仅import、1个Javadoc、5个import＋扫描注释），审查建议14/8漏计了interaction的两个生产服务，故不采纳该建议。映射中的“其余12个”实列8个，已修正为8；探针日志索引与过期扫描注释已修正。
+- 父级离线`test-compile`及普通回归通过：1183项、0失败/错误、228跳过，955项执行通过；日志`/tmp/layout-r4-parent-compile.log`、`/tmp/layout-r4-parent-full.log`。逐方法对照R3/R4 Surefire XML并规范化测试类名：1174项全部保留、结果不变，仅新增9项。
+- event三类FQCN保持，VideoStatusChangedEvent/VideoStatusEventType无变化，VideoStatusDelta仅import适配；Rabbit配置/常量/事件发布与消费正文保持。新增类型头回归通过。真实broker与滚动发布未验收，Spring自动配置将唯一converter装配到RabbitTemplate的结论仍为静态/字节码证据，未增加实际应用启动验证。
+- R6明确待办：教程`docs/tutorial/video-status-batch-aggregation-implementation.md`的旧实体FQCN、`service/video/baseline/*`交互测试归位、全部新mapper包的测试日志WARN覆盖；event兼容例外及XML集中物理路径不能被“零残留”清理掉。
+- 执行侧历史编译失败与修复记录继续保留。父级映射审计脚本首次误按数组遍历files对象而失败，修正分组遍历后完成143项核验；不涉及业务测试失败。按用户授权单独本地提交并fast-forward合入，不推送；真实基础设施、生产及应用启动未验收，未读application.yml。

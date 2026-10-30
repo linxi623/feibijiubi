@@ -12,14 +12,14 @@
     * 不把 payload / lease_token / last_error 原文交给管理员 HTTP 层。
   所有语句加 timeout=3（秒），慢 SQL 由 MyBatis 打断。
 -->
-<mapper namespace="com.feibijiubi.backend.mapper.VideoStatusOutboxRepairMapper">
+<mapper namespace="com.feibijiubi.backend.videostats.mapper.VideoStatusOutboxRepairMapper">
 
     <!--
       安全只读：不返回 payload / lease_token / last_error 原文。
       last_error 历史值可能含 payload 片段或凭证（旧代码会截断异常信息写入），
       HTTP 只通过 selectLastErrorPresent 得到布尔。
     -->
-    <select id="selectSafeByEventId" resultType="com.feibijiubi.backend.entity.VideoStatusOutbox"
+    <select id="selectSafeByEventId" resultType="com.feibijiubi.backend.videostats.entity.VideoStatusOutbox"
             timeout="3">
         SELECT id,
                event_id,
@@ -45,7 +45,7 @@
     </select>
 
     <!-- 重放路径：唯一键 + 行锁，让同一 eventId 的重放请求在数据库层串行。 -->
-    <select id="selectByEventIdForUpdate" resultType="com.feibijiubi.backend.entity.VideoStatusOutbox"
+    <select id="selectByEventIdForUpdate" resultType="com.feibijiubi.backend.videostats.entity.VideoStatusOutbox"
             timeout="3">
         SELECT id,
                event_id,
@@ -83,7 +83,7 @@
     </select>
 
     <select id="selectRepairLogByOperationId"
-            resultType="com.feibijiubi.backend.entity.VideoStatusConsumptionRepairLog"
+            resultType="com.feibijiubi.backend.videostats.entity.VideoStatusConsumptionRepairLog"
             timeout="3">
         SELECT id,
                operation_id,

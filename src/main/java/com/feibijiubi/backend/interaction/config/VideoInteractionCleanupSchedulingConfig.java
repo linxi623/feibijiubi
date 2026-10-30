@@ -9,7 +9,7 @@ import org.springframework.util.ErrorHandler;
 /**
  * T15 交互表清理的调度资源隔离。
  *
- * <p>清理线程<b>不</b>复用 {@link com.feibijiubi.backend.config.VideoStatusSchedulingConfig} 的四条视频统计调度器，也不复用 Spring 默认的
+ * <p>清理线程<b>不</b>复用 {@link com.feibijiubi.backend.videostats.config.VideoStatusSchedulingConfig} 的四条视频统计调度器，也不复用 Spring 默认的
  * {@code taskScheduler}：清理是纯维护任务（一条 DELETE 可能在等交互事务的行锁），把它和投递/落库/恢复/补偿
  * 放进同一条线程，就等于让维护任务的动作时间出现在统计链路的心跳上。一条独立单线程的代价固定为 1，
  * 且不随视频数或请求数增长。</p>

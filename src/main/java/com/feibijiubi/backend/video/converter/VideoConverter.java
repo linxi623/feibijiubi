@@ -3,7 +3,7 @@ package com.feibijiubi.backend.video.converter;
 import com.feibijiubi.backend.user.entity.User;
 import com.feibijiubi.backend.interaction.entity.UserVideo;
 import com.feibijiubi.backend.video.entity.Video;
-import com.feibijiubi.backend.entity.VideoStatus;
+import com.feibijiubi.backend.videostats.entity.VideoStatus;
 import com.feibijiubi.backend.video.vo.AdminVideoDetailVO;
 import com.feibijiubi.backend.video.vo.VideoDetailVO;
 import com.feibijiubi.backend.video.vo.VideoListItemVO;

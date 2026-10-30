@@ -3,7 +3,7 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.feibijiubi.backend.mapper.VideoStatusMapper">
+<mapper namespace="com.feibijiubi.backend.videostats.mapper.VideoStatusMapper">
     <!--
       T02 计数范围：0..9223372036854775807（Long.MAX_VALUE），列仍为 BIGINT UNSIGNED。
       不使用 CAST(... AS SIGNED)：UNSIGNED 可表示到 2^64-1，先转 SIGNED 会改变语义。
@@ -19,7 +19,7 @@
     </insert>
 
     <select id="selectByVid"
-            resultType="com.feibijiubi.backend.entity.VideoStatus">
+            resultType="com.feibijiubi.backend.videostats.entity.VideoStatus">
         SELECT
             vid,
             play_times,

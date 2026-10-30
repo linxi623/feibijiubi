@@ -7,7 +7,7 @@
   指标采集不能改变链路状态，也不得降低幂等性。
   所有语句都封顶（LIMIT）并带 timeout（秒），采样失败由 Java 侧标记 stale。
 -->
-<mapper namespace="com.feibijiubi.backend.metrics.VideoStatusMetricsMapper">
+<mapper namespace="com.feibijiubi.backend.videostats.metrics.VideoStatusMetricsMapper">
 
     <!--
       封顶计数：MySQL 只扫描最多 cap 行索引项，返回 <= cap。

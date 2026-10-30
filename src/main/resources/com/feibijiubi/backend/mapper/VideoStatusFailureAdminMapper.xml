@@ -8,10 +8,10 @@
   status3 受控重放的 3 条写语句，全部带精确 CAS。没有改计数、改 Redis、改 payload
   或新增 eventId 的语句，也不在任何语句里 SELECT lease_token。
 -->
-<mapper namespace="com.feibijiubi.backend.mapper.VideoStatusFailureAdminMapper">
+<mapper namespace="com.feibijiubi.backend.videostats.mapper.VideoStatusFailureAdminMapper">
 
     <select id="selectFailedOutbox"
-            resultType="com.feibijiubi.backend.service.admin.VideoStatusFailureAdminRow$OutboxRow"
+            resultType="com.feibijiubi.backend.videostats.service.admin.VideoStatusFailureAdminRow$OutboxRow"
             timeout="3">
         SELECT id, event_id, aggregate_id AS vid, event_type, status,
                retry_count, lease_recovery_count, confirm_writeback_count,
@@ -26,7 +26,7 @@
     </select>
 
     <select id="selectFailedOutboxByEventId"
-            resultType="com.feibijiubi.backend.service.admin.VideoStatusFailureAdminRow$OutboxRow"
+            resultType="com.feibijiubi.backend.videostats.service.admin.VideoStatusFailureAdminRow$OutboxRow"
             timeout="3">
         SELECT id, event_id, aggregate_id AS vid, event_type, status,
                retry_count, lease_recovery_count, confirm_writeback_count,
@@ -39,7 +39,7 @@
     </select>
 
     <select id="selectFailedOutboxByEventIdForUpdate"
-            resultType="com.feibijiubi.backend.service.admin.VideoStatusFailureAdminRow$OutboxRow"
+            resultType="com.feibijiubi.backend.videostats.service.admin.VideoStatusFailureAdminRow$OutboxRow"
             timeout="3">
         SELECT id, event_id, aggregate_id AS vid, event_type, status,
                retry_count, lease_recovery_count, confirm_writeback_count,
@@ -62,7 +62,7 @@
          两个单状态分支各自用 (process_status, id) 索引做有界范围扫描，
          再在 UNION ALL 外层统一排序和 LIMIT，避免 IN(0,3) 退化。 -->
     <select id="selectDiagnosableConsumed"
-            resultType="com.feibijiubi.backend.service.admin.VideoStatusFailureAdminRow$ConsumedRow"
+            resultType="com.feibijiubi.backend.videostats.service.admin.VideoStatusFailureAdminRow$ConsumedRow"
             timeout="3">
         SELECT paged.*
         FROM (
@@ -93,7 +93,7 @@
     </select>
 
     <select id="selectDiagnosableConsumedByEventId"
-            resultType="com.feibijiubi.backend.service.admin.VideoStatusFailureAdminRow$ConsumedRow"
+            resultType="com.feibijiubi.backend.videostats.service.admin.VideoStatusFailureAdminRow$ConsumedRow"
             timeout="3">
         SELECT id, event_id, vid, event_type, process_status, consumer_retry_count,
                consumed_at, last_attempt_at, redis_applied_at, flushed_at,
@@ -107,7 +107,7 @@
 
     <!-- 确认路径专用：先锁住整行，再由 service 只允许 process_status=3。 -->
     <select id="selectConsumedByEventIdForUpdate"
-            resultType="com.feibijiubi.backend.service.admin.VideoStatusFailureAdminRow$ConsumedRow"
+            resultType="com.feibijiubi.backend.videostats.service.admin.VideoStatusFailureAdminRow$ConsumedRow"
             timeout="3">
         SELECT id, event_id, vid, event_type, process_status, consumer_retry_count,
                consumed_at, last_attempt_at, redis_applied_at, flushed_at,
@@ -127,7 +127,7 @@
       年龄用 DB 时钟计算，避免 JVM/DB 时区差异把窗口边界算歪。
     -->
     <select id="selectStatus3ReplayTarget"
-            resultType="com.feibijiubi.backend.service.admin.VideoStatusStatus3ReplayRow$ConsumedTarget"
+            resultType="com.feibijiubi.backend.videostats.service.admin.VideoStatusStatus3ReplayRow$ConsumedTarget"
             timeout="3">
         SELECT id, event_id, vid, event_type, delta, payload_hash, process_status,
                consumer_retry_count, consumed_at, redis_applied_at,
@@ -140,7 +140,7 @@
 
     <!-- 重放路径专用：唯一键 + 行锁，让同一 eventId 的重放请求在 DB 层串行。 -->
     <select id="selectStatus3ReplayTargetForUpdate"
-            resultType="com.feibijiubi.backend.service.admin.VideoStatusStatus3ReplayRow$ConsumedTarget"
+            resultType="com.feibijiubi.backend.videostats.service.admin.VideoStatusStatus3ReplayRow$ConsumedTarget"
             timeout="3">
         SELECT id, event_id, vid, event_type, delta, payload_hash, process_status,
                consumer_retry_count, consumed_at, redis_applied_at,
@@ -154,7 +154,7 @@
 
     <!-- Outbox 投递源：payload 是 relay 真正会发布的内容，必须在写之前校验。 -->
     <select id="selectOutboxReplaySource"
-            resultType="com.feibijiubi.backend.service.admin.VideoStatusStatus3ReplayRow$OutboxSource"
+            resultType="com.feibijiubi.backend.videostats.service.admin.VideoStatusStatus3ReplayRow$OutboxSource"
             timeout="3">
         SELECT id, event_id, aggregate_id AS vid, event_type, payload, status, sent_at
         FROM video_status_outbox
@@ -162,7 +162,7 @@
     </select>
 
     <select id="selectOutboxReplaySourceForUpdate"
-            resultType="com.feibijiubi.backend.service.admin.VideoStatusStatus3ReplayRow$OutboxSource"
+            resultType="com.feibijiubi.backend.videostats.service.admin.VideoStatusStatus3ReplayRow$OutboxSource"
             timeout="3">
         SELECT id, event_id, aggregate_id AS vid, event_type, payload, status, sent_at
         FROM video_status_outbox
@@ -227,7 +227,7 @@
     </update>
 
     <select id="selectRepairLogByOperationId"
-            resultType="com.feibijiubi.backend.entity.VideoStatusConsumptionRepairLog"
+            resultType="com.feibijiubi.backend.videostats.entity.VideoStatusConsumptionRepairLog"
             timeout="3">
         SELECT id, operation_id, event_id, action, operation_status, reason,
                operator, last_error, created_at, completed_at
@@ -236,7 +236,7 @@
     </select>
     <!-- 锁定目标事件后再读一次：处理同目标同 operationId 的并发幂等。 -->
     <select id="selectRepairLogByOperationIdForUpdate"
-            resultType="com.feibijiubi.backend.entity.VideoStatusConsumptionRepairLog"
+            resultType="com.feibijiubi.backend.videostats.entity.VideoStatusConsumptionRepairLog"
             timeout="3">
         SELECT id, operation_id, event_id, action, operation_status, reason,
                operator, last_error, created_at, completed_at

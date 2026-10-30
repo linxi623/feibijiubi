@@ -1,19 +1,19 @@
 package com.feibijiubi.backend.interaction.service.impl;
 
 import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.config.VideoStatusProperties;
+import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
 import com.feibijiubi.backend.user.entity.User;
 import com.feibijiubi.backend.interaction.entity.UserVideo;
 import com.feibijiubi.backend.video.entity.Video;
 import com.feibijiubi.backend.event.VideoStatusEventType;
 import com.feibijiubi.backend.user.mapper.UserMapper;
 import com.feibijiubi.backend.interaction.mapper.UserVideoMapper;
-import com.feibijiubi.backend.mapper.VideoStatusMapper;
+import com.feibijiubi.backend.videostats.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.video.service.PublishedVideoGuard;
 import com.feibijiubi.backend.interaction.service.UserVideoService;
 import com.feibijiubi.backend.interaction.service.VideoInteractionAction;
 import com.feibijiubi.backend.interaction.service.VideoInteractionAdmissionService;
-import com.feibijiubi.backend.service.video.videostatus.VideoStatusService;
+import com.feibijiubi.backend.videostats.service.VideoStatusService;
 import com.feibijiubi.backend.interaction.vo.VideoInteractionVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

@@ -1,18 +1,18 @@
 package com.feibijiubi.backend.interaction.service.impl;
 
 import com.feibijiubi.backend.common.BusinessException;
-import com.feibijiubi.backend.config.VideoStatusProperties;
+import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
 import com.feibijiubi.backend.interaction.entity.VideoInteractionRequest;
 import com.feibijiubi.backend.interaction.entity.VideoInteractionWindow;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
 import com.feibijiubi.backend.interaction.mapper.VideoInteractionMapper;
-import com.feibijiubi.backend.mapper.VideoStatusMapper;
+import com.feibijiubi.backend.videostats.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.interaction.service.VideoInteractionAction;
 import com.feibijiubi.backend.interaction.service.VideoInteractionCommand;
 import com.feibijiubi.backend.interaction.service.VideoInteractionResult;
 import com.feibijiubi.backend.interaction.service.VideoInteractionService;
 import com.feibijiubi.backend.interaction.service.VideoInteractionValidation;
-import com.feibijiubi.backend.service.video.videostatus.VideoStatusService;
+import com.feibijiubi.backend.videostats.service.VideoStatusService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;

@@ -4,7 +4,7 @@ import com.feibijiubi.backend.user.entity.User;
 import com.feibijiubi.backend.user.converter.UserConverter;
 import com.feibijiubi.backend.video.converter.VideoConverter;
 import com.feibijiubi.backend.video.entity.Video;
-import com.feibijiubi.backend.entity.VideoStatus;
+import com.feibijiubi.backend.videostats.entity.VideoStatus;
 import com.feibijiubi.backend.video.vo.AdminVideoDetailVO;
 import com.feibijiubi.backend.user.vo.UserCountVO;
 import com.feibijiubi.backend.user.vo.UserVO;

@@ -3,8 +3,8 @@ package com.feibijiubi.backend.interaction.service;
 import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.config.RedisScriptConfig;
 import com.feibijiubi.backend.interaction.config.VideoInteractionProperties;
-import com.feibijiubi.backend.config.VideoStatusProperties;
-import com.feibijiubi.backend.entity.VideoStatus;
+import com.feibijiubi.backend.videostats.config.VideoStatusProperties;
+import com.feibijiubi.backend.videostats.entity.VideoStatus;
 import com.feibijiubi.backend.event.VideoStatusChangedEvent;
 import com.feibijiubi.backend.event.VideoStatusEventType;
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionActorResolver;
@@ -12,12 +12,12 @@ import com.feibijiubi.backend.interaction.service.impl.VideoInteractionAdmission
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionRateLimitServiceImpl;
 import com.feibijiubi.backend.interaction.service.impl.VideoInteractionServiceImpl;
 import com.feibijiubi.backend.video.service.PublishedVideoGuard;
-import com.feibijiubi.backend.service.video.videostatus.VideoStatusService;
+import com.feibijiubi.backend.videostats.service.VideoStatusService;
 import com.feibijiubi.backend.utils.JsonUtils;
 import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
 import com.feibijiubi.backend.utils.redis.RedisUtils;
 import com.feibijiubi.backend.interaction.vo.VideoInteractionVO;
-import com.feibijiubi.backend.service.video.VideoStatusIsolatedIntegrationTests;
+import com.feibijiubi.backend.videostats.service.VideoStatusIsolatedIntegrationTests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -91,8 +91,10 @@ class VideoInteractionAdmissionIsolatedTests {
     @EnableAutoConfiguration(excludeName =
             "org.redisson.spring.starter.RedissonAutoConfigurationV2")
     @EnableConfigurationProperties({VideoStatusProperties.class, VideoInteractionProperties.class})
-    // R3：交互/视频 mapper 已按模块迁走，旧扫描范围保持不变，只追加新包。
-    @MapperScan({"com.feibijiubi.backend.mapper", "com.feibijiubi.backend.video.mapper",
+    // R3：交互/视频 mapper 已按模块迁走。
+    // R4：统计 mapper 迁到 videostats.mapper，旧 com.feibijiubi.backend.mapper 已无接口，
+    // 该扫描项按等价集合改为 videostats.mapper（不是缩小扫描范围）。
+    @MapperScan({"com.feibijiubi.backend.videostats.mapper", "com.feibijiubi.backend.video.mapper",
             "com.feibijiubi.backend.interaction.mapper"})
     @Import({RedisScriptConfig.class,
             PublishedVideoGuard.class,

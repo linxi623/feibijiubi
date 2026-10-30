@@ -22,10 +22,10 @@
       database/migrations/t10-video-status-reconciliation-indexes.sql；
     * user_video 使用现有 idx_user_video_vid。
 -->
-<mapper namespace="com.feibijiubi.backend.mapper.VideoStatusReconciliationMapper">
+<mapper namespace="com.feibijiubi.backend.videostats.mapper.VideoStatusReconciliationMapper">
 
     <resultMap id="DbCountsResultMap"
-               type="com.feibijiubi.backend.entity.VideoStatus">
+               type="com.feibijiubi.backend.videostats.entity.VideoStatus">
         <id property="vid" column="vid"/>
         <result property="playTimes" column="play_times"/>
         <result property="likeTimes" column="like_times"/>
@@ -38,7 +38,7 @@
     </resultMap>
 
     <resultMap id="EventProjectionResultMap"
-               type="com.feibijiubi.backend.entity.VideoStatusReconciliationEventRow">
+               type="com.feibijiubi.backend.videostats.entity.VideoStatusReconciliationEventRow">
         <id property="id" column="id"/>
         <result property="processStatus" column="process_status"/>
         <result property="eventType" column="event_type"/>
@@ -46,7 +46,7 @@
     </resultMap>
 
     <resultMap id="RelationAggregateResultMap"
-               type="com.feibijiubi.backend.entity.VideoStatusReconciliationRelationAggregate">
+               type="com.feibijiubi.backend.videostats.entity.VideoStatusReconciliationRelationAggregate">
         <result property="sampledRows" column="sampled_rows"/>
         <result property="likedRows" column="liked_rows"/>
         <result property="unlikedRows" column="unliked_rows"/>

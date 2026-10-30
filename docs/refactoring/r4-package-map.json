@@ -1,0 +1,1159 @@
+{
+  "batch": "R4",
+  "module": "videostats",
+  "worktree": "D:/feibijiubi/backend-layout-r4",
+  "baseCommit": "0215ce4",
+  "baseCommitSubject": "refactor: group video and interaction by feature（R3 父级提交，已合入主工作区）",
+  "state": "干净 detached 基线；本批只在该工作树写入，未 stage/commit/push，未改动主工作区与 R1–R3 工作树，未再委派",
+  "counts": {
+    "productionFilesMoved": 80,
+    "testFilesMoved": 63,
+    "newTestClasses": 3,
+    "newTestMethods": 9,
+    "productionJavaFiles": 258,
+    "testJavaFiles": 132
+  },
+  "files": {
+    "production": [
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/config/VideoStatusMetricsConfig.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/config/VideoStatusMetricsConfig.java",
+        "oldFqcn": "com.feibijiubi.backend.config.VideoStatusMetricsConfig",
+        "newFqcn": "com.feibijiubi.backend.videostats.config.VideoStatusMetricsConfig"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/config/VideoStatusProperties.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/config/VideoStatusProperties.java",
+        "oldFqcn": "com.feibijiubi.backend.config.VideoStatusProperties",
+        "newFqcn": "com.feibijiubi.backend.videostats.config.VideoStatusProperties"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/config/VideoStatusRabbitConfig.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/config/VideoStatusRabbitConfig.java",
+        "oldFqcn": "com.feibijiubi.backend.config.VideoStatusRabbitConfig",
+        "newFqcn": "com.feibijiubi.backend.videostats.config.VideoStatusRabbitConfig"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/config/VideoStatusRuntimeRoles.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/config/VideoStatusRuntimeRoles.java",
+        "oldFqcn": "com.feibijiubi.backend.config.VideoStatusRuntimeRoles",
+        "newFqcn": "com.feibijiubi.backend.videostats.config.VideoStatusRuntimeRoles"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/config/VideoStatusSchedulingConfig.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/config/VideoStatusSchedulingConfig.java",
+        "oldFqcn": "com.feibijiubi.backend.config.VideoStatusSchedulingConfig",
+        "newFqcn": "com.feibijiubi.backend.videostats.config.VideoStatusSchedulingConfig"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/controller/VideoStatusFailureAdminController.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/controller/VideoStatusFailureAdminController.java",
+        "oldFqcn": "com.feibijiubi.backend.controller.VideoStatusFailureAdminController",
+        "newFqcn": "com.feibijiubi.backend.videostats.controller.VideoStatusFailureAdminController"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/controller/VideoStatusMetricsController.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/controller/VideoStatusMetricsController.java",
+        "oldFqcn": "com.feibijiubi.backend.controller.VideoStatusMetricsController",
+        "newFqcn": "com.feibijiubi.backend.videostats.controller.VideoStatusMetricsController"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/controller/VideoStatusOutboxRepairController.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/controller/VideoStatusOutboxRepairController.java",
+        "oldFqcn": "com.feibijiubi.backend.controller.VideoStatusOutboxRepairController",
+        "newFqcn": "com.feibijiubi.backend.videostats.controller.VideoStatusOutboxRepairController"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/controller/VideoStatusReconciliationController.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/controller/VideoStatusReconciliationController.java",
+        "oldFqcn": "com.feibijiubi.backend.controller.VideoStatusReconciliationController",
+        "newFqcn": "com.feibijiubi.backend.videostats.controller.VideoStatusReconciliationController"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/controller/VideoStatusStatus0CompensationController.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/controller/VideoStatusStatus0CompensationController.java",
+        "oldFqcn": "com.feibijiubi.backend.controller.VideoStatusStatus0CompensationController",
+        "newFqcn": "com.feibijiubi.backend.videostats.controller.VideoStatusStatus0CompensationController"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/dto/VideoStatusFailureAcknowledgeDTO.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/dto/VideoStatusFailureAcknowledgeDTO.java",
+        "oldFqcn": "com.feibijiubi.backend.dto.VideoStatusFailureAcknowledgeDTO",
+        "newFqcn": "com.feibijiubi.backend.videostats.dto.VideoStatusFailureAcknowledgeDTO"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/dto/VideoStatusOutboxReplayDTO.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/dto/VideoStatusOutboxReplayDTO.java",
+        "oldFqcn": "com.feibijiubi.backend.dto.VideoStatusOutboxReplayDTO",
+        "newFqcn": "com.feibijiubi.backend.videostats.dto.VideoStatusOutboxReplayDTO"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/dto/VideoStatusStatus3ReplayDTO.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/dto/VideoStatusStatus3ReplayDTO.java",
+        "oldFqcn": "com.feibijiubi.backend.dto.VideoStatusStatus3ReplayDTO",
+        "newFqcn": "com.feibijiubi.backend.videostats.dto.VideoStatusStatus3ReplayDTO"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/entity/VideoStatus.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/entity/VideoStatus.java",
+        "oldFqcn": "com.feibijiubi.backend.entity.VideoStatus",
+        "newFqcn": "com.feibijiubi.backend.videostats.entity.VideoStatus"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/entity/VideoStatusConsumedEvent.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/entity/VideoStatusConsumedEvent.java",
+        "oldFqcn": "com.feibijiubi.backend.entity.VideoStatusConsumedEvent",
+        "newFqcn": "com.feibijiubi.backend.videostats.entity.VideoStatusConsumedEvent"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/entity/VideoStatusConsumptionRepairLog.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/entity/VideoStatusConsumptionRepairLog.java",
+        "oldFqcn": "com.feibijiubi.backend.entity.VideoStatusConsumptionRepairLog",
+        "newFqcn": "com.feibijiubi.backend.videostats.entity.VideoStatusConsumptionRepairLog"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/entity/VideoStatusOutbox.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/entity/VideoStatusOutbox.java",
+        "oldFqcn": "com.feibijiubi.backend.entity.VideoStatusOutbox",
+        "newFqcn": "com.feibijiubi.backend.videostats.entity.VideoStatusOutbox"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/entity/VideoStatusReconciliationEventRow.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/entity/VideoStatusReconciliationEventRow.java",
+        "oldFqcn": "com.feibijiubi.backend.entity.VideoStatusReconciliationEventRow",
+        "newFqcn": "com.feibijiubi.backend.videostats.entity.VideoStatusReconciliationEventRow"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/entity/VideoStatusReconciliationRelationAggregate.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/entity/VideoStatusReconciliationRelationAggregate.java",
+        "oldFqcn": "com.feibijiubi.backend.entity.VideoStatusReconciliationRelationAggregate",
+        "newFqcn": "com.feibijiubi.backend.videostats.entity.VideoStatusReconciliationRelationAggregate"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/enums/RegistrationResult.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/enums/RegistrationResult.java",
+        "oldFqcn": "com.feibijiubi.backend.enums.RegistrationResult",
+        "newFqcn": "com.feibijiubi.backend.videostats.enums.RegistrationResult"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/enums/VideoStatusConsumeProcessStatus.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/enums/VideoStatusConsumeProcessStatus.java",
+        "oldFqcn": "com.feibijiubi.backend.enums.VideoStatusConsumeProcessStatus",
+        "newFqcn": "com.feibijiubi.backend.videostats.enums.VideoStatusConsumeProcessStatus"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/common/NonRetryableMessageException.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/exception/NonRetryableMessageException.java",
+        "oldFqcn": "com.feibijiubi.backend.common.NonRetryableMessageException",
+        "newFqcn": "com.feibijiubi.backend.videostats.exception.NonRetryableMessageException"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/common/RepairRequiredMessageException.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/exception/RepairRequiredMessageException.java",
+        "oldFqcn": "com.feibijiubi.backend.common.RepairRequiredMessageException",
+        "newFqcn": "com.feibijiubi.backend.videostats.exception.RepairRequiredMessageException"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/common/RetryableMessageException.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/exception/RetryableMessageException.java",
+        "oldFqcn": "com.feibijiubi.backend.common.RetryableMessageException",
+        "newFqcn": "com.feibijiubi.backend.videostats.exception.RetryableMessageException"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/common/VideoStatusCounterRangeException.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/exception/VideoStatusCounterRangeException.java",
+        "oldFqcn": "com.feibijiubi.backend.common.VideoStatusCounterRangeException",
+        "newFqcn": "com.feibijiubi.backend.videostats.exception.VideoStatusCounterRangeException"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/common/VideoStatusFlushDataException.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/exception/VideoStatusFlushDataException.java",
+        "oldFqcn": "com.feibijiubi.backend.common.VideoStatusFlushDataException",
+        "newFqcn": "com.feibijiubi.backend.videostats.exception.VideoStatusFlushDataException"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/common/VideoStatusFlushDeferredException.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/exception/VideoStatusFlushDeferredException.java",
+        "oldFqcn": "com.feibijiubi.backend.common.VideoStatusFlushDeferredException",
+        "newFqcn": "com.feibijiubi.backend.videostats.exception.VideoStatusFlushDeferredException"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mapper/VideoStatusConsumedEventMapper.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mapper/VideoStatusConsumedEventMapper.java",
+        "oldFqcn": "com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper",
+        "newFqcn": "com.feibijiubi.backend.videostats.mapper.VideoStatusConsumedEventMapper"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mapper/VideoStatusFailureAdminMapper.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mapper/VideoStatusFailureAdminMapper.java",
+        "oldFqcn": "com.feibijiubi.backend.mapper.VideoStatusFailureAdminMapper",
+        "newFqcn": "com.feibijiubi.backend.videostats.mapper.VideoStatusFailureAdminMapper"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mapper/VideoStatusMapper.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mapper/VideoStatusMapper.java",
+        "oldFqcn": "com.feibijiubi.backend.mapper.VideoStatusMapper",
+        "newFqcn": "com.feibijiubi.backend.videostats.mapper.VideoStatusMapper"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mapper/VideoStatusOutboxMapper.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mapper/VideoStatusOutboxMapper.java",
+        "oldFqcn": "com.feibijiubi.backend.mapper.VideoStatusOutboxMapper",
+        "newFqcn": "com.feibijiubi.backend.videostats.mapper.VideoStatusOutboxMapper"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mapper/VideoStatusOutboxRepairMapper.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mapper/VideoStatusOutboxRepairMapper.java",
+        "oldFqcn": "com.feibijiubi.backend.mapper.VideoStatusOutboxRepairMapper",
+        "newFqcn": "com.feibijiubi.backend.videostats.mapper.VideoStatusOutboxRepairMapper"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mapper/VideoStatusReconciliationMapper.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mapper/VideoStatusReconciliationMapper.java",
+        "oldFqcn": "com.feibijiubi.backend.mapper.VideoStatusReconciliationMapper",
+        "newFqcn": "com.feibijiubi.backend.videostats.mapper.VideoStatusReconciliationMapper"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/metrics/VideoStatusBacklogSampler.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/metrics/VideoStatusBacklogSampler.java",
+        "oldFqcn": "com.feibijiubi.backend.metrics.VideoStatusBacklogSampler",
+        "newFqcn": "com.feibijiubi.backend.videostats.metrics.VideoStatusBacklogSampler"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/metrics/VideoStatusMetricsMapper.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/metrics/VideoStatusMetricsMapper.java",
+        "oldFqcn": "com.feibijiubi.backend.metrics.VideoStatusMetricsMapper",
+        "newFqcn": "com.feibijiubi.backend.videostats.metrics.VideoStatusMetricsMapper"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/metrics/VideoStatusTelemetry.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/metrics/VideoStatusTelemetry.java",
+        "oldFqcn": "com.feibijiubi.backend.metrics.VideoStatusTelemetry",
+        "newFqcn": "com.feibijiubi.backend.videostats.metrics.VideoStatusTelemetry"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/utils/rabbitmq/RabbitConstants.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mq/RabbitConstants.java",
+        "oldFqcn": "com.feibijiubi.backend.utils.rabbitmq.RabbitConstants",
+        "newFqcn": "com.feibijiubi.backend.videostats.mq.RabbitConstants"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mq/VideoStatusBatchFlushScheduler.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mq/VideoStatusBatchFlushScheduler.java",
+        "oldFqcn": "com.feibijiubi.backend.mq.VideoStatusBatchFlushScheduler",
+        "newFqcn": "com.feibijiubi.backend.videostats.mq.VideoStatusBatchFlushScheduler"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mq/VideoStatusConsumerRecoveryController.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mq/VideoStatusConsumerRecoveryController.java",
+        "oldFqcn": "com.feibijiubi.backend.mq.VideoStatusConsumerRecoveryController",
+        "newFqcn": "com.feibijiubi.backend.videostats.mq.VideoStatusConsumerRecoveryController"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mq/VideoStatusDirtyRecoveryScheduler.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mq/VideoStatusDirtyRecoveryScheduler.java",
+        "oldFqcn": "com.feibijiubi.backend.mq.VideoStatusDirtyRecoveryScheduler",
+        "newFqcn": "com.feibijiubi.backend.videostats.mq.VideoStatusDirtyRecoveryScheduler"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mq/VideoStatusEventConsumer.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mq/VideoStatusEventConsumer.java",
+        "oldFqcn": "com.feibijiubi.backend.mq.VideoStatusEventConsumer",
+        "newFqcn": "com.feibijiubi.backend.videostats.mq.VideoStatusEventConsumer"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mq/VideoStatusEventPublisher.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mq/VideoStatusEventPublisher.java",
+        "oldFqcn": "com.feibijiubi.backend.mq.VideoStatusEventPublisher",
+        "newFqcn": "com.feibijiubi.backend.videostats.mq.VideoStatusEventPublisher"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mq/VideoStatusMessageForwarder.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mq/VideoStatusMessageForwarder.java",
+        "oldFqcn": "com.feibijiubi.backend.mq.VideoStatusMessageForwarder",
+        "newFqcn": "com.feibijiubi.backend.videostats.mq.VideoStatusMessageForwarder"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mq/VideoStatusOutboxClaimService.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mq/VideoStatusOutboxClaimService.java",
+        "oldFqcn": "com.feibijiubi.backend.mq.VideoStatusOutboxClaimService",
+        "newFqcn": "com.feibijiubi.backend.videostats.mq.VideoStatusOutboxClaimService"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mq/VideoStatusOutboxRelay.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mq/VideoStatusOutboxRelay.java",
+        "oldFqcn": "com.feibijiubi.backend.mq.VideoStatusOutboxRelay",
+        "newFqcn": "com.feibijiubi.backend.videostats.mq.VideoStatusOutboxRelay"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mq/VideoStatusPublishException.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mq/VideoStatusPublishException.java",
+        "oldFqcn": "com.feibijiubi.backend.mq.VideoStatusPublishException",
+        "newFqcn": "com.feibijiubi.backend.videostats.mq.VideoStatusPublishException"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/mq/VideoStatusStatus0CompensationScheduler.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/mq/VideoStatusStatus0CompensationScheduler.java",
+        "oldFqcn": "com.feibijiubi.backend.mq.VideoStatusStatus0CompensationScheduler",
+        "newFqcn": "com.feibijiubi.backend.videostats.mq.VideoStatusStatus0CompensationScheduler"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/video/videostatus/VideoStatusBatchFlushService.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/VideoStatusBatchFlushService.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.videostatus.VideoStatusBatchFlushService",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusBatchFlushService"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/video/videostatus/VideoStatusConsumptionService.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/VideoStatusConsumptionService.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.videostatus.VideoStatusConsumptionService",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusConsumptionService"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/video/videostatus/VideoStatusEventAgeGuard.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/VideoStatusEventAgeGuard.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.videostatus.VideoStatusEventAgeGuard",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusEventAgeGuard"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/video/videostatus/VideoStatusEventFingerprintService.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/VideoStatusEventFingerprintService.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.videostatus.VideoStatusEventFingerprintService",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusEventFingerprintService"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/video/videostatus/VideoStatusRebuildService.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/VideoStatusRebuildService.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.videostatus.VideoStatusRebuildService",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusRebuildService"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/video/videostatus/VideoStatusRebuildSnapshot.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/VideoStatusRebuildSnapshot.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.videostatus.VideoStatusRebuildSnapshot",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusRebuildSnapshot"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/video/videostatus/VideoStatusRebuildSnapshotService.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/VideoStatusRebuildSnapshotService.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.videostatus.VideoStatusRebuildSnapshotService",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusRebuildSnapshotService"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/video/videostatus/VideoStatusReconciliationService.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/VideoStatusReconciliationService.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.videostatus.VideoStatusReconciliationService",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusReconciliationService"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/video/videostatus/VideoStatusService.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/VideoStatusService.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.videostatus.VideoStatusService",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusService"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/video/videostatus/VideoStatusStatus0CompensationService.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/VideoStatusStatus0CompensationService.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.videostatus.VideoStatusStatus0CompensationService",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusStatus0CompensationService"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/video/videostatus/VideoStatusVidMutex.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/VideoStatusVidMutex.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.videostatus.VideoStatusVidMutex",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusVidMutex"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/admin/VideoStatusFailureAdminRow.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/admin/VideoStatusFailureAdminRow.java",
+        "oldFqcn": "com.feibijiubi.backend.service.admin.VideoStatusFailureAdminRow",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.admin.VideoStatusFailureAdminRow"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/admin/VideoStatusFailureAdminService.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/admin/VideoStatusFailureAdminService.java",
+        "oldFqcn": "com.feibijiubi.backend.service.admin.VideoStatusFailureAdminService",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.admin.VideoStatusFailureAdminService"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/admin/VideoStatusFailureAdminServiceImpl.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/admin/VideoStatusFailureAdminServiceImpl.java",
+        "oldFqcn": "com.feibijiubi.backend.service.admin.VideoStatusFailureAdminServiceImpl",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.admin.VideoStatusFailureAdminServiceImpl"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/admin/VideoStatusOutboxReplayService.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/admin/VideoStatusOutboxReplayService.java",
+        "oldFqcn": "com.feibijiubi.backend.service.admin.VideoStatusOutboxReplayService",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.admin.VideoStatusOutboxReplayService"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/admin/VideoStatusStatus3ReplayRow.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/admin/VideoStatusStatus3ReplayRow.java",
+        "oldFqcn": "com.feibijiubi.backend.service.admin.VideoStatusStatus3ReplayRow",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.admin.VideoStatusStatus3ReplayRow"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/admin/VideoStatusStatus3ReplayService.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/admin/VideoStatusStatus3ReplayService.java",
+        "oldFqcn": "com.feibijiubi.backend.service.admin.VideoStatusStatus3ReplayService",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.admin.VideoStatusStatus3ReplayService"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/videostatus/VideoStatusBatchFlushServiceImpl.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/impl/VideoStatusBatchFlushServiceImpl.java",
+        "oldFqcn": "com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusBatchFlushServiceImpl",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.impl.VideoStatusBatchFlushServiceImpl"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/videostatus/VideoStatusConsumptionServiceImpl.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/impl/VideoStatusConsumptionServiceImpl.java",
+        "oldFqcn": "com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusConsumptionServiceImpl",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.impl.VideoStatusConsumptionServiceImpl"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/videostatus/VideoStatusEventFingerprintServiceImpl.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/impl/VideoStatusEventFingerprintServiceImpl.java",
+        "oldFqcn": "com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusEventFingerprintServiceImpl",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.impl.VideoStatusEventFingerprintServiceImpl"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/videostatus/VideoStatusRebuildServiceImpl.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/impl/VideoStatusRebuildServiceImpl.java",
+        "oldFqcn": "com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusRebuildServiceImpl",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.impl.VideoStatusRebuildServiceImpl"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/videostatus/VideoStatusRebuildSnapshotServiceImpl.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/impl/VideoStatusRebuildSnapshotServiceImpl.java",
+        "oldFqcn": "com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusRebuildSnapshotServiceImpl",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.impl.VideoStatusRebuildSnapshotServiceImpl"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/videostatus/VideoStatusReconciliationServiceImpl.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/impl/VideoStatusReconciliationServiceImpl.java",
+        "oldFqcn": "com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusReconciliationServiceImpl",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.impl.VideoStatusReconciliationServiceImpl"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/videostatus/VideoStatusServiceImpl.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/impl/VideoStatusServiceImpl.java",
+        "oldFqcn": "com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusServiceImpl",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.impl.VideoStatusServiceImpl"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/videostatus/VideoStatusStatus0CompensationClaimService.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/impl/VideoStatusStatus0CompensationClaimService.java",
+        "oldFqcn": "com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusStatus0CompensationClaimService",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.impl.VideoStatusStatus0CompensationClaimService"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/videostatus/VideoStatusStatus0CompensationServiceImpl.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/service/impl/VideoStatusStatus0CompensationServiceImpl.java",
+        "oldFqcn": "com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusStatus0CompensationServiceImpl",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.impl.VideoStatusStatus0CompensationServiceImpl"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/common/VideoStatusCounterRange.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/support/VideoStatusCounterRange.java",
+        "oldFqcn": "com.feibijiubi.backend.common.VideoStatusCounterRange",
+        "newFqcn": "com.feibijiubi.backend.videostats.support.VideoStatusCounterRange"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/vo/VideoStatusGateVO.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/vo/VideoStatusGateVO.java",
+        "oldFqcn": "com.feibijiubi.backend.vo.VideoStatusGateVO",
+        "newFqcn": "com.feibijiubi.backend.videostats.vo.VideoStatusGateVO"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/vo/VideoStatusMetricsVO.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/vo/VideoStatusMetricsVO.java",
+        "oldFqcn": "com.feibijiubi.backend.vo.VideoStatusMetricsVO",
+        "newFqcn": "com.feibijiubi.backend.videostats.vo.VideoStatusMetricsVO"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/vo/VideoStatusOutboxReplayVO.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/vo/VideoStatusOutboxReplayVO.java",
+        "oldFqcn": "com.feibijiubi.backend.vo.VideoStatusOutboxReplayVO",
+        "newFqcn": "com.feibijiubi.backend.videostats.vo.VideoStatusOutboxReplayVO"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/vo/VideoStatusOutboxStatusVO.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/vo/VideoStatusOutboxStatusVO.java",
+        "oldFqcn": "com.feibijiubi.backend.vo.VideoStatusOutboxStatusVO",
+        "newFqcn": "com.feibijiubi.backend.videostats.vo.VideoStatusOutboxStatusVO"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/vo/VideoStatusReconciliationVO.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/vo/VideoStatusReconciliationVO.java",
+        "oldFqcn": "com.feibijiubi.backend.vo.VideoStatusReconciliationVO",
+        "newFqcn": "com.feibijiubi.backend.videostats.vo.VideoStatusReconciliationVO"
+      },
+      {
+        "oldPath": "src/main/java/com/feibijiubi/backend/vo/VideoStatusStatus3ReplayVO.java",
+        "newPath": "src/main/java/com/feibijiubi/backend/videostats/vo/VideoStatusStatus3ReplayVO.java",
+        "oldFqcn": "com.feibijiubi.backend.vo.VideoStatusStatus3ReplayVO",
+        "newFqcn": "com.feibijiubi.backend.videostats.vo.VideoStatusStatus3ReplayVO"
+      }
+    ],
+    "tests": [
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/capacity/VideoStatusCapacityAudit.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/capacity/VideoStatusCapacityAudit.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.capacity.VideoStatusCapacityAudit",
+        "newFqcn": "com.feibijiubi.backend.videostats.capacity.VideoStatusCapacityAudit"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/capacity/VideoStatusCapacityAuditIsolatedTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/capacity/VideoStatusCapacityAuditIsolatedTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.capacity.VideoStatusCapacityAuditIsolatedTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.capacity.VideoStatusCapacityAuditIsolatedTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/capacity/VideoStatusCapacityAuditScanTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/capacity/VideoStatusCapacityAuditScanTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.capacity.VideoStatusCapacityAuditScanTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.capacity.VideoStatusCapacityAuditScanTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/capacity/VideoStatusCapacityEstimator.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/capacity/VideoStatusCapacityEstimator.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.capacity.VideoStatusCapacityEstimator",
+        "newFqcn": "com.feibijiubi.backend.videostats.capacity.VideoStatusCapacityEstimator"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/capacity/VideoStatusCapacityEstimatorTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/capacity/VideoStatusCapacityEstimatorTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.capacity.VideoStatusCapacityEstimatorTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.capacity.VideoStatusCapacityEstimatorTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/capacity/VideoStatusCapacityReport.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/capacity/VideoStatusCapacityReport.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.capacity.VideoStatusCapacityReport",
+        "newFqcn": "com.feibijiubi.backend.videostats.capacity.VideoStatusCapacityReport"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/capacity/VideoStatusCapacityReportTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/capacity/VideoStatusCapacityReportTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.capacity.VideoStatusCapacityReportTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.capacity.VideoStatusCapacityReportTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/config/VideoStatusRuntimePropertiesContextTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/config/VideoStatusRuntimePropertiesContextTests.java",
+        "oldFqcn": "com.feibijiubi.backend.config.VideoStatusRuntimePropertiesContextTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.config.VideoStatusRuntimePropertiesContextTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/config/VideoStatusSchedulingConfigTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/config/VideoStatusSchedulingConfigTests.java",
+        "oldFqcn": "com.feibijiubi.backend.config.VideoStatusSchedulingConfigTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.config.VideoStatusSchedulingConfigTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/config/VideoStatusSchedulingIsolationTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/config/VideoStatusSchedulingIsolationTests.java",
+        "oldFqcn": "com.feibijiubi.backend.config.VideoStatusSchedulingIsolationTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.config.VideoStatusSchedulingIsolationTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/controller/VideoStatusFailureAdminAuthorizationTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/controller/VideoStatusFailureAdminAuthorizationTests.java",
+        "oldFqcn": "com.feibijiubi.backend.controller.VideoStatusFailureAdminAuthorizationTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.controller.VideoStatusFailureAdminAuthorizationTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/controller/VideoStatusMetricsAuthorizationTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/controller/VideoStatusMetricsAuthorizationTests.java",
+        "oldFqcn": "com.feibijiubi.backend.controller.VideoStatusMetricsAuthorizationTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.controller.VideoStatusMetricsAuthorizationTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/controller/VideoStatusOutboxRepairAuthorizationTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/controller/VideoStatusOutboxRepairAuthorizationTests.java",
+        "oldFqcn": "com.feibijiubi.backend.controller.VideoStatusOutboxRepairAuthorizationTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.controller.VideoStatusOutboxRepairAuthorizationTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/controller/VideoStatusReconciliationAuthorizationTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/controller/VideoStatusReconciliationAuthorizationTests.java",
+        "oldFqcn": "com.feibijiubi.backend.controller.VideoStatusReconciliationAuthorizationTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.controller.VideoStatusReconciliationAuthorizationTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/controller/VideoStatusStatus0CompensationAuthorizationTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/controller/VideoStatusStatus0CompensationAuthorizationTests.java",
+        "oldFqcn": "com.feibijiubi.backend.controller.VideoStatusStatus0CompensationAuthorizationTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.controller.VideoStatusStatus0CompensationAuthorizationTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/metrics/VideoStatusMetricsComponentWiringTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/metrics/VideoStatusMetricsComponentWiringTests.java",
+        "oldFqcn": "com.feibijiubi.backend.metrics.VideoStatusMetricsComponentWiringTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.metrics.VideoStatusMetricsComponentWiringTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/metrics/VideoStatusMetricsSamplerTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/metrics/VideoStatusMetricsSamplerTests.java",
+        "oldFqcn": "com.feibijiubi.backend.metrics.VideoStatusMetricsSamplerTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.metrics.VideoStatusMetricsSamplerTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/metrics/VideoStatusMetricsTelemetryTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/metrics/VideoStatusMetricsTelemetryTests.java",
+        "oldFqcn": "com.feibijiubi.backend.metrics.VideoStatusMetricsTelemetryTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.metrics.VideoStatusMetricsTelemetryTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/mq/VideoStatusConsumerRecoveryControllerTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/mq/VideoStatusConsumerRecoveryControllerTests.java",
+        "oldFqcn": "com.feibijiubi.backend.mq.VideoStatusConsumerRecoveryControllerTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.mq.VideoStatusConsumerRecoveryControllerTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/mq/VideoStatusEventConsumerAckBoundaryTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/mq/VideoStatusEventConsumerAckBoundaryTests.java",
+        "oldFqcn": "com.feibijiubi.backend.mq.VideoStatusEventConsumerAckBoundaryTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.mq.VideoStatusEventConsumerAckBoundaryTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/mq/VideoStatusRetryTierRoutingTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/mq/VideoStatusRetryTierRoutingTests.java",
+        "oldFqcn": "com.feibijiubi.backend.mq.VideoStatusRetryTierRoutingTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.mq.VideoStatusRetryTierRoutingTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/mq/VideoStatusRetryTopologyTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/mq/VideoStatusRetryTopologyTests.java",
+        "oldFqcn": "com.feibijiubi.backend.mq.VideoStatusRetryTopologyTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.mq.VideoStatusRetryTopologyTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusConsumerRetryLifecycleIsolatedTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusConsumerRetryLifecycleIsolatedTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusConsumerRetryLifecycleIsolatedTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusConsumerRetryLifecycleIsolatedTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusConsumptionRegistrationTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusConsumptionRegistrationTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusConsumptionRegistrationTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusConsumptionRegistrationTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusCounterIsolatedTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusCounterIsolatedTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusCounterIsolatedTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusCounterIsolatedTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusCounterReadTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusCounterReadTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusCounterReadTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusCounterReadTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusCounterTransactionTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusCounterTransactionTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusCounterTransactionTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusCounterTransactionTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusDirtyRecoveryFairnessIsolatedTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusDirtyRecoveryFairnessIsolatedTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusDirtyRecoveryFairnessIsolatedTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusDirtyRecoveryFairnessIsolatedTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusDirtyRecoveryFairnessTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusDirtyRecoveryFairnessTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusDirtyRecoveryFairnessTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusDirtyRecoveryFairnessTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusDirtyRecoveryRealConvergenceTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusDirtyRecoveryRealConvergenceTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusDirtyRecoveryRealConvergenceTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusDirtyRecoveryRealConvergenceTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusDirtySchedulingTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusDirtySchedulingTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusDirtySchedulingTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusDirtySchedulingTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusEventAgeGuardTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusEventAgeGuardTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusEventAgeGuardTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusEventAgeGuardTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusFlushDeferralTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusFlushDeferralTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusFlushDeferralTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusFlushDeferralTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusFlushOrderingTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusFlushOrderingTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusFlushOrderingTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusFlushOrderingTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusFlushTestFixture.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusFlushTestFixture.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusFlushTestFixture",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusFlushTestFixture"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusIsolatedIntegrationTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusIsolatedIntegrationTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusIsolatedIntegrationTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusIsolatedIntegrationTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusLuaCounterTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusLuaCounterTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusLuaCounterTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusLuaCounterTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusMetricsIsolatedTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusMetricsIsolatedTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusMetricsIsolatedTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusMetricsIsolatedTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusOutboxConfirmWritebackMigrationTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusOutboxConfirmWritebackMigrationTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusOutboxConfirmWritebackMigrationTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusOutboxConfirmWritebackMigrationTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusOutboxLeaseTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusOutboxLeaseTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusOutboxLeaseTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusOutboxLeaseTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusOutboxRelayTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusOutboxRelayTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusOutboxRelayTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusOutboxRelayTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusOutboxReliabilityIsolatedTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusOutboxReliabilityIsolatedTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusOutboxReliabilityIsolatedTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusOutboxReliabilityIsolatedTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusOutboxReplayBoundaryTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusOutboxReplayBoundaryTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusOutboxReplayBoundaryTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusOutboxReplayBoundaryTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusOutboxReplayIsolatedTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusOutboxReplayIsolatedTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusOutboxReplayIsolatedTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusOutboxReplayIsolatedTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusReadConsistencyTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusReadConsistencyTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusReadConsistencyTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusReadConsistencyTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusRebuildProcessedEvidenceTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusRebuildProcessedEvidenceTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusRebuildProcessedEvidenceTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusRebuildProcessedEvidenceTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusRebuildScaleIsolatedTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusRebuildScaleIsolatedTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusRebuildScaleIsolatedTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusRebuildScaleIsolatedTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusRebuildSnapshotPagingTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusRebuildSnapshotPagingTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusRebuildSnapshotPagingTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusRebuildSnapshotPagingTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusReconciliationIsolatedTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusReconciliationIsolatedTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusReconciliationIsolatedTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusReconciliationIsolatedTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusReconciliationTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusReconciliationTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusReconciliationTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusReconciliationTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusReplaceLuaIsolatedTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusReplaceLuaIsolatedTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusReplaceLuaIsolatedTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusReplaceLuaIsolatedTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusRuntimeRoleContractTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusRuntimeRoleContractTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusRuntimeRoleContractTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusRuntimeRoleContractTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusSchedulingIsolationTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusSchedulingIsolationTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusSchedulingIsolationTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusSchedulingIsolationTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusSchedulingRealFlowTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusSchedulingRealFlowTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusSchedulingRealFlowTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusSchedulingRealFlowTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusSqlBaselineTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusSqlBaselineTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusSqlBaselineTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusSqlBaselineTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusStatus0CompensationIsolatedIntegrationTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusStatus0CompensationIsolatedIntegrationTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusStatus0CompensationIsolatedIntegrationTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusStatus0CompensationIsolatedIntegrationTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusStatus0CompensationTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusStatus0CompensationTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusStatus0CompensationTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusStatus0CompensationTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusStatus3ReplayIsolatedTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusStatus3ReplayIsolatedTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusStatus3ReplayIsolatedTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusStatus3ReplayIsolatedTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusTelemetryInstrumentationTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusTelemetryInstrumentationTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.video.VideoStatusTelemetryInstrumentationTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.VideoStatusTelemetryInstrumentationTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/admin/VideoStatusFailureAdminIsolatedTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/admin/VideoStatusFailureAdminIsolatedTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.admin.VideoStatusFailureAdminIsolatedTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.admin.VideoStatusFailureAdminIsolatedTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/admin/VideoStatusFailureAdminServiceTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/admin/VideoStatusFailureAdminServiceTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.admin.VideoStatusFailureAdminServiceTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.admin.VideoStatusFailureAdminServiceTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/service/admin/VideoStatusStatus3ReplayServiceTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/service/admin/VideoStatusStatus3ReplayServiceTests.java",
+        "oldFqcn": "com.feibijiubi.backend.service.admin.VideoStatusStatus3ReplayServiceTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.service.admin.VideoStatusStatus3ReplayServiceTests"
+      },
+      {
+        "oldPath": "src/test/java/com/feibijiubi/backend/common/VideoStatusCounterRangeTests.java",
+        "newPath": "src/test/java/com/feibijiubi/backend/videostats/support/VideoStatusCounterRangeTests.java",
+        "oldFqcn": "com.feibijiubi.backend.common.VideoStatusCounterRangeTests",
+        "newFqcn": "com.feibijiubi.backend.videostats.support.VideoStatusCounterRangeTests"
+      }
+    ]
+  },
+  "scopeDecisions": [
+    {
+      "target": "videostats.support.VideoStatusCounterRange",
+      "from": "common.VideoStatusCounterRange",
+      "reason": "只服务统计计数区间校验（service.impl 的 Redis/DB 计数路径 + 其单元测试），没有第二个业务消费者，因此不塞进 shared；与 R3 把 CursorDTO 留在 video 的判据一致"
+    },
+    {
+      "target": "videostats.exception.{VideoStatusCounterRangeException,VideoStatusFlushDataException,VideoStatusFlushDeferredException}",
+      "from": "common.*",
+      "reason": "统计专属异常（区间/落库数据/延后落库语义），只被统计实现与调度器使用"
+    },
+    {
+      "target": "videostats.exception.{RetryableMessageException,NonRetryableMessageException,RepairRequiredMessageException}",
+      "from": "common.*",
+      "reason": "按父级裁定“按实际职责而非名字判断”：逐个核对生产/测试引用后，三者只服务统计消息的解析、分类与重试/死信/人工修复语义（VideoStatusEventConsumer、VideoStatusConsumptionServiceImpl、VideoStatusEventFingerprintServiceImpl、VideoStatusBatchFlushServiceImpl、VideoStatusRebuildServiceImpl、VideoStatusServiceImpl、VideoStatusVidMutex 及其测试），不存在真正通用的跨业务消费者。仅改包，未改继承关系、抛出/捕获点、重试与错误处理行为"
+    },
+    {
+      "target": "videostats.mq.RabbitConstants",
+      "from": "utils.rabbitmq.RabbitConstants",
+      "reason": "父级裁定边界 1：内容 100% 是 video.status.* 拓扑名与统计消息头名，只被统计代码使用；常量值、队列/交换机/路由键、头名、监听器 id 全部原样保留"
+    },
+    {
+      "target": "videostats.enums.{VideoStatusConsumeProcessStatus,RegistrationResult}",
+      "from": "enums.*",
+      "reason": "消费状态机与注册结果枚举，只服务统计消费路径；User* 枚举留在原处（R5）"
+    },
+    {
+      "target": "videostats.service.admin",
+      "from": "service.admin",
+      "reason": "统计失败诊断/Outbox 重放/status3 重放服务，保留既有 service/admin 形状（接口、实现与行类型同包），不新造 impl 子包"
+    },
+    {
+      "target": "videostats.service / videostats.service.impl",
+      "from": "service.video.videostatus / service.impl.video.videostatus",
+      "reason": "去掉多余的 videostatus 包段；Controller→Service→Mapper 分层与全部方法正文不变"
+    },
+    {
+      "target": "videostats.capacity（仅测试树）",
+      "from": "service.video.capacity（仅测试树）",
+      "reason": "统计容量审计/估算/报告是统计专属测试工具，不是 service 层实现；路径镜像会造出并不存在的 videostats.service.capacity 生产层"
+    },
+    {
+      "target": "videostats.service（测试）",
+      "from": "service.video（测试）",
+      "reason": "统计测试按当前相对路径镜像迁移，保留类名/断言/跳过条件；不按 SUT 逐个改判包，避免 37 个文件的主观分派"
+    },
+    {
+      "target": "两个同名 VideoStatusSchedulingIsolationTests 分别落在 videostats.config 与 videostats.service",
+      "from": "config.VideoStatusSchedulingIsolationTests 与 service.video.VideoStatusSchedulingIsolationTests",
+      "reason": "父级明确要求分到不同子包避免同名冲突；类名、断言与 opt-in 条件均未改，不重命名、不合并"
+    },
+    {
+      "target": "src/test/java/.../service/video/baseline/VideoInteractionAdmissionBaselineSummary(+Tests)",
+      "from": "未迁移",
+      "reason": "内容是交互准入基线（不是统计流水线），本批不扩大范围；R3 遗留位置，记为 R6 清理项"
+    }
+  ],
+  "messageCompatibility": {
+    "verdict": "协议闸门触发：统计事件 payload 类（com.feibijiubi.backend.event.VideoStatusChangedEvent）的包名会进入 Rabbit __TypeId__ 头，迁移它会改变出站协议并破坏在途/滚动期消息；父级裁定 A：本轮不迁 event 包，并留作需要单独设计/授权的协议迁移事项",
+    "converter": {
+      "bean": "com.feibijiubi.backend.videostats.config.VideoStatusRabbitConfig#rabbitMessageConverter",
+      "type": "Jackson2JsonMessageConverter + DefaultJackson2JavaTypeMapper",
+      "trustedPackages": "\"*\"（既有配置，本轮未改、未放宽也未收紧）",
+      "idClassMapping": "空：本轮不新增兼容映射类名表",
+      "typePrecedence": "默认（INFERRED），本轮未改",
+      "wiredToRabbitTemplateBy": "Spring Boot RabbitAutoConfiguration$RabbitTemplateConfiguration.rabbitTemplateConfigurer 用 ObjectProvider.getIfUnique() 注入唯一的 MessageConverter bean（应用中仅此一个），因此 VideoStatusEventPublisher 的 convertAndSend 由它序列化"
+    },
+    "sendPath": [
+      "VideoStatusEventPublisher#publish → rabbitTemplate.convertAndSend(MAIN_EXCHANGE, MAIN_ROUTING_KEY, event, ...) → 写入 __TypeId__=<payload 类 FQCN> 与 contentType=application/json",
+      "VideoStatusMessageForwarder#toRetry/toDead → MessageBuilder 克隆原消息（保留原头）或按 eventId+payload 重建消息（无 __TypeId__）→ rabbitTemplate.send(Message) 不再经过 converter 序列化"
+    ],
+    "listenPath": [
+      "VideoStatusEventConsumer#consume(org.springframework.amqp.core.Message, Channel) 的 @RabbitListener 使用 containerFactory=videoStatusListenerContainerFactory",
+      "容器适配器 MessagingMessageListenerAdapter.toMessagingMessage 仍会走 converter；amqp Message/MessageProperties/Channel 参数在 isEligibleParameter 中被排除 → 不设置 inferredArgumentType → DefaultJackson2JavaTypeMapper.toJavaType 回落到 __TypeId__ 解析类",
+      "类不存在时抛 MessageConversionException('failed to resolve class name. Class not found')→ ListenerExecutionFailedException，业务 handler 不会被调用；配合 defaultRequeueRejected=false + 主队列 DLX，消息被拒进死信而不会落统计"
+    ],
+    "evidence": [
+      "实测（临时探针，日志 C:/Users/31984/AppData/Local/Temp/r4-probe2.log）：converter.toMessage(event, props) 头 = {__TypeId__=com.feibijiubi.backend.event.VideoStatusChangedEvent}",
+      "实测：把 __TypeId__ 改成不存在的类后 converter.fromMessage 抛 MessageConversionException，经 MessagingMessageListenerAdapter.onMessage 时 handler 未被调用（caused-by 链为 MessageConversionException → ClassNotFoundException）",
+      "实测：无 __TypeId__ 的消息（forwarder 的 recovery 消息形态）反序列化为 java.util.LinkedHashMap，与包名无关",
+      "Spring AMQP 3.2.11 / Spring Boot 3.5.15 字节码核对：MessagingMessageListenerAdapter$MessagingMessageConverterAdapter.isEligibleParameter 排除 org.springframework.amqp.core.Message；DefaultJackson2JavaTypeMapper.toJavaType 在无 inferred type 时按 __TypeId__ 解析；RabbitTemplateConfigurer 用 getIfUnique() 取唯一 MessageConverter",
+      "持久化序列化路径与包名无关：Outbox payload 是普通 objectMapper.writeValueAsString(event)（无 default typing），回放按 readValue(payload, VideoStatusChangedEvent.class) 或 forwarder.toRetry(eventId,payload,attempt) 重建消息；Redis key/Lua、日志里的 getSimpleName 均不承载 FQCN",
+      "全仓无 Class.forName/@MapperScan 依赖类型头的反射用法；application.yml.example 只有 mapper-locations，无 type-aliases-package"
+    ],
+    "impactIfMoved": [
+      "新消息头变成新 FQCN：部署瞬间主队列/10s/30s/120s 重试队列/DLX 中带旧 FQCN 的在途消息在新版本上解析失败，被拒进死信而不落统计（需人工从 DLQ/Outbox 补）",
+      "反向滚动期旧实例收到新 FQCN 消息同样 ClassNotFound"
+    ],
+    "decision": {
+      "option": "A",
+      "content": "保留 com.feibijiubi.backend.event 三个类（VideoStatusChangedEvent/VideoStatusEventType/VideoStatusDelta）的原路径与 FQCN；本轮不迁、不加别名类、不加 idClassMapping、不改 converter/trustedPackages/队列，不排空队列、不操作真实消息",
+      "followUp": "协议感知迁移（含排空/兼容策略）作为待单独设计并授权的独立事项；本轮不预先指定排空策略"
+    },
+    "notReliedUpon": "未选方案 B 中“idClassMapping 可能同时影响出站反向映射”的判断未经本轮验证，本文件不把它记为已证事实；实际出站映射行为未测试",
+    "regression": "com.feibijiubi.backend.videostats.config.VideoStatusRabbitMessageTypeHeaderTests（4 项，DB-free、不连 broker）：固定出站 __TypeId__ 为原 FQCN、原 FQCN 仍可解析回事件对象、不存在的类名仍然失败、converter 未新增 idClassMapping 且消息体不含包名"
+  },
+  "nonMechanicalChanges": [
+    {
+      "file": "src/main/java/com/feibijiubi/backend/videostats/mapper/VideoStatusConsumedEventMapper.java",
+      "change": "Javadoc 的 {@link ...VideoStatusProperties#MAX_REBUILD_CANDIDATE_PAGE_SIZE} 改为迁移后的 FQCN（唯一正文差异）"
+    },
+    {
+      "file": "src/main/java/com/feibijiubi/backend/videostats/support/VideoStatusCounterRange.java",
+      "change": "拆包后新增 import videostats.exception.VideoStatusCounterRangeException（原先同包无需 import）"
+    },
+    {
+      "file": "src/test/java/com/feibijiubi/backend/videostats/support/VideoStatusCounterRangeTests.java",
+      "change": "同上：新增 import videostats.exception.VideoStatusCounterRangeException"
+    },
+    {
+      "file": "src/test/java/com/feibijiubi/backend/videostats/metrics/VideoStatusMetricsSamplerTests.java",
+      "change": "MappedStatement namespace 字面量 com.feibijiubi.backend.metrics.VideoStatusMetricsMapper. → videostats.metrics..."
+    },
+    {
+      "file": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusSchedulingRealFlowTests.java",
+      "change": "Javadoc 中 VideoStatusSchedulingIsolationTests 的 FQCN 改为 videostats.config..."
+    },
+    {
+      "file": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusIsolatedIntegrationTests.java",
+      "change": "通配 import 改为 videostats.config/mq/service.impl；补 import config.RedisScriptConfig；@MapperScan 旧 mapper 包项按等价集合改为 videostats.mapper；注释同步；public IsolationGuard 与全部断言未改"
+    },
+    {
+      "file": "src/test/java/com/feibijiubi/backend/videostats/service/VideoStatusCounterTransactionTests.java",
+      "change": "@MapperScan 追加 videostats.mapper（该清单原本没有旧 mapper 包项）；注释同步"
+    },
+    {
+      "file": "其余 8 个统计 opt-in/隔离测试",
+      "change": "@MapperScan(\"com.feibijiubi.backend.mapper\") → \"com.feibijiubi.backend.videostats.mapper\"（旧包 R4 后已无接口，等价集合，不是缩小扫描范围）：VideoStatusCounterIsolatedTests、VideoStatusDirtyRecoveryFairnessIsolatedTests、VideoStatusDirtyRecoveryRealConvergenceTests、VideoStatusOutboxLeaseTests、VideoStatusRebuildScaleIsolatedTests、VideoStatusSqlBaselineTests、VideoStatusStatus0CompensationIsolatedIntegrationTests、VideoStatusStatus3ReplayIsolatedTests"
+    },
+    {
+      "file": "src/test/java/com/feibijiubi/backend/interaction/service/{VideoInteractionAdmissionBaselineIsolatedTests,VideoInteractionAdmissionIsolatedTests,VideoInteractionCleanupIsolatedTests,VideoInteractionIsolatedTests,VideoInteractionSyncIsolatedTests}.java",
+      "change": "@MapperScan 旧 mapper 包项改为 videostats.mapper（这 5 个上下文导入/依赖统计服务与 VideoStatusMapper，旧扫描项本来就是为统计 mapper 写的）；注释同步；其余源码不变"
+    },
+    {
+      "file": "src/main/java/com/feibijiubi/backend/interaction/config/VideoInteractionCleanupSchedulingConfig.java",
+      "change": "Javadoc 的 {@link ...VideoStatusSchedulingConfig} 改为 videostats.config...（R3 遗留的 FQCN 同步项）"
+    }
+  ],
+  "xmlChanges": {
+    "physicalPathPolicy": "7 个 XML 物理路径仍在 src/main/resources/com/feibijiubi/backend/mapper/，namespace/resultType 只改 FQCN；mybatis.mapper-locations 约定因此无需改动（application.yml 未读取，application.yml.example 中该值仍是同一物理目录）",
+    "files": [
+      "VideoStatusConsumedEventMapper.xml：namespace + resultMap type（VideoStatusConsumedEvent）",
+      "VideoStatusFailureAdminMapper.xml：namespace + 11 处 resultType（VideoStatusFailureAdminRow$OutboxRow/ConsumedRow、VideoStatusStatus3ReplayRow$ConsumedTarget/OutboxSource、VideoStatusConsumptionRepairLog）",
+      "VideoStatusMapper.xml：namespace + resultType（VideoStatus）",
+      "VideoStatusMetricsMapper.xml：namespace（videostats.metrics.VideoStatusMetricsMapper）",
+      "VideoStatusOutboxMapper.xml：namespace + resultType（VideoStatusOutbox）",
+      "VideoStatusOutboxRepairMapper.xml：namespace + resultType（VideoStatusOutbox、VideoStatusConsumptionRepairLog）",
+      "VideoStatusReconciliationMapper.xml：namespace + resultMap type（VideoStatus、VideoStatusReconciliationEventRow、VideoStatusReconciliationRelationAggregate）"
+    ],
+    "sql": "全部 SQL 文本、语句 id、resultMap 结构未改（父级可对差异逐行确认为 FQCN 行）"
+  },
+  "mapperScanAudit": {
+    "mainCode": "主代码没有 @MapperScan；mapper 由 mybatis-spring-boot 的自动配置按 @SpringBootApplication 根包 com.feibijiubi.backend 扫描 @Mapper 接口注册，videostats.mapper 仍在根包下",
+    "oldPackageNowEmpty": "R4 后 com.feibijiubi.backend.mapper 目录内已无任何接口（迁移前该包只有 6 个统计 mapper），空目录已删除",
+    "stringScansUpdated": 15,
+    "stringScanRule": "14 处把旧包项就地改为 videostats.mapper（等价集合）；1 处（VideoStatusCounterTransactionTests）追加 videostats.mapper",
+    "basePackageClassesScans": [
+      "videostats.service.admin.VideoStatusFailureAdminIsolatedTests（VideoStatusFailureAdminMapper）",
+      "videostats.service.VideoStatusMetricsIsolatedTests（VideoStatusMetricsMapper + VideoStatusMapper）",
+      "videostats.service.VideoStatusOutboxReplayIsolatedTests（VideoStatusOutboxRepairMapper）",
+      "videostats.service.VideoStatusReconciliationIsolatedTests（VideoStatusReconciliationMapper）"
+    ],
+    "basePackageClassesNote": "这几处按接口类引用，随导入自动指向新包，扫描范围本身不变",
+    "verified": "静态核对（opt-in 用例未运行，需真实 MySQL/Redis/RabbitMQ）；相关上下文的测试类/断言未改"
+  },
+  "dependencies": {
+    "videostatsToOthers": [
+      "event（21 处 import，协议例外类：VideoStatusChangedEvent/VideoStatusEventType/VideoStatusDelta）",
+      "common（20 处：ApiResponse、BusinessException、RedisOperationException → R5 的 shared/异常归属待收口）",
+      "utils（18 处：JsonUtils、RedisUtils、RedisKeyUtils、RedisHash/Set/ZSetOperations → R5 基础设施）",
+      "auth（5 处：@AdminOnly 管理端点鉴权注解）"
+    ],
+    "othersToVideostats": [
+      "user/service/impl/UserServiceImpl → videostats.mapper.VideoStatusMapper",
+      "video/converter/VideoConverter、video/service/impl/VideoReviewImpl、video/service/impl/VideoServiceImpl → videostats.entity.VideoStatus / videostats.mapper.VideoStatusMapper",
+      "interaction/service/impl/UserVideoServiceImpl → videostats.mapper.VideoStatusMapper、videostats.service.VideoStatusService、videostats.config.VideoStatusProperties",
+      "interaction/service/impl/VideoInteractionServiceImpl → 同上",
+      "event/VideoStatusDelta → videostats.entity.VideoStatusConsumedEvent（协议例外类内部的既有引用，只改 import）",
+      "BackendApplication → videostats.config.VideoStatusProperties（@EnableConfigurationProperties 仍显式登记）"
+    ],
+    "testDependents": [
+      "converter/ResponseConverterTests",
+      "interaction/service/{VideoInteractionAdmissionBaselineIsolatedTests,VideoInteractionAdmissionIsolatedTests,VideoInteractionCleanupIsolatedTests,VideoInteractionIsolatedTests,VideoInteractionServiceTests,VideoInteractionSyncIsolatedTests}"
+    ],
+    "note": "以上跨模块访问是既有调用链的显式归组，未做任何解耦或门面改造，不宣称“移动包名即完成架构解耦”"
+  },
+  "exceptions": [
+    {
+      "item": "com.feibijiubi.backend.event.{VideoStatusChangedEvent,VideoStatusEventType,VideoStatusDelta}",
+      "reason": "消息协议兼容例外（见 messageCompatibility）；R6 保持该例外，不迁、不加别名/映射"
+    },
+    {
+      "item": "Mapper XML 物理路径仍集中",
+      "reason": "不在本批搬迁；namespace/resultType 已随 Java 包更新，物理路径属 R6 才评估的事项"
+    },
+    {
+      "item": "src/test/resources/video-status-isolated.properties 的 logging.level.com.feibijiubi.backend.mapper=WARN",
+      "reason": "R4 后它不再覆盖 videostats.mapper 包；按父级约束留 R6 统一补齐并验证，本批不提前扩大范围"
+    },
+    {
+      "item": "docs/tutorial/video-status-batch-aggregation-implementation.md 第 89 行的 resultType 示例仍是 com.feibijiubi.backend.entity.VideoStatusConsumedEvent",
+      "reason": "文档类修改归 R6；本批只更新计划与映射"
+    },
+    {
+      "item": "src/test/java/.../service/video/baseline/*（交互准入基线摘要及其测试）",
+      "reason": "内容不属于统计流水线，本批不迁，R6 决定归属"
+    },
+    {
+      "item": "R5 余量：common/{ApiResponse,BusinessException,GlobalExceptionHandler,RedisOperationException}、config/{RedisScriptConfig,TencentCosConfig,TencentCosProperties,WebMvcConfig}、enums/User*、service/{ratelimit,storage} 及其实现、utils/*",
+      "reason": "通用/基础设施能力，按计划留 R5 收口"
+    }
+  ],
+  "knownGaps": [
+    "opt-in 隔离/集成用例（需真实 MySQL/Redis/RabbitMQ）未运行：VideoStatus*Isolated*、VideoStatusSchedulingRealFlowTests、VideoStatusCapacityAuditIsolatedTests、VideoStatusRebuildScaleIsolatedTests、VideoInteraction*Isolated* 等；普通回归只做离线证据",
+    "application.yml 未读取：其对包名的任何引用（如 type-aliases-package）未核对；本批 XML 全部使用 FQCN，不依赖类型别名，application.yml.example 中 mapper-locations 仍指向同一物理目录",
+    "真实 Broker 的 __TypeId__ 收发现场、滚动发布、DLQ 重放未验证（仅离线 converter/adapter 证据与静态审计）",
+    "新增/修改的 @MapperScan 只做静态核对，未在真实容器中启动验证",
+    "日志 WARN 旧包覆盖缺口与教程文档过期 FQCN 留 R6"
+  ],
+  "verification": {
+    "commands": [
+      "MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o -DskipTests test-compile",
+      "MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o '-Dtest=*Tests,!BackendApplicationTests' -DvideoSourceLocalTls=false -DvideoStatusIT=false -DvideoStatusScale=false -DvideoStatusBaseline=false -DvideoStatusBenchmark=false '-DargLine=-Xms64m -Xmx512m -Djdk.attach.allowAttachSelf=true' test"
+    ],
+    "cleanCompile": {
+      "action": "rm -rf target 后全量 test-compile（离线 maven-clean-plugin 不可用，沿用 R2/R3 做法，不宣称 clean 命令通过）",
+      "productionSources": 258,
+      "testSources": 132,
+      "result": "BUILD SUCCESS",
+      "log": "C:/Users/31984/AppData/Local/Temp/layout-r4-final-compile.log"
+    },
+    "relatedTests": {
+      "scope": "videostats/interaction/converter/auth/user/video/common/utils 全部 *Tests（含 3 个新增类）",
+      "tests": 820,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 217,
+      "result": "BUILD SUCCESS",
+      "log": "C:/Users/31984/AppData/Local/Temp/layout-r4-final-related.log"
+    },
+    "newTests": {
+      "classes": [
+        "videostats.mapper.VideoStatusMapperBindingTests（3）",
+        "videostats.metrics.VideoStatusMetricsMapperBindingTests（2）",
+        "videostats.config.VideoStatusRabbitMessageTypeHeaderTests（4）"
+      ],
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "log": "C:/Users/31984/AppData/Local/Temp/layout-r4-new-tests-1.log"
+    },
+    "fullRegression": {
+      "tests": 1183,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 228,
+      "executedPassed": 955,
+      "result": "BUILD SUCCESS",
+      "log": "C:/Users/31984/AppData/Local/Temp/layout-r4-final-full.log"
+    },
+    "comparisonWithR3": {
+      "baseline": "R3 target/surefire-reports 只读比对（1174 项）",
+      "method": "按 R4 映射把 63 个迁移测试类 FQCN 规范化后逐 method 比对类名/方法名/结果",
+      "missing": 0,
+      "statusChanged": 0,
+      "added": 9,
+      "skippedBaseline": 228,
+      "skippedNow": 228
+    },
+    "processLogs": [
+      "C:/Users/31984/AppData/Local/Temp/layout-r4-compile-1.log（旧：support/exception 拆包后 VideoStatusCounterRange 缺 import）",
+      "C:/Users/31984/AppData/Local/Temp/layout-r4-compile-2.log（同上，英文 locale 重跑确认只有 1 个错误）",
+      "C:/Users/31984/AppData/Local/Temp/layout-r4-compile-3.log（旧：VideoStatusIsolatedIntegrationTests 通配 import 未随迁移更新 + CounterRangeTests 缺 import）",
+      "C:/Users/31984/AppData/Local/Temp/layout-r4-compile-4.log（旧：通配 import 改写后 RedisScriptConfig 丢引用）",
+      "C:/Users/31984/AppData/Local/Temp/layout-r4-compile-5.log（通过）",
+      "C:/Users/31984/AppData/Local/Temp/r4-probe.log、r4-probe2.log（协议审计临时探针）"
+    ]
+  }
+}
