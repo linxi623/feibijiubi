@@ -3,10 +3,10 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.feibijiubi.backend.mapper.UploadTempFileMapper">
+<mapper namespace="com.feibijiubi.backend.video.mapper.UploadTempFileMapper">
 
     <insert id="insert"
-            parameterType="com.feibijiubi.backend.entity.UploadTempFile"
+            parameterType="com.feibijiubi.backend.video.entity.UploadTempFile"
             useGeneratedKeys="true"
             keyProperty="id">
         INSERT INTO upload_temp_file (
@@ -31,7 +31,7 @@
     </insert>
 
     <select id="selectByObjectKey"
-            resultType="com.feibijiubi.backend.entity.UploadTempFile">
+            resultType="com.feibijiubi.backend.video.entity.UploadTempFile">
         SELECT
             id,
             uid,
@@ -64,7 +64,7 @@
     </update>
 
     <select id="selectExpiredTempFiles"
-            resultType="com.feibijiubi.backend.entity.UploadTempFile">
+            resultType="com.feibijiubi.backend.video.entity.UploadTempFile">
         SELECT
             id,
             uid,

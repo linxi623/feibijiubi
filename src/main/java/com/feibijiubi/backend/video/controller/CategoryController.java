@@ -1,0 +1,28 @@
+package com.feibijiubi.backend.video.controller;
+
+import com.feibijiubi.backend.auth.annotation.OptionalLogin;
+import com.feibijiubi.backend.common.ApiResponse;
+import com.feibijiubi.backend.video.service.category.CategoryService;
+import com.feibijiubi.backend.video.vo.CategoryParentVO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+
+@RestController
+@RequestMapping("/api/category")
+@RequiredArgsConstructor
+public class CategoryController {
+    private final CategoryService categoryService;
+
+    @GetMapping
+    @OptionalLogin
+    public ApiResponse<List<CategoryParentVO>> getAll() {
+        List<CategoryParentVO> list = categoryService.getCategories();
+        return ApiResponse.success(list);
+    }
+
+}

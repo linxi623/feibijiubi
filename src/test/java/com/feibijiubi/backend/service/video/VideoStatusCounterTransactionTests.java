@@ -6,15 +6,16 @@ import com.feibijiubi.backend.config.VideoStatusProperties;
 import com.feibijiubi.backend.user.converter.UserConverter;
 import com.feibijiubi.backend.user.mapper.UserFollowMapper;
 import com.feibijiubi.backend.user.mapper.UserMapper;
-import com.feibijiubi.backend.mapper.UserVideoMapper;
-import com.feibijiubi.backend.mapper.VideoMapper;
+import com.feibijiubi.backend.interaction.mapper.UserVideoMapper;
+import com.feibijiubi.backend.video.mapper.VideoMapper;
 import com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper;
 import com.feibijiubi.backend.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.user.service.impl.UserServiceImpl;
-import com.feibijiubi.backend.service.impl.video.UserVideoServiceImpl;
+import com.feibijiubi.backend.interaction.service.UserVideoService;
+import com.feibijiubi.backend.interaction.service.impl.UserVideoServiceImpl;
 import com.feibijiubi.backend.service.impl.video.videostatus.VideoStatusBatchFlushServiceImpl;
 import com.feibijiubi.backend.user.service.UserService;
-import com.feibijiubi.backend.service.video.PublishedVideoGuard;
+import com.feibijiubi.backend.video.service.PublishedVideoGuard;
 import com.feibijiubi.backend.service.video.videostatus.VideoStatusBatchFlushService;
 import com.feibijiubi.backend.user.vo.UserVO;
 import org.junit.jupiter.api.AfterEach;
@@ -96,7 +97,10 @@ class VideoStatusCounterTransactionTests {
     @EnableConfigurationProperties(VideoStatusProperties.class)
     // R2：UserMapper 已迁到 com.feibijiubi.backend.user.mapper，不再落在 TestApplication 的
     // @MapperScan("com.feibijiubi.backend.mapper") 范围内，这里显式补扫该包。
-    @MapperScan("com.feibijiubi.backend.user.mapper")
+    // R3：VideoMapper 迁到 com.feibijiubi.backend.video.mapper，UserVideoMapper 迁到
+    // com.feibijiubi.backend.interaction.mapper，同样追加（旧范围不动）。
+    @MapperScan({"com.feibijiubi.backend.user.mapper", "com.feibijiubi.backend.video.mapper",
+            "com.feibijiubi.backend.interaction.mapper"})
     static class TransactionalTestBeans {
 
         @Bean

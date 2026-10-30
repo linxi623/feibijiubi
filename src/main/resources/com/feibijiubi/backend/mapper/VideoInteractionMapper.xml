@@ -7,10 +7,10 @@
   全部时间判断都用 DB 时钟 NOW(3)，不用 JVM 时钟：多实例部署时 JVM 时钟偏差会直接变成
   “窗口提前放开”或“窗口永久抑制”。
 -->
-<mapper namespace="com.feibijiubi.backend.mapper.VideoInteractionMapper">
+<mapper namespace="com.feibijiubi.backend.interaction.mapper.VideoInteractionMapper">
 
     <select id="selectRequestByKey"
-            resultType="com.feibijiubi.backend.entity.VideoInteractionRequest"
+            resultType="com.feibijiubi.backend.interaction.entity.VideoInteractionRequest"
             timeout="3">
         SELECT id,
                request_key,
@@ -76,7 +76,7 @@
     </insert>
 
     <select id="selectWindowForUpdate"
-            resultType="com.feibijiubi.backend.entity.VideoInteractionWindow"
+            resultType="com.feibijiubi.backend.interaction.entity.VideoInteractionWindow"
             timeout="3">
         SELECT id,
                actor_type,

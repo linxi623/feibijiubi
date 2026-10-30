@@ -1,12 +1,12 @@
 package com.feibijiubi.backend.service.video;
 
-import com.feibijiubi.backend.converter.VideoConverter;
-import com.feibijiubi.backend.entity.Video;
+import com.feibijiubi.backend.video.converter.VideoConverter;
+import com.feibijiubi.backend.video.entity.Video;
 import com.feibijiubi.backend.entity.VideoStatus;
 import com.feibijiubi.backend.event.VideoStatusDelta;
 import com.feibijiubi.backend.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
-import com.feibijiubi.backend.vo.VideoDetailVO;
+import com.feibijiubi.backend.video.vo.VideoDetailVO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

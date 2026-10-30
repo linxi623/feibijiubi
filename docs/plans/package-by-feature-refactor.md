@@ -43,9 +43,9 @@ Lua、测试fixture、SQL迁移路径不变。R6只有在不修改敏感配置�
 |---|---|---|---|---|
 | R0 | 基线、范围清单、风险清单 | 父级处理，无业务改动 | 干净提交、测试数字、敏感/产物排除 | 已完成 |
 | R1 | 外部视频源＋本地身份归位 | videosource及video.local；其他代码仅修受影响引用 | HTTP权限/响应不变、受限客户端语义、两Mapper绑定、旧包残留 | 已离线验收并合入29ff843 |
-| R2 | 用户与鉴权 | user/auth及必要引用；共享类不强行搬入某个业务 | Login/Admin拦截器装配、Token/用户接口、Bean名稳定 | 父级离线验收通过，纳入本批本地提交（见R2验收记录） |
-| R3 | 视频、分类、审核、互动 | video/interaction及必要引用 | 发布可用性守卫、原事务/幂等/限流、Mapper绑定 | R2已验收，准备派发 |
-| R4 | 视频统计流水线 | videostats以及专属配置/事件/MQ/指标 | 队列名/消息序列化类型头、锁/事务/调度器Bean名、旧包兼容风险 | 待R3验收 |
+| R2 | 用户与鉴权 | user/auth及必要引用；共享类不强行搬入某个业务 | Login/Admin拦截器装配、Token/用户接口、Bean名稳定 | 父级离线验收通过，已本地提交`e451467`并fast-forward合入主工作区（未推送远程） |
+| R3 | 视频、分类、审核、互动 | video/interaction及必要引用 | 发布可用性守卫、原事务/幂等/限流、Mapper绑定 | 父级离线验收通过，纳入本批本地提交（见R3验收记录） |
+| R4 | 视频统计流水线 | videostats以及专属配置/事件/MQ/指标 | 队列名/消息序列化类型头、锁/事务/调度器Bean名、旧包兼容风险 | R3已验收，准备派发；先过消息类型兼容闸门 |
 | R5 | 通用能力收口 | shared/infrastructure/全局装配 | 避免新的大杂烩、全局异常/脚本/存储Bean仍可装配 | 待R4验收 |
 | R6 | 全局扫描、目录说明、最终验收 | 空目录/残留引用/架构测试/文档 | 测试数量守恒、包路径一致、XML解析装配、打包和运行边界说明 | 待R5验收 |
 
@@ -137,3 +137,32 @@ MAVEN_OPTS='-Xms64m -Xmx256m' ./mvnw -o \
 - 历史失败补查：`layout-r2-worker-compile-1.log`为3个测试尚未迁包导致同包类无法解析；`compile-2.log`为ResponseConverterTests缺少迁移后的UserConverter import。候选已分别迁移测试包、补充import，父级核对修复位置；后续编译与回归成功。此前runner退出3221226505的运行故障原因仍未查明，不能由重试成功认定已根治。离线clean插件缺失记录保留，不宣称clean命令通过。父级审计脚本初次因Windows默认GBK读取UTF-8映射失败，显式UTF-8后完成，不涉及业务测试失败。
 - 审查备注处理：保留既有无用import及util命名，不夹带风格清理；`src/test/resources/video-status-isolated.properties`对旧mapper包的WARN日志配置未覆盖迁移后的user.mapper，留R6统一补齐并验证，真实opt-in运行仍未验收。
 - 本批仅离线验收，不代表应用启动、真实MySQL/Redis/RabbitMQ/TLS或生产验收；未读application.yml，未联网、未执行迁移。父级按用户授权单独本地提交本批并fast-forward集成，不推送远程。
+
+### R3 执行记录（执行侧自验，非父级验收）
+
+- 工作树：`D:/feibijiubi/backend-layout-r3`，干净 detached 基线`e451467`（R2 父级提交，已合入主工作区）。本批只在该工作树写入，未stage/commit/push，未改动 R1/R2 工作树，未再委派。
+- 范围与映射：迁移58个生产Java＋14个测试Java；逐文件旧→新路径/FQCN、模块归属裁定、新增测试、非机械改动、opt-in 扫描审计全部列在`docs/refactoring/r3-package-map.json`（先写映射再迁移，迁移后回填实际改动）。
+  - `video`：`controller`（Video/Category/VideoReview）、`converter.VideoConverter`、`dto`（CursorDTO/VideoSubmitDTO/VideoReviewDTO/VideoUploadPrepareDTO）、`entity`（Video/Category/UploadTempFile）、`enums.VideoReviewStatus`、`mapper`（Video/Category/UploadTempFile）、`service`（VideoService/VideoReviewService/PublishedVideoGuard/`category.CategoryService`）、`service.impl`（VideoServiceImpl/VideoReviewImpl/`category.CategoryServiceImpl`）、`vo`（VideoDetail/VideoListItem/VideoSubmit/VideoUploadPrepare/AdminVideoDetail/AdminVideoListItem/CategoryParent/CategoryChildren/CursorPage）。
+  - `interaction`：`UserVideoController`、`entity`（UserVideo/VideoInteractionRequest/VideoInteractionWindow）、`mapper`（UserVideo/VideoInteraction）、`UserVideoService(+Impl)`、`service`（10个交互接口/枚举/值类型）、`service.impl`（6个交互实现/调度器）、`vo.VideoInteractionVO`、`config`（VideoInteractionProperties/VideoInteractionCleanupSchedulingConfig）。
+  - 归属裁定（父级确认）：上传准备DTO/VO与UploadTempFile实体+Mapper随视频上传/发布流程归video，接受未来infrastructure存储实现import video；CursorDTO/CursorPageVO经核实无其他业务消费者，归video而非shared；interaction内部去掉冗余`interaction`包段，类名/Bean名/配置前缀/调度不变。
+- 逐文件正文核对：58+14个迁移文件与`git show e451467:旧路径`在不计package/import行后正文一致，仅6个测试文件的MapperScan/路径常量/FQCN字符串不同（均已在映射文件列明）；另有无需迁移但仅改import的调用点（BackendApplication、FileStorageService/TencentCosStorageServiceImpl、UserServiceImpl、若干VideoStatus*测试）。
+- Mapper XML：`VideoMapper.xml`、`CategoryMapper.xml`、`UploadTempFileMapper.xml`（namespace/parameterType/resultType）、`UserVideoMapper.xml`、`VideoInteractionMapper.xml`只改FQCN，物理路径仍在`src/main/resources/com/feibijiubi/backend/mapper/`；孤立测试用的`mybatis.mapper-locations=classpath:com/feibijiubi/backend/mapper/*.xml`因此保持有效，全程未读application.yml。
+- 新增DB-free装配测试5类12项（不连数据库、不启动Web容器）：`VideoMapperBindingTests`（3，含真实MyBatis解析XML→新namespace、逐方法MappedStatement、resultType/parameterType指向video实体与VO、根包扫描含3个video mapper、旧FQCN类不存在）、`CategoryMapperBindingTests`（2）、`UploadTempFileMapperBindingTests`（2）、`UserVideoMapperBindingTests`（3，含两个interaction mapper的扫描与旧包残留）、`VideoInteractionMapperBindingTests`（2）。
+- opt-in 上下文：7个按字符串扫描的上下文补扫新包（仅追加，不删旧范围），其余14个静态核对不依赖迁走的mapper，未改动；该审计与已知缺口（`video-status-isolated.properties`的WARN日志仍只覆盖旧mapper包）记录在映射文件。
+- 验证（离线、串行、未联网、未读application.yml、未启动应用/容器/数据库）：
+  - 最终交付证据用干净全量编译：删除`target/`后`test-compile`，258个生产源文件＋129个测试源文件（124基线＋5新增），BUILD SUCCESS；日志`/tmp/layout-r3-final-compile.log`。过程日志`layout-r3-compile-1..6.log`保留每次失败与修复（1：VideoController的旧`vo.*`通配import随VO迁移失效；2：迁移后同包引用需显式import——PublishedVideoGuard/UserVideoService、`config.*`不再覆盖VideoInteractionProperties；3：交互隔离用例缺VideoStatusIsolatedIntegrationTests import；4：baseline隔离用例缺PublishedVideoGuard import；5：ResponseConverterTests缺VideoConverter import；6：通过），不代表最终状态。离线`maven-clean-plugin`仍不可用，用`rm -rf target`代替，不宣称clean命令通过。
+  - 新增装配测试：12项，0失败/错误/跳过；日志`/tmp/layout-r3-binding-2.log`（首次`layout-r3-binding.log`为`updateVideo`无显式parameterType导致1项断言过强，已删除该断言并复跑通过）。
+  - 相关测试272项（interaction/video/converter/video-status读一致性/各Mapper装配/auth端点），0失败/错误/跳过63（均为opt-in跳过）；日志`/tmp/layout-r3-related.log`。
+  - 普通回归1174项、0失败/错误、228跳过（946项执行通过），BUILD SUCCESS；最终日志`/tmp/layout-r3-final-full.log`（同一数字的中间日志`/tmp/layout-r3-full.log`保留）。
+- 与R2父级全回归1162项逐方法对照（按映射把14个迁移测试类FQCN换成新名；R2Surefire报告只读）：1162项全部保留、0缺失、0结果变化，仅新增12项装配测试；跳过数228不变。
+- 未验证/限制：opt-in用例（需真实MySQL/Redis/RabbitMQ）未运行；真实数据库、MQ、TLS、应用启动与打包未验证；`application.yml`未读取，其对包名的任何引用（如`type-aliases-package`）未核对，本批XML全部使用FQCN，不依赖类型别名；`logging.level`缺口留R6。
+- 本批仅执行侧自验：不声称父级验收通过，未stage/commit/push，未删除任何工作树。
+
+### R3 父级验收记录
+
+- 执行工作流`21560224-2678-4ac7-9a05-1e89d9c94f03`；执行`5c7bb7c5-9141-4b7f-86ae-496e922a952f`、独立审查`6ee1afcb-b0f6-45f8-a392-0756feb5e61e`，均使用`my-cpa/cn:deepseek-v4.1-flash`；独立审查PASS。
+- 父级逐项比对72条映射：旧路径消失、新package匹配；剔除package/import后正文仅6个测试的扫描范围/路径/namespace字符串变化，以及父级补全1处原同包Javadoc引用。所有业务正文保持不变。另核对未迁移文件差异：测试类及IsolationGuard公开可见性仅供跨包复用，隔离逻辑和跳过条件不变；5个XML只改FQCN。
+- 父级补齐记录：video→interaction的UserVideo实体/Mapper依赖，interaction→video的Video/PublishedVideoGuard依赖，user→video的VideoMapper依赖均为既有调用的显式归组，不宣称架构解耦。R4必须同步5个互动隔离测试对VideoStatusIsolatedIntegrationTests的import，以及互动调度配置Javadoc中的VideoStatusSchedulingConfig全限定名。日志WARN配置对user/video/interaction mapper的覆盖缺口仍留R6。
+- 父级复跑离线`test-compile`及普通回归通过：1174项、0失败/错误、228跳过，946项执行通过；日志`/tmp/layout-r3-parent-compile.log`、`/tmp/layout-r3-parent-full.log`。逐方法对比R2/R3 Surefire XML并规范化迁移类名：1162项原测试全部保留、结果不变，只新增12项。
+- 父级核查执行侧历史编译失败位置与对应import/跨包可见性修复。新增绑定测试曾错误要求updateVideo声明parameterType，实际XML未声明，删除该新增错误断言未修改任何既有断言；保留逐statement绑定验证，不额外把未声明类型固定为Object（当前解析结果为null）。历史失败日志保留，未以最终通过抹去失败。
+- 父级验收仅限离线；真实数据库/Redis/RabbitMQ/TLS、应用启动和生产行为未验证，不读取application.yml、不访问基础设施。按用户授权单独本地提交并fast-forward集成，不推送远程。

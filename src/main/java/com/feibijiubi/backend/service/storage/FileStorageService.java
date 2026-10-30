@@ -1,7 +1,7 @@
 package com.feibijiubi.backend.service.storage;
 
-import com.feibijiubi.backend.dto.VideoUploadPrepareDTO;
-import com.feibijiubi.backend.vo.VideoUploadPrepareVO;
+import com.feibijiubi.backend.video.dto.VideoUploadPrepareDTO;
+import com.feibijiubi.backend.video.vo.VideoUploadPrepareVO;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface FileStorageService {

@@ -2,8 +2,8 @@ package com.feibijiubi.backend.service.video;
 
 import com.feibijiubi.backend.common.VideoStatusCounterRangeException;
 import com.feibijiubi.backend.config.VideoStatusProperties;
-import com.feibijiubi.backend.converter.VideoConverter;
-import com.feibijiubi.backend.entity.Video;
+import com.feibijiubi.backend.video.converter.VideoConverter;
+import com.feibijiubi.backend.video.entity.Video;
 import com.feibijiubi.backend.entity.VideoStatus;
 import com.feibijiubi.backend.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.mapper.VideoStatusOutboxMapper;
@@ -14,7 +14,7 @@ import com.feibijiubi.backend.utils.JsonUtils;
 import com.feibijiubi.backend.utils.redis.RedisKeyUtils;
 import com.feibijiubi.backend.utils.redis.RedisUtils;
 import com.feibijiubi.backend.utils.redis.operation.RedisHashOperations;
-import com.feibijiubi.backend.vo.VideoDetailVO;
+import com.feibijiubi.backend.video.vo.VideoDetailVO;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;

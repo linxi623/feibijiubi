@@ -1,0 +1,20 @@
+package com.feibijiubi.backend.video.vo;
+
+
+import lombok.Data;
+
+import java.time.LocalDateTime;
+
+@Data
+public class VideoListItemVO {
+    private Integer vid;
+    private Integer uid;
+    private String title;
+    private String coverUrl;
+    private Double duration;
+    private Long playTimes;
+    private Long commentTimes;
+    private LocalDateTime createdAt;
+
+    private String nickname;
+}

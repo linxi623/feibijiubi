@@ -1,11 +1,11 @@
 package com.feibijiubi.backend.common;
 
-import com.feibijiubi.backend.converter.VideoConverter;
-import com.feibijiubi.backend.entity.Video;
+import com.feibijiubi.backend.video.converter.VideoConverter;
+import com.feibijiubi.backend.video.entity.Video;
 import com.feibijiubi.backend.entity.VideoStatus;
 import com.feibijiubi.backend.event.VideoStatusDelta;
-import com.feibijiubi.backend.vo.AdminVideoDetailVO;
-import com.feibijiubi.backend.vo.VideoDetailVO;
+import com.feibijiubi.backend.video.vo.AdminVideoDetailVO;
+import com.feibijiubi.backend.video.vo.VideoDetailVO;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

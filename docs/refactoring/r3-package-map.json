@@ -1,0 +1,747 @@
+{
+  "batch": "R3",
+  "basePackage": "com.feibijiubi.backend",
+  "note": "One entry per migrated production/test Java file: old and new path and FQCN. Reviewers diff file-by-file against this list. Mapper XML keeps its physical src/main/resources/com/feibijiubi/backend/mapper/ location; only namespace/resultType/parameterType change, so mybatis.mapper-locations and the opt-in video-status-isolated.properties stay valid without reading application.yml. R3 covers video (video/category/review/upload ledger) and interaction (UserVideo + request admission). The videostats pipeline stays where it is for R4; shared/infrastructure/global assembly stays for R5.",
+  "counts": {
+    "migratedMain": 58,
+    "migratedTest": 14,
+    "addedTestClasses": 5,
+    "addedTestMethods": 12
+  },
+  "files": [
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/config/VideoInteractionCleanupSchedulingConfig.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/config/VideoInteractionCleanupSchedulingConfig.java",
+      "oldFqcn": "com.feibijiubi.backend.config.VideoInteractionCleanupSchedulingConfig",
+      "newFqcn": "com.feibijiubi.backend.interaction.config.VideoInteractionCleanupSchedulingConfig"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/config/VideoInteractionProperties.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/config/VideoInteractionProperties.java",
+      "oldFqcn": "com.feibijiubi.backend.config.VideoInteractionProperties",
+      "newFqcn": "com.feibijiubi.backend.interaction.config.VideoInteractionProperties"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/controller/CategoryController.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/controller/CategoryController.java",
+      "oldFqcn": "com.feibijiubi.backend.controller.CategoryController",
+      "newFqcn": "com.feibijiubi.backend.video.controller.CategoryController"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/controller/UserVideoController.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/controller/UserVideoController.java",
+      "oldFqcn": "com.feibijiubi.backend.controller.UserVideoController",
+      "newFqcn": "com.feibijiubi.backend.interaction.controller.UserVideoController"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/controller/VideoController.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/controller/VideoController.java",
+      "oldFqcn": "com.feibijiubi.backend.controller.VideoController",
+      "newFqcn": "com.feibijiubi.backend.video.controller.VideoController"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/controller/VideoReviewController.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/controller/VideoReviewController.java",
+      "oldFqcn": "com.feibijiubi.backend.controller.VideoReviewController",
+      "newFqcn": "com.feibijiubi.backend.video.controller.VideoReviewController"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/converter/VideoConverter.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/converter/VideoConverter.java",
+      "oldFqcn": "com.feibijiubi.backend.converter.VideoConverter",
+      "newFqcn": "com.feibijiubi.backend.video.converter.VideoConverter"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/dto/CursorDTO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/dto/CursorDTO.java",
+      "oldFqcn": "com.feibijiubi.backend.dto.CursorDTO",
+      "newFqcn": "com.feibijiubi.backend.video.dto.CursorDTO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/dto/VideoReviewDTO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/dto/VideoReviewDTO.java",
+      "oldFqcn": "com.feibijiubi.backend.dto.VideoReviewDTO",
+      "newFqcn": "com.feibijiubi.backend.video.dto.VideoReviewDTO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/dto/VideoSubmitDTO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/dto/VideoSubmitDTO.java",
+      "oldFqcn": "com.feibijiubi.backend.dto.VideoSubmitDTO",
+      "newFqcn": "com.feibijiubi.backend.video.dto.VideoSubmitDTO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/dto/VideoUploadPrepareDTO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/dto/VideoUploadPrepareDTO.java",
+      "oldFqcn": "com.feibijiubi.backend.dto.VideoUploadPrepareDTO",
+      "newFqcn": "com.feibijiubi.backend.video.dto.VideoUploadPrepareDTO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/entity/Category.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/entity/Category.java",
+      "oldFqcn": "com.feibijiubi.backend.entity.Category",
+      "newFqcn": "com.feibijiubi.backend.video.entity.Category"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/entity/UploadTempFile.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/entity/UploadTempFile.java",
+      "oldFqcn": "com.feibijiubi.backend.entity.UploadTempFile",
+      "newFqcn": "com.feibijiubi.backend.video.entity.UploadTempFile"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/entity/UserVideo.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/entity/UserVideo.java",
+      "oldFqcn": "com.feibijiubi.backend.entity.UserVideo",
+      "newFqcn": "com.feibijiubi.backend.interaction.entity.UserVideo"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/entity/Video.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/entity/Video.java",
+      "oldFqcn": "com.feibijiubi.backend.entity.Video",
+      "newFqcn": "com.feibijiubi.backend.video.entity.Video"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/entity/VideoInteractionRequest.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/entity/VideoInteractionRequest.java",
+      "oldFqcn": "com.feibijiubi.backend.entity.VideoInteractionRequest",
+      "newFqcn": "com.feibijiubi.backend.interaction.entity.VideoInteractionRequest"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/entity/VideoInteractionWindow.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/entity/VideoInteractionWindow.java",
+      "oldFqcn": "com.feibijiubi.backend.entity.VideoInteractionWindow",
+      "newFqcn": "com.feibijiubi.backend.interaction.entity.VideoInteractionWindow"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/enums/VideoReviewStatus.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/enums/VideoReviewStatus.java",
+      "oldFqcn": "com.feibijiubi.backend.enums.VideoReviewStatus",
+      "newFqcn": "com.feibijiubi.backend.video.enums.VideoReviewStatus"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/mapper/CategoryMapper.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/mapper/CategoryMapper.java",
+      "oldFqcn": "com.feibijiubi.backend.mapper.CategoryMapper",
+      "newFqcn": "com.feibijiubi.backend.video.mapper.CategoryMapper"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/mapper/UploadTempFileMapper.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/mapper/UploadTempFileMapper.java",
+      "oldFqcn": "com.feibijiubi.backend.mapper.UploadTempFileMapper",
+      "newFqcn": "com.feibijiubi.backend.video.mapper.UploadTempFileMapper"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/mapper/UserVideoMapper.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/mapper/UserVideoMapper.java",
+      "oldFqcn": "com.feibijiubi.backend.mapper.UserVideoMapper",
+      "newFqcn": "com.feibijiubi.backend.interaction.mapper.UserVideoMapper"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/mapper/VideoInteractionMapper.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/mapper/VideoInteractionMapper.java",
+      "oldFqcn": "com.feibijiubi.backend.mapper.VideoInteractionMapper",
+      "newFqcn": "com.feibijiubi.backend.interaction.mapper.VideoInteractionMapper"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/mapper/VideoMapper.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/mapper/VideoMapper.java",
+      "oldFqcn": "com.feibijiubi.backend.mapper.VideoMapper",
+      "newFqcn": "com.feibijiubi.backend.video.mapper.VideoMapper"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/category/CategoryService.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/service/category/CategoryService.java",
+      "oldFqcn": "com.feibijiubi.backend.service.category.CategoryService",
+      "newFqcn": "com.feibijiubi.backend.video.service.category.CategoryService"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/category/CategoryServiceImpl.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/service/impl/category/CategoryServiceImpl.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.category.CategoryServiceImpl",
+      "newFqcn": "com.feibijiubi.backend.video.service.impl.category.CategoryServiceImpl"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/UserVideoServiceImpl.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/impl/UserVideoServiceImpl.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.UserVideoServiceImpl",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.impl.UserVideoServiceImpl"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/VideoReviewImpl.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/service/impl/VideoReviewImpl.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.VideoReviewImpl",
+      "newFqcn": "com.feibijiubi.backend.video.service.impl.VideoReviewImpl"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/VideoServiceImpl.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/service/impl/VideoServiceImpl.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.VideoServiceImpl",
+      "newFqcn": "com.feibijiubi.backend.video.service.impl.VideoServiceImpl"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/interaction/VideoInteractionActorResolver.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/impl/VideoInteractionActorResolver.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.interaction.VideoInteractionActorResolver",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.impl.VideoInteractionActorResolver"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/interaction/VideoInteractionAdmissionServiceImpl.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/impl/VideoInteractionAdmissionServiceImpl.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.interaction.VideoInteractionAdmissionServiceImpl",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.impl.VideoInteractionAdmissionServiceImpl"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/interaction/VideoInteractionCleanupScheduler.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/impl/VideoInteractionCleanupScheduler.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.interaction.VideoInteractionCleanupScheduler",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.impl.VideoInteractionCleanupScheduler"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/interaction/VideoInteractionCleanupServiceImpl.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/impl/VideoInteractionCleanupServiceImpl.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.interaction.VideoInteractionCleanupServiceImpl",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.impl.VideoInteractionCleanupServiceImpl"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/interaction/VideoInteractionRateLimitServiceImpl.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/impl/VideoInteractionRateLimitServiceImpl.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.interaction.VideoInteractionRateLimitServiceImpl",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.impl.VideoInteractionRateLimitServiceImpl"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/interaction/VideoInteractionServiceImpl.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/impl/VideoInteractionServiceImpl.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.interaction.VideoInteractionServiceImpl",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.impl.VideoInteractionServiceImpl"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/PublishedVideoGuard.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/service/PublishedVideoGuard.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.PublishedVideoGuard",
+      "newFqcn": "com.feibijiubi.backend.video.service.PublishedVideoGuard"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/UserVideoService.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/UserVideoService.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.UserVideoService",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.UserVideoService"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/VideoReviewService.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/service/VideoReviewService.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.VideoReviewService",
+      "newFqcn": "com.feibijiubi.backend.video.service.VideoReviewService"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/VideoService.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/service/VideoService.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.VideoService",
+      "newFqcn": "com.feibijiubi.backend.video.service.VideoService"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/interaction/VideoInteractionAction.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/VideoInteractionAction.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.interaction.VideoInteractionAction",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionAction"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/interaction/VideoInteractionActor.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/VideoInteractionActor.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.interaction.VideoInteractionActor",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionActor"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/interaction/VideoInteractionActorType.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/VideoInteractionActorType.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.interaction.VideoInteractionActorType",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionActorType"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/interaction/VideoInteractionAdmissionService.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/VideoInteractionAdmissionService.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.interaction.VideoInteractionAdmissionService",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionAdmissionService"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/interaction/VideoInteractionCleanupService.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/VideoInteractionCleanupService.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.interaction.VideoInteractionCleanupService",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionCleanupService"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/interaction/VideoInteractionCommand.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/VideoInteractionCommand.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.interaction.VideoInteractionCommand",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionCommand"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/interaction/VideoInteractionRateLimitService.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/VideoInteractionRateLimitService.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.interaction.VideoInteractionRateLimitService",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionRateLimitService"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/interaction/VideoInteractionResult.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/VideoInteractionResult.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.interaction.VideoInteractionResult",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionResult"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/interaction/VideoInteractionService.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/VideoInteractionService.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.interaction.VideoInteractionService",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionService"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/interaction/VideoInteractionValidation.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/service/VideoInteractionValidation.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.interaction.VideoInteractionValidation",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionValidation"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/AdminVideoDetailVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/vo/AdminVideoDetailVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.AdminVideoDetailVO",
+      "newFqcn": "com.feibijiubi.backend.video.vo.AdminVideoDetailVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/AdminVideoListItemVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/vo/AdminVideoListItemVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.AdminVideoListItemVO",
+      "newFqcn": "com.feibijiubi.backend.video.vo.AdminVideoListItemVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/CategoryChildrenVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/vo/CategoryChildrenVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.CategoryChildrenVO",
+      "newFqcn": "com.feibijiubi.backend.video.vo.CategoryChildrenVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/CategoryParentVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/vo/CategoryParentVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.CategoryParentVO",
+      "newFqcn": "com.feibijiubi.backend.video.vo.CategoryParentVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/CursorPageVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/vo/CursorPageVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.CursorPageVO",
+      "newFqcn": "com.feibijiubi.backend.video.vo.CursorPageVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/VideoDetailVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/vo/VideoDetailVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.VideoDetailVO",
+      "newFqcn": "com.feibijiubi.backend.video.vo.VideoDetailVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/VideoInteractionVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/interaction/vo/VideoInteractionVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.VideoInteractionVO",
+      "newFqcn": "com.feibijiubi.backend.interaction.vo.VideoInteractionVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/VideoListItemVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/vo/VideoListItemVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.VideoListItemVO",
+      "newFqcn": "com.feibijiubi.backend.video.vo.VideoListItemVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/VideoSubmitVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/vo/VideoSubmitVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.VideoSubmitVO",
+      "newFqcn": "com.feibijiubi.backend.video.vo.VideoSubmitVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/VideoUploadPrepareVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/vo/VideoUploadPrepareVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.VideoUploadPrepareVO",
+      "newFqcn": "com.feibijiubi.backend.video.vo.VideoUploadPrepareVO"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/config/VideoInteractionCleanupSchedulingWiringTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/interaction/config/VideoInteractionCleanupSchedulingWiringTests.java",
+      "oldFqcn": "com.feibijiubi.backend.config.VideoInteractionCleanupSchedulingWiringTests",
+      "newFqcn": "com.feibijiubi.backend.interaction.config.VideoInteractionCleanupSchedulingWiringTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/controller/VideoInteractionHttpMappingTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/interaction/controller/VideoInteractionHttpMappingTests.java",
+      "oldFqcn": "com.feibijiubi.backend.controller.VideoInteractionHttpMappingTests",
+      "newFqcn": "com.feibijiubi.backend.interaction.controller.VideoInteractionHttpMappingTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/impl/video/interaction/VideoInteractionCleanupRetentionTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/interaction/service/impl/VideoInteractionCleanupRetentionTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.interaction.VideoInteractionCleanupRetentionTests",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.impl.VideoInteractionCleanupRetentionTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionActorResolverTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionActorResolverTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.VideoInteractionActorResolverTests",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionActorResolverTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionAdmissionBaselineIsolatedTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionAdmissionBaselineIsolatedTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.VideoInteractionAdmissionBaselineIsolatedTests",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionAdmissionBaselineIsolatedTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionAdmissionIsolatedTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionAdmissionIsolatedTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.VideoInteractionAdmissionIsolatedTests",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionAdmissionIsolatedTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionAdmissionServiceTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionAdmissionServiceTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.VideoInteractionAdmissionServiceTests",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionAdmissionServiceTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionCleanupContractTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionCleanupContractTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.VideoInteractionCleanupContractTests",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionCleanupContractTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionCleanupIsolatedTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionCleanupIsolatedTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.VideoInteractionCleanupIsolatedTests",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionCleanupIsolatedTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionCleanupServiceTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionCleanupServiceTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.VideoInteractionCleanupServiceTests",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionCleanupServiceTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionIsolatedTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionIsolatedTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.VideoInteractionIsolatedTests",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionIsolatedTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionRateLimitServiceTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionRateLimitServiceTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.VideoInteractionRateLimitServiceTests",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionRateLimitServiceTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionServiceTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionServiceTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.VideoInteractionServiceTests",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionServiceTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/video/VideoInteractionSyncIsolatedTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionSyncIsolatedTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.VideoInteractionSyncIsolatedTests",
+      "newFqcn": "com.feibijiubi.backend.interaction.service.VideoInteractionSyncIsolatedTests"
+    }
+  ],
+  "moduleAssignmentDecisions": [
+    {
+      "subject": "existing video / interaction and cross-batch test dependencies",
+      "decision": "retain existing calls; package migration does not establish architectural decoupling",
+      "reason": "VideoServiceImpl imports interaction UserVideo/UserVideoMapper, while interaction services import video Video/PublishedVideoGuard. UserServiceImpl imports video VideoMapper. R4 must update all five interaction isolated-test imports when moving VideoStatusIsolatedIntegrationTests, preserving public IsolationGuard access and its safety checks. No facade or service-boundary changes are introduced in this refactor."
+    },
+    {
+      "subject": "VideoInteractionCleanupSchedulingConfig javadoc",
+      "decision": "qualify the VideoStatusSchedulingConfig link after moving out of config",
+      "reason": "parent review fix for a former same-package reference; R4 must update this FQCN when the referenced stats config moves"
+    },
+    {
+      "subject": "dto/CursorDTO, vo/CursorPageVO",
+      "decision": "moved into video.dto / video.vo",
+      "reason": "verified single consumer: VideoController + VideoService/VideoServiceImpl only; no cross-module consumer, so they are not shared types"
+    },
+    {
+      "subject": "entity/UploadTempFile, mapper/UploadTempFileMapper, dto/VideoUploadPrepareDTO, vo/VideoUploadPrepareVO",
+      "decision": "moved into video.entity / video.mapper / video.dto / video.vo (parent decision, option A)",
+      "reason": "they belong to the video upload/publish flow. FileStorageService/TencentCosStorageServiceImpl already depend on these business types, so the move only makes the existing coupling explicit. Per plan no business restructuring is done to remove cross-module dependencies, therefore the future infrastructure storage implementation importing video.* is accepted; the storage interface/implementation themselves stay for R5 and only their imports changed"
+    },
+    {
+      "subject": "interaction subpackage naming",
+      "decision": "the redundant 'interaction' segment is dropped inside the interaction module: service/video/interaction/* -> interaction.service.*, service/impl/video/interaction/* -> interaction.service.impl.*",
+      "reason": "class names, bean names (component names stay derived from the simple names), configuration prefix app.video-interaction, scheduling attributes and business behaviour are unchanged; only the package segment is removed"
+    },
+    {
+      "subject": "converter/VideoConverter",
+      "decision": "moved to video.converter",
+      "reason": "only VideoServiceImpl/VideoReviewImpl consume it"
+    },
+    {
+      "subject": "com.feibijiubi.backend.converter.ResponseConverterTests",
+      "decision": "deliberately not relocated (only its imports changed, incl. a new explicit VideoConverter import)",
+      "reason": "same as R2: it covers both VideoConverter (now video.converter) and UserConverter (user.converter), so it has no single module home; moving it would place user-converter assertions inside the video module"
+    },
+    {
+      "subject": "interaction isolated tests reuse of VideoStatusIsolatedIntegrationTests.IsolationGuard",
+      "decision": "VideoStatusIsolatedIntegrationTests and its nested IsolationGuard became public",
+      "reason": "the five relocated interaction isolated tests keep using that shared isolation guard as the @ContextConfiguration initializer; the initializer logic, assertions, opt-in system properties and test bodies are unchanged. Public visibility on a test class is the minimum change that allows the cross-package reuse"
+    }
+  ],
+  "addedFiles": [
+    {
+      "path": "src/test/java/com/feibijiubi/backend/video/mapper/VideoMapperBindingTests.java",
+      "fqcn": "com.feibijiubi.backend.video.mapper.VideoMapperBindingTests",
+      "purpose": "DB-free MyBatis assembly for VideoMapper: legacy XML path loads, namespace binds video.mapper.VideoMapper, every declared method has a MappedStatement, resultType/parameterType point at video.entity.Video and the video VOs, the application scan root discovers all three video mappers, and the old com.feibijiubi.backend.mapper.* interfaces are gone"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/video/mapper/CategoryMapperBindingTests.java",
+      "fqcn": "com.feibijiubi.backend.video.mapper.CategoryMapperBindingTests",
+      "purpose": "DB-free MyBatis assembly for CategoryMapper: legacy XML path, new namespace, statement coverage, resultType video.entity.Category"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/video/mapper/UploadTempFileMapperBindingTests.java",
+      "fqcn": "com.feibijiubi.backend.video.mapper.UploadTempFileMapperBindingTests",
+      "purpose": "DB-free MyBatis assembly for UploadTempFileMapper: legacy XML path, new namespace, statement coverage, resultType/parameterType video.entity.UploadTempFile"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/interaction/mapper/UserVideoMapperBindingTests.java",
+      "fqcn": "com.feibijiubi.backend.interaction.mapper.UserVideoMapperBindingTests",
+      "purpose": "DB-free MyBatis assembly for UserVideoMapper plus the interaction scan-root proof: legacy XML path, new namespace, statement coverage, resultType interaction.entity.UserVideo, both interaction mappers discovered from the application root, old mapper interfaces gone"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/interaction/mapper/VideoInteractionMapperBindingTests.java",
+      "fqcn": "com.feibijiubi.backend.interaction.mapper.VideoInteractionMapperBindingTests",
+      "purpose": "DB-free MyBatis assembly for VideoInteractionMapper (including the T15 cleanup statements): legacy XML path, new namespace, per-method MappedStatement coverage, resultTypes interaction.entity.VideoInteractionRequest/VideoInteractionWindow and java.lang.Long"
+    }
+  ],
+  "nonMechanicalChanges": [
+    {
+      "path": "src/main/resources/com/feibijiubi/backend/mapper/VideoMapper.xml",
+      "change": "namespace -> com.feibijiubi.backend.video.mapper.VideoMapper; parameterType/resultType -> com.feibijiubi.backend.video.entity.Video / com.feibijiubi.backend.video.vo.VideoListItemVO / com.feibijiubi.backend.video.vo.AdminVideoListItemVO (physical XML path unchanged)"
+    },
+    {
+      "path": "src/main/resources/com/feibijiubi/backend/mapper/CategoryMapper.xml",
+      "change": "namespace -> com.feibijiubi.backend.video.mapper.CategoryMapper; resultType -> com.feibijiubi.backend.video.entity.Category (physical XML path unchanged)"
+    },
+    {
+      "path": "src/main/resources/com/feibijiubi/backend/mapper/UploadTempFileMapper.xml",
+      "change": "namespace -> com.feibijiubi.backend.video.mapper.UploadTempFileMapper; parameterType/resultType -> com.feibijiubi.backend.video.entity.UploadTempFile (physical XML path unchanged)"
+    },
+    {
+      "path": "src/main/resources/com/feibijiubi/backend/mapper/UserVideoMapper.xml",
+      "change": "namespace -> com.feibijiubi.backend.interaction.mapper.UserVideoMapper; resultType -> com.feibijiubi.backend.interaction.entity.UserVideo (physical XML path unchanged)"
+    },
+    {
+      "path": "src/main/resources/com/feibijiubi/backend/mapper/VideoInteractionMapper.xml",
+      "change": "namespace -> com.feibijiubi.backend.interaction.mapper.VideoInteractionMapper; resultType -> com.feibijiubi.backend.interaction.entity.VideoInteractionRequest / VideoInteractionWindow (physical XML path unchanged)"
+    },
+    {
+      "path": "src/main/java/com/feibijiubi/backend/BackendApplication.java",
+      "change": "@EnableConfigurationProperties import now points at com.feibijiubi.backend.interaction.config.VideoInteractionProperties; registration list, prefixes and startup behaviour unchanged"
+    },
+    {
+      "path": "src/main/java/com/feibijiubi/backend/video/controller/VideoController.java",
+      "change": "the old wildcard 'import com.feibijiubi.backend.vo.*;' was replaced by five explicit video.vo imports because the moved VOs no longer live in that package; no endpoint, annotation or body changed"
+    },
+    {
+      "path": "src/main/java/com/feibijiubi/backend/service/storage/FileStorageService.java, src/main/java/com/feibijiubi/backend/service/impl/storage/TencentCosStorageServiceImpl.java",
+      "change": "imports of the video upload DTO/VO/entity/mapper updated only; storage interfaces/implementations stay put for R5"
+    },
+    {
+      "path": "src/main/java/com/feibijiubi/backend/user/service/impl/UserServiceImpl.java",
+      "change": "imports of mapper.VideoMapper / mapper.VideoStatusMapper updated only (existing cross-module mapper dependency kept as-is, per plan)"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusIsolatedIntegrationTests.java",
+      "change": "class and nested IsolationGuard made public, explicit VideoInteractionProperties import added (the old config.* wildcard no longer covers it), @MapperScan keeps its old range and appends video.mapper + interaction.mapper"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusCounterTransactionTests.java",
+      "change": "@MapperScan keeps user.mapper and appends video.mapper + interaction.mapper; explicit UserVideoService import added (it was a same-package reference before)"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionAdmissionBaselineIsolatedTests.java, VideoInteractionAdmissionIsolatedTests.java",
+      "change": "@MapperScan keeps the old range and appends video.mapper + interaction.mapper; explicit PublishedVideoGuard / VideoStatusIsolatedIntegrationTests imports added (both were same-package references before)"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionCleanupIsolatedTests.java, VideoInteractionIsolatedTests.java, VideoInteractionSyncIsolatedTests.java",
+      "change": "@MapperScan keeps the old range and appends interaction.mapper; explicit VideoStatusIsolatedIntegrationTests import added"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionCleanupContractTests.java",
+      "change": "the source path constant of the paired isolated test now points at interaction/service/, and the asserted MappedStatement id prefix is com.feibijiubi.backend.interaction.mapper.VideoInteractionMapper (assertions otherwise unchanged)"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/converter/ResponseConverterTests.java",
+      "change": "explicit VideoConverter import added because the class stayed outside the video module; all assertions unchanged"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/interaction/service/*Tests.java (10 files)",
+      "change": "removed 36 redundant same-package imports created by the FQCN rewrite (e.g. interaction.service importing interaction.service.VideoInteractionAction); no assertion changed"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/common/VideoStatusCounterRangeTests.java, src/test/java/com/feibijiubi/backend/service/video/VideoStatusCounterIsolatedTests.java, VideoStatusCounterReadTests.java, VideoStatusReadConsistencyTests.java",
+      "change": "imports of the moved video/interaction types updated only; test bodies, assertions and opt-in conditions unchanged"
+    }
+  ],
+  "optInMapperScanAudit": {
+    "scope": "opt-in tests that scan mappers by package string; they need real MySQL/Redis and are not run by the offline regression",
+    "method": "grep every opt-in context for @MapperScan / @Import / @SpringBootTest(classes=...), then resolve which mappers each imported service transitively needs (PublishedVideoGuard->VideoMapper, UserVideoServiceImpl->UserVideoMapper+VideoMapper(+UserMapper), VideoInteractionServiceImpl->VideoInteractionMapper+VideoStatusMapper, VideoInteractionCleanupServiceImpl->VideoInteractionMapper)",
+    "extended": [
+      {
+        "path": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusIsolatedIntegrationTests.java",
+        "addedPackages": [
+          "com.feibijiubi.backend.video.mapper",
+          "com.feibijiubi.backend.interaction.mapper"
+        ],
+        "reason": "imports UserVideoServiceImpl, PublishedVideoGuard and the whole interaction admission/cleanup chain"
+      },
+      {
+        "path": "src/test/java/com/feibijiubi/backend/service/video/VideoStatusCounterTransactionTests.java",
+        "addedPackages": [
+          "com.feibijiubi.backend.video.mapper",
+          "com.feibijiubi.backend.interaction.mapper"
+        ],
+        "reason": "constructs UserVideoServiceImpl(VideoStatusMapper, UserVideoMapper, UserMapper, ..., PublishedVideoGuard(VideoMapper)) by hand"
+      },
+      {
+        "path": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionAdmissionBaselineIsolatedTests.java",
+        "addedPackages": [
+          "com.feibijiubi.backend.video.mapper",
+          "com.feibijiubi.backend.interaction.mapper"
+        ],
+        "reason": "imports PublishedVideoGuard and the interaction admission chain"
+      },
+      {
+        "path": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionAdmissionIsolatedTests.java",
+        "addedPackages": [
+          "com.feibijiubi.backend.video.mapper",
+          "com.feibijiubi.backend.interaction.mapper"
+        ],
+        "reason": "same as above"
+      },
+      {
+        "path": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionCleanupIsolatedTests.java",
+        "addedPackages": [
+          "com.feibijiubi.backend.interaction.mapper"
+        ],
+        "reason": "autowires VideoInteractionMapper and imports the interaction service implementations"
+      },
+      {
+        "path": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionIsolatedTests.java",
+        "addedPackages": [
+          "com.feibijiubi.backend.interaction.mapper"
+        ],
+        "reason": "imports VideoInteractionServiceImpl"
+      },
+      {
+        "path": "src/test/java/com/feibijiubi/backend/interaction/service/VideoInteractionSyncIsolatedTests.java",
+        "addedPackages": [
+          "com.feibijiubi.backend.interaction.mapper"
+        ],
+        "reason": "imports VideoInteractionServiceImpl"
+      }
+    ],
+    "unchanged": [
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusCounterIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusDirtyRecoveryFairnessIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusDirtyRecoveryRealConvergenceTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusOutboxLeaseTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusRebuildScaleIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusSqlBaselineTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusStatus0CompensationIsolatedIntegrationTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusStatus3ReplayIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusMetricsIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/admin/VideoStatusFailureAdminIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusOutboxReplayIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusReconciliationIsolatedTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusSchedulingRealFlowTests.java",
+      "src/test/java/com/feibijiubi/backend/service/video/VideoStatusOutboxReliabilityIsolatedTests.java"
+    ],
+    "unchangedReason": "these contexts only import videostats beans/mappers (or inherit VideoStatusIsolatedIntegrationTests.TestApplication, which was extended) and never touch a mapper that left com.feibijiubi.backend.mapper",
+    "knownGap": "src/test/resources/video-status-isolated.properties still logs only com.feibijiubi.backend.mapper at WARN; the migrated video.mapper / interaction.mapper packages are not covered. Same gap R2 left for user.mapper; deferred to R6 instead of editing opt-in logging during the move"
+  },
+  "unchangedByDecision": [
+    {
+      "path": "src/main/java/com/feibijiubi/backend/entity/VideoStatus*.java, enums/VideoStatusConsumeProcessStatus.java, enums/RegistrationResult.java, metrics/*, mq/*, event/*, service/admin/*, service/video/videostatus/*, service/impl/video/videostatus/*, config/VideoStatus*.java, vo/VideoStatus*.java, dto/VideoStatus*.java, common/VideoStatus*.java",
+      "reason": "videostats pipeline belongs to R4; only imports of the classes moved in R3 changed"
+    },
+    {
+      "path": "src/main/java/com/feibijiubi/backend/service/storage/*, service/impl/storage/*, service/ratelimit/*, service/impl/ratelimit/*, utils/*, common/*, config/WebMvcConfig.java",
+      "reason": "shared/infrastructure/global capability collection is R5; only imports changed where they referenced the R3 upload types"
+    },
+    {
+      "path": "src/main/java/com/feibijiubi/backend/enums/UserAuth.java, UserGender.java, UserRole.java, UserVip.java",
+      "reason": "user/auth enums left over from R2 (R2 did not move them); out of R3 scope, untouched"
+    }
+  ]
+}

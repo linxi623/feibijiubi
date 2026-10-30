@@ -6,17 +6,18 @@ import com.feibijiubi.backend.config.*;
 import com.feibijiubi.backend.event.*;
 import com.feibijiubi.backend.mapper.VideoStatusConsumedEventMapper;
 import com.feibijiubi.backend.mq.*;
-import com.feibijiubi.backend.service.impl.video.UserVideoServiceImpl;
-import com.feibijiubi.backend.service.impl.video.interaction.VideoInteractionActorResolver;
-import com.feibijiubi.backend.service.impl.video.interaction.VideoInteractionAdmissionServiceImpl;
-import com.feibijiubi.backend.service.impl.video.interaction.VideoInteractionRateLimitServiceImpl;
-import com.feibijiubi.backend.service.impl.video.interaction.VideoInteractionServiceImpl;
+import com.feibijiubi.backend.interaction.service.impl.UserVideoServiceImpl;
+import com.feibijiubi.backend.interaction.service.impl.VideoInteractionActorResolver;
+import com.feibijiubi.backend.interaction.service.impl.VideoInteractionAdmissionServiceImpl;
+import com.feibijiubi.backend.interaction.service.impl.VideoInteractionRateLimitServiceImpl;
+import com.feibijiubi.backend.interaction.service.impl.VideoInteractionServiceImpl;
 import com.feibijiubi.backend.service.impl.video.videostatus.*;
-import com.feibijiubi.backend.service.video.PublishedVideoGuard;
-import com.feibijiubi.backend.service.video.UserVideoService;
+import com.feibijiubi.backend.video.service.PublishedVideoGuard;
+import com.feibijiubi.backend.interaction.config.VideoInteractionProperties;
+import com.feibijiubi.backend.interaction.service.UserVideoService;
 import com.feibijiubi.backend.service.video.videostatus.*;
 import com.feibijiubi.backend.utils.JsonUtils;
-import com.feibijiubi.backend.vo.VideoInteractionVO;
+import com.feibijiubi.backend.interaction.vo.VideoInteractionVO;
 import com.feibijiubi.backend.utils.rabbitmq.RabbitConstants;
 import com.feibijiubi.backend.utils.redis.*;
 import com.feibijiubi.backend.utils.redis.operation.*;
@@ -78,9 +79,14 @@ import static org.mockito.Mockito.*;
 // This class runs a real queue listener; close the context at class end so a
 // cached context cannot keep consuming messages during the next IT class.
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class VideoStatusIsolatedIntegrationTests {
-    /** Runs before beans/listeners can connect, including environment-variable overrides. */
-    static class IsolationGuard implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+public class VideoStatusIsolatedIntegrationTests {
+    /**
+     * Runs before beans/listeners can connect, including environment-variable overrides.
+     *
+     * <p>R3：交互模块的隔离用例迁到 {@code com.feibijiubi.backend.interaction.service} 后仍复用这个守卫，
+     * 因此类和嵌套类改为 {@code public}；初始化逻辑、断言与 opt-in 条件不变。</p>
+     */
+    public static class IsolationGuard implements ApplicationContextInitializer<ConfigurableApplicationContext> {
         @Override
         public void initialize(ConfigurableApplicationContext context) {
             var env = context.getEnvironment();
@@ -111,9 +117,12 @@ class VideoStatusIsolatedIntegrationTests {
     @Profile("video-status-isolated")
     @EnableAutoConfiguration(excludeName = "org.redisson.spring.starter.RedissonAutoConfigurationV2")
     @EnableConfigurationProperties({VideoStatusProperties.class, VideoInteractionProperties.class})
-    // R2：UserVideoServiceImpl 依赖的 UserMapper 已迁到 com.feibijiubi.backend.user.mapper，
-    // 旧扫描范围保持不变，显式补扫该包。
-    @MapperScan({"com.feibijiubi.backend.mapper", "com.feibijiubi.backend.user.mapper"})
+    // R2：UserVideoServiceImpl 依赖的 UserMapper 已迁到 com.feibijiubi.backend.user.mapper。
+    // R3：VideoMapper/UploadTempFileMapper 迁到 com.feibijiubi.backend.video.mapper，
+    // UserVideoMapper/VideoInteractionMapper 迁到 com.feibijiubi.backend.interaction.mapper。
+    // 旧扫描范围保持不变，只追加新包。
+    @MapperScan({"com.feibijiubi.backend.mapper", "com.feibijiubi.backend.user.mapper",
+            "com.feibijiubi.backend.video.mapper", "com.feibijiubi.backend.interaction.mapper"})
     @EnableRabbit
     @Import({RedisScriptConfig.class, VideoStatusRabbitConfig.class,
             VideoStatusServiceImpl.class, VideoStatusConsumptionServiceImpl.class,

@@ -2,11 +2,11 @@ package com.feibijiubi.backend.service.impl.storage;
 
 import com.feibijiubi.backend.common.BusinessException;
 import com.feibijiubi.backend.config.TencentCosProperties;
-import com.feibijiubi.backend.dto.VideoUploadPrepareDTO;
-import com.feibijiubi.backend.entity.UploadTempFile;
-import com.feibijiubi.backend.mapper.UploadTempFileMapper;
+import com.feibijiubi.backend.video.dto.VideoUploadPrepareDTO;
+import com.feibijiubi.backend.video.entity.UploadTempFile;
+import com.feibijiubi.backend.video.mapper.UploadTempFileMapper;
 import com.feibijiubi.backend.service.storage.FileStorageService;
-import com.feibijiubi.backend.vo.VideoUploadPrepareVO;
+import com.feibijiubi.backend.video.vo.VideoUploadPrepareVO;
 import com.qcloud.cos.COSClient;
 import com.qcloud.cos.exception.CosClientException;
 import com.qcloud.cos.exception.CosServiceException;

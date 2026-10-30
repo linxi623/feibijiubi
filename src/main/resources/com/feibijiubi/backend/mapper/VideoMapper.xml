@@ -3,9 +3,9 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.feibijiubi.backend.mapper.VideoMapper">
+<mapper namespace="com.feibijiubi.backend.video.mapper.VideoMapper">
     <insert id="insert"
-            parameterType="com.feibijiubi.backend.entity.Video"
+            parameterType="com.feibijiubi.backend.video.entity.Video"
             useGeneratedKeys="true"
             keyProperty="vid">
         INSERT INTO video (
@@ -80,7 +80,7 @@
     </update>
 
     <select id="selectPublishedByVid"
-            resultType="com.feibijiubi.backend.entity.Video">
+            resultType="com.feibijiubi.backend.video.entity.Video">
         SELECT
             vid,
             uid,
@@ -103,7 +103,7 @@
     </select>
 
     <select id="selectPublishedList"
-            resultType="com.feibijiubi.backend.entity.Video">
+            resultType="com.feibijiubi.backend.video.entity.Video">
         SELECT
             vid,
             uid,
@@ -128,7 +128,7 @@
     </select>
 
     <select id="selectFeed"
-            resultType="com.feibijiubi.backend.vo.VideoListItemVO">
+            resultType="com.feibijiubi.backend.video.vo.VideoListItemVO">
         SELECT
             v.vid AS vid,
             v.uid AS uid,
@@ -165,7 +165,7 @@
         ORDER BY v.created_at DESC, v.vid DESC
         LIMIT #{size}
     </select>
-    <select id="selectByVid" resultType="com.feibijiubi.backend.entity.Video">
+    <select id="selectByVid" resultType="com.feibijiubi.backend.video.entity.Video">
         SELECT
             vid,
             uid,
@@ -188,7 +188,7 @@
         WHERE vid = #{vid}
     </select>
 
-    <select id="selectByStatus" resultType="com.feibijiubi.backend.vo.AdminVideoListItemVO">
+    <select id="selectByStatus" resultType="com.feibijiubi.backend.video.vo.AdminVideoListItemVO">
         SELECT
             vid AS vid,
             uid AS uid,
