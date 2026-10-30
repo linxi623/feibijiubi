@@ -17,7 +17,7 @@
 
   唯一键（local_identity、vid）和外键（series_id → local_video_series.id）是最终防线。
 -->
-<mapper namespace="com.feibijiubi.backend.mapper.LocalVideoCatalogMapper">
+<mapper namespace="com.feibijiubi.backend.video.local.mapper.LocalVideoCatalogMapper">
 
     <insert id="insertSeries" useGeneratedKeys="true" keyProperty="id" timeout="3">
         INSERT INTO local_video_series(
@@ -32,7 +32,7 @@
     </insert>
 
     <select id="selectSeriesById"
-            resultType="com.feibijiubi.backend.entity.LocalVideoSeries"
+            resultType="com.feibijiubi.backend.video.local.entity.LocalVideoSeries"
             timeout="3">
         SELECT id,
                local_identity,
@@ -45,7 +45,7 @@
     </select>
 
     <select id="selectSeriesAfter"
-            resultType="com.feibijiubi.backend.entity.LocalVideoSeries"
+            resultType="com.feibijiubi.backend.video.local.entity.LocalVideoSeries"
             timeout="3">
         SELECT id,
                local_identity,
@@ -74,7 +74,7 @@
     </insert>
 
     <select id="selectEpisodeById"
-            resultType="com.feibijiubi.backend.entity.LocalVideoEpisode"
+            resultType="com.feibijiubi.backend.video.local.entity.LocalVideoEpisode"
             timeout="3">
         SELECT id,
                series_id,
@@ -90,7 +90,7 @@
     </select>
 
     <select id="selectEpisodesAfter"
-            resultType="com.feibijiubi.backend.entity.LocalVideoEpisode"
+            resultType="com.feibijiubi.backend.video.local.entity.LocalVideoEpisode"
             timeout="3">
         SELECT id,
                series_id,

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.feibijiubi.backend.mapper.LocalEpisodeSourceMapper">
+<mapper namespace="com.feibijiubi.backend.videosource.mapper.LocalEpisodeSourceMapper">
     <!-- Keep SQL parameter logging disabled: address is a server-only signed credential. -->
-    <select id="lockEpisode" resultType="com.feibijiubi.backend.entity.LocalVideoEpisode" timeout="3">
+    <select id="lockEpisode" resultType="com.feibijiubi.backend.video.local.entity.LocalVideoEpisode" timeout="3">
         SELECT id, duration_seconds, vid FROM local_video_episode WHERE id = #{id} FOR UPDATE
     </select>
     <select id="selectRevision" resultType="java.lang.Long" timeout="3">
@@ -24,14 +24,14 @@
          #{lineOrdinal}, #{entryOrdinal}, #{label}, #{address}, #{addressHash}, #{probeStatus},
          #{candidateSeconds}, #{manifestHash}, #{capturedBy})
     </insert>
-    <select id="selectCandidate" resultType="com.feibijiubi.backend.entity.LocalEpisodeMediaCandidate" timeout="3">
+    <select id="selectCandidate" resultType="com.feibijiubi.backend.videosource.entity.LocalEpisodeMediaCandidate" timeout="3">
         SELECT * FROM local_episode_media_candidate WHERE episode_id = #{episodeId} AND id = #{id}
     </select>
-    <select id="selectCandidates" resultType="com.feibijiubi.backend.entity.LocalEpisodeMediaCandidate" timeout="3">
+    <select id="selectCandidates" resultType="com.feibijiubi.backend.videosource.entity.LocalEpisodeMediaCandidate" timeout="3">
         SELECT * FROM local_episode_media_candidate WHERE episode_id = #{episodeId} AND id &gt; #{afterId}
         ORDER BY id LIMIT #{limit}
     </select>
-    <select id="selectBindings" resultType="com.feibijiubi.backend.entity.LocalEpisodeSourceBinding" timeout="3">
+    <select id="selectBindings" resultType="com.feibijiubi.backend.videosource.entity.LocalEpisodeSourceBinding" timeout="3">
         SELECT id, episode_id, candidate_id FROM local_episode_source_binding
         WHERE episode_id = #{episodeId} ORDER BY id LIMIT 33
     </select>

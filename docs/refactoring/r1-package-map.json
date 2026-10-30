@@ -1,0 +1,698 @@
+{
+  "batch": "R1",
+  "basePackage": "com.feibijiubi.backend",
+  "note": "One entry per migrated production/test Java file: old and new path and FQCN. Reviewers diff file-by-file against this list. Mapper XML keeps its physical src/main/resources/com/feibijiubi/backend/mapper/ location; only namespace/resultType change.",
+  "files": [
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/ExternalVideoUrlPolicy.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/ExternalVideoUrlPolicy.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.ExternalVideoUrlPolicy",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.ExternalVideoUrlPolicy"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/applecms/AppleCmsCatalogEntry.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/applecms/AppleCmsCatalogEntry.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.applecms.AppleCmsCatalogEntry",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.applecms.AppleCmsCatalogEntry"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/applecms/AppleCmsDetailSnapshot.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/applecms/AppleCmsDetailSnapshot.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.applecms.AppleCmsDetailSnapshot",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.applecms.AppleCmsDetailSnapshot"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/applecms/AppleCmsJsonAdapter.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/applecms/AppleCmsJsonAdapter.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.applecms.AppleCmsJsonAdapter",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.applecms.AppleCmsJsonAdapter"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/applecms/AppleCmsLineEntry.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/applecms/AppleCmsLineEntry.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.applecms.AppleCmsLineEntry",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.applecms.AppleCmsLineEntry"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/applecms/AppleCmsListSnapshot.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/applecms/AppleCmsListSnapshot.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.applecms.AppleCmsListSnapshot",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.applecms.AppleCmsListSnapshot"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/applecms/AppleCmsPagination.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/applecms/AppleCmsPagination.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.applecms.AppleCmsPagination",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.applecms.AppleCmsPagination"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/applecms/AppleCmsParseException.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/applecms/AppleCmsParseException.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.applecms.AppleCmsParseException",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.applecms.AppleCmsParseException"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/applecms/AppleCmsPlayLine.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/applecms/AppleCmsPlayLine.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.applecms.AppleCmsPlayLine",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.applecms.AppleCmsPlayLine"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/applecms/AppleCmsPlaybackState.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/applecms/AppleCmsPlaybackState.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.applecms.AppleCmsPlaybackState",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.applecms.AppleCmsPlaybackState"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/applecms/AppleCmsResponseMismatchException.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/applecms/AppleCmsResponseMismatchException.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.applecms.AppleCmsResponseMismatchException",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.applecms.AppleCmsResponseMismatchException"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/applecms/AppleCmsSourceClient.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/applecms/AppleCmsSourceClient.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.applecms.AppleCmsSourceClient",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.applecms.AppleCmsSourceClient"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/media/HlsDurationProbe.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/media/HlsDurationProbe.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.media.HlsDurationProbe",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.media.HlsDurationProbe"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/media/HlsManifestParseException.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/media/HlsManifestParseException.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.media.HlsManifestParseException",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.media.HlsManifestParseException"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/media/HlsMediaDurationCandidate.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/media/HlsMediaDurationCandidate.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.media.HlsMediaDurationCandidate",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.media.HlsMediaDurationCandidate"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/media/HlsMediaDurationParser.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/media/HlsMediaDurationParser.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.media.HlsMediaDurationParser",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.media.HlsMediaDurationParser"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/transport/BoundedBodyReader.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/transport/BoundedBodyReader.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.BoundedBodyReader",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.BoundedBodyReader"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/transport/CmsHttpClientFactory.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/transport/CmsHttpClientFactory.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.CmsHttpClientFactory",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.CmsHttpClientFactory"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/transport/CmsHttpRequestException.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/transport/CmsHttpRequestException.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.CmsHttpRequestException",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.CmsHttpRequestException"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/transport/CmsRequestDeadline.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/transport/CmsRequestDeadline.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.CmsRequestDeadline",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.CmsRequestDeadline"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/transport/DnsResolutionException.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/transport/DnsResolutionException.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.DnsResolutionException",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.DnsResolutionException"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/transport/PublicAddressPolicy.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/transport/PublicAddressPolicy.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.PublicAddressPolicy",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.PublicAddressPolicy"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/transport/RestrictedCmsHttpClient.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/transport/RestrictedCmsHttpClient.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.RestrictedCmsHttpClient",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.RestrictedCmsHttpClient"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/transport/RestrictedGetExecutor.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/transport/RestrictedGetExecutor.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.RestrictedGetExecutor",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.RestrictedGetExecutor"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/transport/RestrictedHttpClientFactory.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/transport/RestrictedHttpClientFactory.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.RestrictedHttpClientFactory",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.RestrictedHttpClientFactory"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/transport/RestrictedManifestHttpClient.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/transport/RestrictedManifestHttpClient.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.RestrictedManifestHttpClient",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.RestrictedManifestHttpClient"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/integration/videosource/transport/ValidatedDnsResolver.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/integration/transport/ValidatedDnsResolver.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.ValidatedDnsResolver",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.ValidatedDnsResolver"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/config/ExternalVideoSourceConfig.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/config/ExternalVideoSourceConfig.java",
+      "oldFqcn": "com.feibijiubi.backend.config.ExternalVideoSourceConfig",
+      "newFqcn": "com.feibijiubi.backend.videosource.config.ExternalVideoSourceConfig"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/config/ExternalVideoSourceProperties.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/config/ExternalVideoSourceProperties.java",
+      "oldFqcn": "com.feibijiubi.backend.config.ExternalVideoSourceProperties",
+      "newFqcn": "com.feibijiubi.backend.videosource.config.ExternalVideoSourceProperties"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/controller/ExternalVideoSourceAdminController.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/controller/ExternalVideoSourceAdminController.java",
+      "oldFqcn": "com.feibijiubi.backend.controller.ExternalVideoSourceAdminController",
+      "newFqcn": "com.feibijiubi.backend.videosource.controller.ExternalVideoSourceAdminController"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/ExternalVideoSourceCatalogVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/vo/ExternalVideoSourceCatalogVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.ExternalVideoSourceCatalogVO",
+      "newFqcn": "com.feibijiubi.backend.videosource.vo.ExternalVideoSourceCatalogVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/ExternalVideoSourceDetailVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/vo/ExternalVideoSourceDetailVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.ExternalVideoSourceDetailVO",
+      "newFqcn": "com.feibijiubi.backend.videosource.vo.ExternalVideoSourceDetailVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/ExternalVideoSourceVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/vo/ExternalVideoSourceVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.ExternalVideoSourceVO",
+      "newFqcn": "com.feibijiubi.backend.videosource.vo.ExternalVideoSourceVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/external/ExternalMediaProbe.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/service/ExternalMediaProbe.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.external.ExternalMediaProbe",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.ExternalMediaProbe"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/external/ExternalVideoSourceCatalogClient.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/service/ExternalVideoSourceCatalogClient.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.external.ExternalVideoSourceCatalogClient",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.ExternalVideoSourceCatalogClient"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/external/ExternalVideoSourceClientProvider.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/service/ExternalVideoSourceClientProvider.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.external.ExternalVideoSourceClientProvider",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.ExternalVideoSourceClientProvider"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/external/ExternalVideoSourceDescriptor.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/service/ExternalVideoSourceDescriptor.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.external.ExternalVideoSourceDescriptor",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.ExternalVideoSourceDescriptor"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/external/ExternalVideoSourceDetailClient.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/service/ExternalVideoSourceDetailClient.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.external.ExternalVideoSourceDetailClient",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.ExternalVideoSourceDetailClient"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/external/ExternalVideoSourcePreviewQuotaService.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/service/ExternalVideoSourcePreviewQuotaService.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.external.ExternalVideoSourcePreviewQuotaService",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.ExternalVideoSourcePreviewQuotaService"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/external/ExternalVideoSourcePreviewService.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/service/ExternalVideoSourcePreviewService.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.external.ExternalVideoSourcePreviewService",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.ExternalVideoSourcePreviewService"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/video/external/ExternalVideoSourceRegistry.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/service/ExternalVideoSourceRegistry.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.external.ExternalVideoSourceRegistry",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.ExternalVideoSourceRegistry"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/external/AppleCmsExternalVideoSourceClientProvider.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/service/impl/AppleCmsExternalVideoSourceClientProvider.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.external.AppleCmsExternalVideoSourceClientProvider",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.impl.AppleCmsExternalVideoSourceClientProvider"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/external/ExternalVideoSourcePreviewQuotaServiceImpl.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/service/impl/ExternalVideoSourcePreviewQuotaServiceImpl.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.external.ExternalVideoSourcePreviewQuotaServiceImpl",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.impl.ExternalVideoSourcePreviewQuotaServiceImpl"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/external/ExternalVideoSourcePreviewServiceImpl.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/service/impl/ExternalVideoSourcePreviewServiceImpl.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.external.ExternalVideoSourcePreviewServiceImpl",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.impl.ExternalVideoSourcePreviewServiceImpl"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/video/external/RestrictedExternalMediaProbe.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/service/impl/RestrictedExternalMediaProbe.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.external.RestrictedExternalMediaProbe",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.impl.RestrictedExternalMediaProbe"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/controller/LocalEpisodeSourceAdminController.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/controller/LocalEpisodeSourceAdminController.java",
+      "oldFqcn": "com.feibijiubi.backend.controller.LocalEpisodeSourceAdminController",
+      "newFqcn": "com.feibijiubi.backend.videosource.controller.LocalEpisodeSourceAdminController"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/dto/LocalEpisodeSourceCaptureDTO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/dto/LocalEpisodeSourceCaptureDTO.java",
+      "oldFqcn": "com.feibijiubi.backend.dto.LocalEpisodeSourceCaptureDTO",
+      "newFqcn": "com.feibijiubi.backend.videosource.dto.LocalEpisodeSourceCaptureDTO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/dto/LocalEpisodeSourceConfirmDTO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/dto/LocalEpisodeSourceConfirmDTO.java",
+      "oldFqcn": "com.feibijiubi.backend.dto.LocalEpisodeSourceConfirmDTO",
+      "newFqcn": "com.feibijiubi.backend.videosource.dto.LocalEpisodeSourceConfirmDTO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/entity/LocalEpisodeMediaCandidate.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/entity/LocalEpisodeMediaCandidate.java",
+      "oldFqcn": "com.feibijiubi.backend.entity.LocalEpisodeMediaCandidate",
+      "newFqcn": "com.feibijiubi.backend.videosource.entity.LocalEpisodeMediaCandidate"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/entity/LocalEpisodeSourceBinding.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/entity/LocalEpisodeSourceBinding.java",
+      "oldFqcn": "com.feibijiubi.backend.entity.LocalEpisodeSourceBinding",
+      "newFqcn": "com.feibijiubi.backend.videosource.entity.LocalEpisodeSourceBinding"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/mapper/LocalEpisodeSourceMapper.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/mapper/LocalEpisodeSourceMapper.java",
+      "oldFqcn": "com.feibijiubi.backend.mapper.LocalEpisodeSourceMapper",
+      "newFqcn": "com.feibijiubi.backend.videosource.mapper.LocalEpisodeSourceMapper"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/localvideo/LocalEpisodeSourceService.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/service/LocalEpisodeSourceService.java",
+      "oldFqcn": "com.feibijiubi.backend.service.localvideo.LocalEpisodeSourceService",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.LocalEpisodeSourceService"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/localvideo/LocalEpisodeSourceServiceImpl.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/service/impl/LocalEpisodeSourceServiceImpl.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.localvideo.LocalEpisodeSourceServiceImpl",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.impl.LocalEpisodeSourceServiceImpl"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/LocalEpisodeSourceVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/videosource/vo/LocalEpisodeSourceVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.LocalEpisodeSourceVO",
+      "newFqcn": "com.feibijiubi.backend.videosource.vo.LocalEpisodeSourceVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/entity/LocalVideoSeries.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/local/entity/LocalVideoSeries.java",
+      "oldFqcn": "com.feibijiubi.backend.entity.LocalVideoSeries",
+      "newFqcn": "com.feibijiubi.backend.video.local.entity.LocalVideoSeries"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/entity/LocalVideoEpisode.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/local/entity/LocalVideoEpisode.java",
+      "oldFqcn": "com.feibijiubi.backend.entity.LocalVideoEpisode",
+      "newFqcn": "com.feibijiubi.backend.video.local.entity.LocalVideoEpisode"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/dto/LocalVideoSeriesCreateDTO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/local/dto/LocalVideoSeriesCreateDTO.java",
+      "oldFqcn": "com.feibijiubi.backend.dto.LocalVideoSeriesCreateDTO",
+      "newFqcn": "com.feibijiubi.backend.video.local.dto.LocalVideoSeriesCreateDTO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/dto/LocalVideoEpisodeCreateDTO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/local/dto/LocalVideoEpisodeCreateDTO.java",
+      "oldFqcn": "com.feibijiubi.backend.dto.LocalVideoEpisodeCreateDTO",
+      "newFqcn": "com.feibijiubi.backend.video.local.dto.LocalVideoEpisodeCreateDTO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/LocalVideoSeriesVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/local/vo/LocalVideoSeriesVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.LocalVideoSeriesVO",
+      "newFqcn": "com.feibijiubi.backend.video.local.vo.LocalVideoSeriesVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/LocalVideoEpisodeVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/local/vo/LocalVideoEpisodeVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.LocalVideoEpisodeVO",
+      "newFqcn": "com.feibijiubi.backend.video.local.vo.LocalVideoEpisodeVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/vo/LocalVideoPageVO.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/local/vo/LocalVideoPageVO.java",
+      "oldFqcn": "com.feibijiubi.backend.vo.LocalVideoPageVO",
+      "newFqcn": "com.feibijiubi.backend.video.local.vo.LocalVideoPageVO"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/controller/LocalVideoAdminController.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/local/controller/LocalVideoAdminController.java",
+      "oldFqcn": "com.feibijiubi.backend.controller.LocalVideoAdminController",
+      "newFqcn": "com.feibijiubi.backend.video.local.controller.LocalVideoAdminController"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/mapper/LocalVideoCatalogMapper.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/local/mapper/LocalVideoCatalogMapper.java",
+      "oldFqcn": "com.feibijiubi.backend.mapper.LocalVideoCatalogMapper",
+      "newFqcn": "com.feibijiubi.backend.video.local.mapper.LocalVideoCatalogMapper"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/localvideo/LocalVideoCatalogService.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/local/service/LocalVideoCatalogService.java",
+      "oldFqcn": "com.feibijiubi.backend.service.localvideo.LocalVideoCatalogService",
+      "newFqcn": "com.feibijiubi.backend.video.local.service.LocalVideoCatalogService"
+    },
+    {
+      "kind": "main",
+      "oldPath": "src/main/java/com/feibijiubi/backend/service/impl/localvideo/LocalVideoCatalogServiceImpl.java",
+      "newPath": "src/main/java/com/feibijiubi/backend/video/local/service/impl/LocalVideoCatalogServiceImpl.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.localvideo.LocalVideoCatalogServiceImpl",
+      "newFqcn": "com.feibijiubi.backend.video.local.service.impl.LocalVideoCatalogServiceImpl"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/ExternalVideoUrlPolicyTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/ExternalVideoUrlPolicyTests.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.ExternalVideoUrlPolicyTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.ExternalVideoUrlPolicyTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/applecms/AppleCmsJsonAdapterTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/applecms/AppleCmsJsonAdapterTests.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.applecms.AppleCmsJsonAdapterTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.applecms.AppleCmsJsonAdapterTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/applecms/AppleCmsSnapshotModelTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/applecms/AppleCmsSnapshotModelTests.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.applecms.AppleCmsSnapshotModelTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.applecms.AppleCmsSnapshotModelTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/applecms/AppleCmsSourceClientTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/applecms/AppleCmsSourceClientTests.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.applecms.AppleCmsSourceClientTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.applecms.AppleCmsSourceClientTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/media/HlsDurationProbeTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/media/HlsDurationProbeTests.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.media.HlsDurationProbeTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.media.HlsDurationProbeTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/media/HlsMediaDurationCandidateTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/media/HlsMediaDurationCandidateTests.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.media.HlsMediaDurationCandidateTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.media.HlsMediaDurationCandidateTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/media/HlsMediaDurationParserTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/media/HlsMediaDurationParserTests.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.media.HlsMediaDurationParserTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.media.HlsMediaDurationParserTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/transport/LocalSocksTrapListener.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/transport/LocalSocksTrapListener.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.LocalSocksTrapListener",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.LocalSocksTrapListener"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/transport/LocalTlsTestCertificate.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/transport/LocalTlsTestCertificate.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.LocalTlsTestCertificate",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.LocalTlsTestCertificate"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/transport/LocalTlsTestServer.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/transport/LocalTlsTestServer.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.LocalTlsTestServer",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.LocalTlsTestServer"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/transport/PublicAddressPolicyTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/transport/PublicAddressPolicyTests.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.PublicAddressPolicyTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.PublicAddressPolicyTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/transport/RestrictedCmsHttpClientLocalTlsTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/transport/RestrictedCmsHttpClientLocalTlsTests.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.RestrictedCmsHttpClientLocalTlsTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.RestrictedCmsHttpClientLocalTlsTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/transport/RestrictedCmsHttpClientTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/transport/RestrictedCmsHttpClientTests.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.RestrictedCmsHttpClientTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.RestrictedCmsHttpClientTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/transport/RestrictedHttpClientFactoryTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/transport/RestrictedHttpClientFactoryTests.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.RestrictedHttpClientFactoryTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.RestrictedHttpClientFactoryTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/transport/RestrictedManifestHttpClientTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/transport/RestrictedManifestHttpClientTests.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.RestrictedManifestHttpClientTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.RestrictedManifestHttpClientTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/integration/videosource/transport/ValidatedDnsResolverTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/integration/transport/ValidatedDnsResolverTests.java",
+      "oldFqcn": "com.feibijiubi.backend.integration.videosource.transport.ValidatedDnsResolverTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.integration.transport.ValidatedDnsResolverTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/config/ExternalVideoSourceConfigContextTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/config/ExternalVideoSourceConfigContextTests.java",
+      "oldFqcn": "com.feibijiubi.backend.config.ExternalVideoSourceConfigContextTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.config.ExternalVideoSourceConfigContextTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/config/ExternalVideoSourcePropertiesBindingTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/config/ExternalVideoSourcePropertiesBindingTests.java",
+      "oldFqcn": "com.feibijiubi.backend.config.ExternalVideoSourcePropertiesBindingTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.config.ExternalVideoSourcePropertiesBindingTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/config/ExternalVideoSourcePropertiesTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/config/ExternalVideoSourcePropertiesTests.java",
+      "oldFqcn": "com.feibijiubi.backend.config.ExternalVideoSourcePropertiesTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.config.ExternalVideoSourcePropertiesTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/controller/ExternalVideoSourceAdminControllerTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/controller/ExternalVideoSourceAdminControllerTests.java",
+      "oldFqcn": "com.feibijiubi.backend.controller.ExternalVideoSourceAdminControllerTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.controller.ExternalVideoSourceAdminControllerTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/controller/LocalEpisodeSourceAdminControllerTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/controller/LocalEpisodeSourceAdminControllerTests.java",
+      "oldFqcn": "com.feibijiubi.backend.controller.LocalEpisodeSourceAdminControllerTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.controller.LocalEpisodeSourceAdminControllerTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/controller/LocalVideoAdminControllerTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/video/local/controller/LocalVideoAdminControllerTests.java",
+      "oldFqcn": "com.feibijiubi.backend.controller.LocalVideoAdminControllerTests",
+      "newFqcn": "com.feibijiubi.backend.video.local.controller.LocalVideoAdminControllerTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/mapper/LocalEpisodeSourceMapperTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/mapper/LocalEpisodeSourceMapperTests.java",
+      "oldFqcn": "com.feibijiubi.backend.mapper.LocalEpisodeSourceMapperTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.mapper.LocalEpisodeSourceMapperTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/mapper/LocalVideoCatalogMapperXmlTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/video/local/mapper/LocalVideoCatalogMapperXmlTests.java",
+      "oldFqcn": "com.feibijiubi.backend.mapper.LocalVideoCatalogMapperXmlTests",
+      "newFqcn": "com.feibijiubi.backend.video.local.mapper.LocalVideoCatalogMapperXmlTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/external/ExternalCaptureBindingSchemaTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/schema/ExternalCaptureBindingSchemaTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.external.ExternalCaptureBindingSchemaTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.schema.ExternalCaptureBindingSchemaTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/external/ExternalVideoSourceCatalogSchemaTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/schema/ExternalVideoSourceCatalogSchemaTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.external.ExternalVideoSourceCatalogSchemaTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.schema.ExternalVideoSourceCatalogSchemaTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/external/LocalVideoIdentitySchemaTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/video/local/schema/LocalVideoIdentitySchemaTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.external.LocalVideoIdentitySchemaTests",
+      "newFqcn": "com.feibijiubi.backend.video.local.schema.LocalVideoIdentitySchemaTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/impl/video/external/ExternalVideoSourcePreviewQuotaServiceImplTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/service/impl/ExternalVideoSourcePreviewQuotaServiceImplTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.external.ExternalVideoSourcePreviewQuotaServiceImplTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.impl.ExternalVideoSourcePreviewQuotaServiceImplTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/impl/video/external/ExternalVideoSourcePreviewServiceTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/service/impl/ExternalVideoSourcePreviewServiceTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.impl.video.external.ExternalVideoSourcePreviewServiceTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.impl.ExternalVideoSourcePreviewServiceTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/localvideo/LocalEpisodeSourceServiceTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/service/LocalEpisodeSourceServiceTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.localvideo.LocalEpisodeSourceServiceTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.LocalEpisodeSourceServiceTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/localvideo/LocalVideoCatalogServiceTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/video/local/service/LocalVideoCatalogServiceTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.localvideo.LocalVideoCatalogServiceTests",
+      "newFqcn": "com.feibijiubi.backend.video.local.service.LocalVideoCatalogServiceTests"
+    },
+    {
+      "kind": "test",
+      "oldPath": "src/test/java/com/feibijiubi/backend/service/video/external/ExternalVideoSourceRegistryTests.java",
+      "newPath": "src/test/java/com/feibijiubi/backend/videosource/service/ExternalVideoSourceRegistryTests.java",
+      "oldFqcn": "com.feibijiubi.backend.service.video.external.ExternalVideoSourceRegistryTests",
+      "newFqcn": "com.feibijiubi.backend.videosource.service.ExternalVideoSourceRegistryTests"
+    }
+  ],
+  "addedFiles": [
+    {
+      "path": "src/test/java/com/feibijiubi/backend/videosource/mapper/LocalEpisodeSourceMapperBindingTests.java",
+      "fqcn": "com.feibijiubi.backend.videosource.mapper.LocalEpisodeSourceMapperBindingTests",
+      "purpose": "DB-free MyBatis assembly: legacy XML path loads, namespace binds migrated mapper, every MappedStatement exists"
+    },
+    {
+      "path": "src/test/java/com/feibijiubi/backend/video/local/mapper/LocalVideoCatalogMapperBindingTests.java",
+      "fqcn": "com.feibijiubi.backend.video.local.mapper.LocalVideoCatalogMapperBindingTests",
+      "purpose": "DB-free MyBatis assembly: legacy XML path loads, namespace binds migrated mapper, every MappedStatement exists"
+    }
+  ]
+}
