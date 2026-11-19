@@ -183,7 +183,7 @@ class VideoInteractionCleanupIsolatedTests {
         ownRequestIds.clear();
         ownWindowIds.clear();
 
-        String username = "t15-cleanup-it-" + UUID.randomUUID();
+        String username = "t15-it-" + UUID.randomUUID();
         jdbc.update("INSERT INTO users(username,password_hash,nickname) "
                 + "VALUES (?, 'test', 'test')", username);
         int uid = jdbc.queryForObject(

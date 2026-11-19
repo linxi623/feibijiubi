@@ -23,7 +23,6 @@ import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Profile;
@@ -108,28 +107,13 @@ class VideoStatusSchedulingRealFlowTests {
     private static final int EVENTS = 100;
 
     /**
-     * 复用已有隔离 IT 的真实组件装配（真实 DataSource/Redis/RabbitMQ、真实 Mapper、
-     * 真实事务模板、真实 MQ 消费者），只额外补两样东西：
-     * 生产 {@link VideoStatusSchedulingConfig} 的三条调度器 Bean，以及测试上下文里
-     * 尚未注册的真实 {@link VideoStatusDirtyRecoveryScheduler} Bean。
+     * 复用隔离 IT 的真实组件（包括批量落库与 dirty 恢复调度），
+     * 只额外引入生产 {@link VideoStatusSchedulingConfig} 提供的调度线程池。
      */
     @Configuration(proxyBeanMethods = false)
     @Import({VideoStatusIsolatedIntegrationTests.TestApplication.class,
             VideoStatusSchedulingConfig.class})
     static class SchedulingRealFlowApplication {
-
-        @Bean
-        VideoStatusDirtyRecoveryScheduler videoStatusDirtyRecoveryScheduler(
-                VideoStatusProperties properties,
-                VideoStatusConsumedEventMapper consumedEventMapper,
-                RedisSetOperations redisSetOperations
-        ) {
-            return new VideoStatusDirtyRecoveryScheduler(
-                    properties,
-                    consumedEventMapper,
-                    redisSetOperations
-            );
-        }
     }
 
     @Autowired JdbcTemplate jdbc;

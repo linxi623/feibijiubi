@@ -12,7 +12,10 @@ services:
       TZ: Asia/Shanghai
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./database/feibijiubi.sql:/docker-entrypoint-initdb.d/feibijiubi.sql:ro
+      # 不直接挂进 initdb 目录：官方 entrypoint 用 latin1 客户端导入，中文种子会在窄列上溢出而中断。
+      # database/init-schema.sh 显式使用 utf8mb4 导入。
+      - ./database/feibijiubi.sql:/schema/feibijiubi.sql:ro
+      - ./database/init-schema.sh:/docker-entrypoint-initdb.d/init-schema.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 10s
