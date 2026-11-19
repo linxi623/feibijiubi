@@ -77,7 +77,7 @@ Authorization: Bearer <管理员 token>
 
 错误：400参数/标题/分类/可见性/临时封面不合法或JSON错误；401未登录；403非管理员，或首次导入时数据库里的封面所有者与当前管理员不符（错误的 key 前缀先返回400）；404剧集不存在；409首次导入版本冲突、已软删绑定、无已确认/启用来源、无有效统一时长、临时封面状态冲突或认领条件已变化；415内容类型；500持久化或COS失败。控制器在服务调用前设置 `Cache-Control:no-store`，不覆盖拦截器及参数绑定前错误。
 
-迁移文件 `database/migrations/m5-local-episode-import.sql` 仅新增 `local_video_episode.import_revision BIGINT NULL` 并把 `video.video_url/video_key` 放宽为NULL；初始化SQL末尾已镜像，**本轮未执行**，不代表真实MySQL回滚/并发或COS验收。审核路径同时阻止无播放媒体的外部稿件进入APPROVED（见8.1）；M6-A 新增默认关闭的 `playback-enabled` 与只读播放/选集接口，详见下文“M6-A 新增”；M6-B 允许已导入剧集通过 S2 来源接口加线/换线，详见“M6-B 新增”。M5新增测试与相关回归已在 `Java_video` 隔离环境运行，详见 [M5 验证记录](tutorial/external-video-source-manual-import.md)。
+迁移文件 `database/migrations/m5-local-episode-import.sql` 仅新增 `local_video_episode.import_revision BIGINT NULL` 并把 `video.video_url/video_key` 放宽为NULL；初始化SQL末尾已镜像，**本轮未执行**，不代表真实MySQL回滚/并发或COS验收。审核路径同时阻止无播放媒体的外部稿件进入APPROVED（见8.1）；M6-A 新增 `playback-enabled`（现默认开启）与只读播放/选集接口，详见下文“M6-A 新增”；M6-B 允许已导入剧集通过 S2 来源接口加线/换线，详见“M6-B 新增”。M5新增测试与相关回归已在 `Java_video` 隔离环境运行，详见 [M5 验证记录](tutorial/external-video-source-manual-import.md)。
 
 ## M6-A 新增：只读播放与选集（后端通过离线回归）
 
@@ -123,7 +123,7 @@ GET /api/videos/{vid}/playback?lineId=12
 
 线路资格判定（播放接口与审核闸门共用同一实现）：
 
-1. 部署显式开启 `app.external-video-source.playback-enabled=true`（默认 false，与 `preview-enabled` 独立）；
+1. `app.external-video-source.playback-enabled` 默认 `true`（与 `preview-enabled` 独立）；部署显式设为 `false` 时关闭外部播放；
 2. binding 当前指针所指候选已人工确认（`confirmed_at/confirmed_seconds` 非空）；
 3. 仅有 HLS 探测成功证据：`probe_status=SUCCEEDED`、`manifest_hash` 为64位小写十六进制、`candidate_seconds` 有限且>0；失败/未知格式不会被假称 HLS；
 4. 确认时长与剧集统一时长、视频统一时长都精确相等；
@@ -2093,7 +2093,7 @@ Content-Type: application/json
 | 409 | `视频尚无可用播放媒体，不能审核通过`（外部稿件 `video_url/video_key` 均为NULL，且 `playback-enabled` 关闭或没有线路通过 M6-A 资格判定时） |
 | 409 | `视频已经由其他管理员审核，请刷新后重试` |
 
-> M5导入的外部稿件没有本站播放对象（`video_url`/`video_key` 均为NULL）。审核服务在唯一的状态写入口阻止其进入 `APPROVED`；仍可驳回。M6-A 只有显式开启 `app.external-video-source.playback-enabled` 且同一资格判定确认至少一条可用 HLS 线路时才允许外部稿件通过；仅打开开关不等于可用。旧COS视频两列非空，审核行为不变且不查询 S2/M5 表。
+> M5导入的外部稿件没有本站播放对象（`video_url`/`video_key` 均为NULL）。审核服务在唯一的状态写入口阻止其进入 `APPROVED`；仍可驳回。M6-A 仅在 `app.external-video-source.playback-enabled` 未被关闭，且资格判定确认至少一条可用 HLS 线路时才允许外部稿件通过；默认开启不等于任意线路可用。旧COS视频两列非空，审核行为不变且不查询 S2/M5 表。
 
 ### curl
 

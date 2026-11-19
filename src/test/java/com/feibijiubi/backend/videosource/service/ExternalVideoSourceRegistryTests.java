@@ -179,20 +179,21 @@ class ExternalVideoSourceRegistryTests {
     }
 
     @Test
-    void playbackEnabledDefaultsOffAndIsIndependentOfPreview() {
+    void playbackEnabledDefaultsOnAndIsIndependentOfPreview() {
         ExternalVideoSourceProperties defaults = properties(false, source("live-one", true));
-        assertFalse(defaults.isPlaybackEnabled(), "playback-enabled 默认关闭");
-        assertFalse(new ExternalVideoSourceRegistry(defaults).playbackEnabled());
-
-        ExternalVideoSourceProperties playbackOnly = properties(false, source("live-one", true));
-        playbackOnly.setPlaybackEnabled(true);
-        ExternalVideoSourceRegistry playbackRegistry = new ExternalVideoSourceRegistry(playbackOnly);
-
+        assertTrue(defaults.isPlaybackEnabled(), "playback-enabled 默认开启");
+        ExternalVideoSourceRegistry playbackRegistry = new ExternalVideoSourceRegistry(defaults);
         assertTrue(playbackRegistry.playbackEnabled());
         assertFalse(playbackRegistry.previewEnabled(), "播放开关与预览开关独立");
         assertTrue(playbackRegistry.listAvailableSources().isEmpty(),
                 "预览关闭时仍不暴露来源摘要");
         assertEquals("live-one", playbackRegistry.requireEnabledSource("live-one").code(),
                 "播放只需要来源存在且启用，不受预览开关影响");
+
+        ExternalVideoSourceProperties previewOnly = properties(true, source("live-one", true));
+        previewOnly.setPlaybackEnabled(false);
+        ExternalVideoSourceRegistry previewRegistry = new ExternalVideoSourceRegistry(previewOnly);
+        assertFalse(previewRegistry.playbackEnabled());
+        assertTrue(previewRegistry.previewEnabled());
     }
 }

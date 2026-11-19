@@ -46,6 +46,7 @@ class LocalEpisodeSourceServiceTests {
 
     @BeforeEach void setup() throws Exception {
         properties.setPreviewEnabled(true);
+        properties.setPlaybackEnabled(false); // 管理端确认不应依赖播放总开关。
         properties.setMaxConcurrentRequests(1);
         var source = new ExternalVideoSourceProperties.Source();
         source.setEnabled(true);

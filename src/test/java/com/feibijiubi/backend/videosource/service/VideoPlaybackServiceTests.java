@@ -58,7 +58,7 @@ class VideoPlaybackServiceTests {
     final VideoPlaybackMapper playbackMapper = mock(VideoPlaybackMapper.class);
     final ExternalVideoSourceProperties properties = new ExternalVideoSourceProperties();
 
-    private VideoPlaybackServiceImpl service(boolean playbackEnabled, boolean sourceEnabled) {
+    private VideoPlaybackServiceImpl service(Boolean playbackEnabled, boolean sourceEnabled) {
         var source = new ExternalVideoSourceProperties.Source();
         source.setEnabled(sourceEnabled);
         source.setCode("demo");
@@ -66,7 +66,7 @@ class VideoPlaybackServiceTests {
         source.setApiBase("https://api.example.invalid/api.php");
         source.setApiAllowedEndpoints(new LinkedHashSet<>(Set.of("api.example.invalid:443")));
         source.setMediaAllowedEndpoints(new LinkedHashSet<>(Set.of("media.example.invalid:443")));
-        properties.setPlaybackEnabled(playbackEnabled);
+        if (playbackEnabled != null) properties.setPlaybackEnabled(playbackEnabled);
         properties.setSources(List.of(source));
         return new VideoPlaybackServiceImpl(videoMapper, playbackMapper,
                 new ExternalPlaybackLineResolver(playbackMapper,
@@ -74,7 +74,7 @@ class VideoPlaybackServiceTests {
     }
 
     private VideoPlaybackServiceImpl service() {
-        return service(true, true);
+        return service(null, true); // 不指定播放总开关，覆盖正常部署默认值。
     }
 
     private static Video video(byte visibility) {

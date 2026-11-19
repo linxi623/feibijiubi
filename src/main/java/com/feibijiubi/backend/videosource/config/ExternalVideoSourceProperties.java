@@ -131,11 +131,11 @@ public class ExternalVideoSourceProperties {
     private boolean previewEnabled;
 
     /**
-     * 播放总开关，默认 <b>false</b>，与 {@code preview-enabled} <b>独立</b>：关闭时对外只返回
-     * {@code playable=false / PLAYBACK_DISABLED}，不返回任何已确认线路的媒体地址。显式开启也不会
-     * 让任意地址可播，仍须逐条通过候选确认、HLS 探测证据、统一时长、来源启用和媒体允许列表校验。
+     * 播放总开关，默认 <b>true</b>，与 {@code preview-enabled} <b>独立</b>。显式关闭时绑定线路不可播，
+     * 不返回媒体地址。默认开启也不会让任意地址可播，仍须逐条通过候选确认、HLS 探测证据、统一时长、
+     * 来源启用和媒体允许列表校验。
      */
-    private boolean playbackEnabled;
+    private boolean playbackEnabled = true;
 
     /** 部署批准的来源列表，默认空列表（零来源 = 零预览能力，是合法配置）。 */
     private List<Source> sources = new ArrayList<>();

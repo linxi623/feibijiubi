@@ -35,6 +35,12 @@ spring:
         auto-startup: false
 
 app:
+  external-video-source:
+    # 外部播放默认开启；仍要求来源启用、线路校验通过，以及视频审核和可见性规则允许。
+    playback-enabled: true
+    # 管理员上游预览单独控制；不预置任何外部来源。
+    preview-enabled: false
+    sources: []
   video-status:
     # 四个开关 = 四个可独立部署的角色，说明见 docs/tutorial/video-status-runtime-roles.md
     # async-enabled：业务侧是否写 Outbox（false = 同步直接写统计）

@@ -46,7 +46,7 @@ class ExternalVideoSourcePropertiesBindingTests {
             ExternalVideoSourceProperties properties =
                     context.getBean(ExternalVideoSourceProperties.class);
             assertFalse(properties.isPreviewEnabled());
-            assertFalse(properties.isPlaybackEnabled());
+            assertTrue(properties.isPlaybackEnabled());
             assertTrue(properties.getSources().isEmpty());
             assertEquals(2, properties.getMaxConcurrentRequests());
             assertEquals(30, properties.getPerAdminRequestsPerMinute());
@@ -61,7 +61,7 @@ class ExternalVideoSourcePropertiesBindingTests {
     void nestedSourceEntriesAndAllowedEndpointSetsAreBound() {
         runner.withPropertyValues(
                         "app.external-video-source.preview-enabled=true",
-                        "app.external-video-source.playback-enabled=true",
+                        "app.external-video-source.playback-enabled=false",
                         "app.external-video-source.max-concurrent-requests=4",
                         "app.external-video-source.per-admin-requests-per-minute=45",
                         "app.external-video-source.sources[0].enabled=true",
@@ -76,7 +76,7 @@ class ExternalVideoSourcePropertiesBindingTests {
                     ExternalVideoSourceProperties properties =
                             context.getBean(ExternalVideoSourceProperties.class);
                     assertTrue(properties.isPreviewEnabled());
-                    assertTrue(properties.isPlaybackEnabled());
+                    assertFalse(properties.isPlaybackEnabled(), "部署配置可显式关闭播放而不影响预览");
                     assertEquals(4, properties.getMaxConcurrentRequests());
                     assertEquals(45, properties.getPerAdminRequestsPerMinute());
                     assertEquals(1, properties.getSources().size());

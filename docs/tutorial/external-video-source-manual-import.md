@@ -88,11 +88,11 @@
 
 线路直接复用 S2 当前 `local_episode_source_binding`/`local_episode_media_candidate`：binding.id 即线路ID，默认按id取第一条可用线路；指定线路只在当前vid所绑剧集内，非法/跨集400且不静默回退。资格判定要求 `playback-enabled=true`、候选已人工确认、`probe_status=SUCCEEDED` 且 `manifest_hash`/`candidate_seconds` 有效、确认时长与剧集/视频统一时长精确一致、来源当前启用、媒体允许列表重新校验、地址重算 SHA-256 等于现有 `address_hash`。只有选中线路的一条地址进入响应 `url`；`lines[]` 只有本地id/标签/可用性。旧COS无绑定返回200 `NOT_BOUND`，不读取或改写旧 `videoUrl`；选集返回空页。
 
-新增 `app.external-video-source.playback-enabled`，默认false，与 `preview-enabled` 独立。审核唯一写入口 `VideoReviewImpl` 复用同一资格判定：旧COS行为不变且不查S2/M5表；外部稿件只有显式开启且至少一条可用HLS线路时才可APPROVED，仅打开开关仍409；`video_url/video_key` 继续为NULL。无新DDL。
+新增 `app.external-video-source.playback-enabled`（M6-A 当时默认关闭，现按产品决定默认开启），与 `preview-enabled` 独立。审核唯一写入口 `VideoReviewImpl` 复用同一资格判定：旧COS行为不变且不查S2/M5表；只有播放未被关闭且至少一条 HLS 线路可用，外部稿件才可 APPROVED；`video_url/video_key` 继续为NULL。无新DDL。
 
 敏感边界：候选 `address` 是可能带签名的上游凭据，只保存在服务端；播放 SQL 按剧集限定最多33行（32条+溢出防线），不返回地址摘要/来源配置/凭据引用，异常固定文案且不带 cause。生产须限制数据库/备份访问并关闭 MyBatis SQL 参数/结果 TRACE；本仓库未读取或编辑实际 `application.yml`。关闭开关或停用来源不撤回已发给浏览器的上游地址，也不保证地址可用/时效。
 
-独立审查 OK with notes，无阻塞；父级把上游分集标签明确为 `episodeLabel`，并统一拒绝分页大小的前导零。`Java_video` 隔离工作区普通离线回归共 1319 项：1091 项执行通过、228 项跳过、零失败或错误（`/tmp/feibijiubi-m6a.juCAKS/full-m6a-r1.log`）。整应用 smoke test 未运行，真实基础设施 opt-in 未开启。未做真实 MySQL、Redis、上游、浏览器或生产验收。外部播放保持默认关闭。
+独立审查 OK with notes，无阻塞；父级把上游分集标签明确为 `episodeLabel`，并统一拒绝分页大小的前导零。`Java_video` 隔离工作区普通离线回归共 1319 项：1091 项执行通过、228 项跳过、零失败或错误（`/tmp/feibijiubi-m6a.juCAKS/full-m6a-r1.log`）。整应用 smoke test 未运行，真实基础设施 opt-in 未开启。当时未做真实 MySQL、Redis、上游、浏览器或生产验收，仍使用 M6-A 原默认值。
 
 ### M6 用户端：HLS、线路和选集（组件及隔离构建已验）
 
@@ -109,7 +109,7 @@
 
 已导入确认额外要求：绑定的 video 存在、未软删、`video_url/video_key` 均为 NULL；剧集和视频时长一致、有限且>0；候选具备与 M6-A 相同的成功 HLS 证据（`SUCCEEDED`、64位小写 `manifest_hash`、正有限 `candidate_seconds`）；来源仍启用且媒体允许列表/地址摘要重新校验通过；人工确认时长等于剧集与原视频的统一时长（不要求等于候选探测秒数，理由字段记录同版判断）。确认事务按 `episode → video` 顺序取行锁，版本 CAS、候选 write-once 与新增/替换 binding 在同一短事务；不写 video/video_status/统计/进度，不调用 `setDuration`，不改变 `vid`、作者、标题或 `import_revision`。失败探测、来源停用、摘要不符或时长不一致都会在写 binding 前被拒绝，当前有效线路保持不变。
 
-播放开关 `playback-enabled` 不参与管理端确认；抓取/确认仍由默认关闭的 `preview-enabled` 和来源 `enabled` 控制。M6-A 播放/审核资格未放宽。测试覆盖已导入新增/替换、未确认候选不换线、失败/确认时长不符/版本过期/软删拒绝、草稿旧行为、鉴权/脱敏和新 SQL 方法。独立审查无阻塞；保留管理员核验同一版本及时间轴的规则，不拿探测秒数做精确匹配。在 `Java_video` 隔离工作区运行普通后端离线回归：共 1342 项，1114 通过、228 跳过、零失败或错误（`/tmp/feibijiubi-m6b.DnK3kk/full-m6b-r1.log`）。整应用 smoke test 未运行，真实基础设施 opt-in 未开启。M6-B 本轮后端回归未涉及真实 MySQL 行锁/回滚、真实上游或生产验收；外部播放保持默认关闭。
+播放开关 `playback-enabled` 不参与管理端确认；抓取/确认仍由默认关闭的 `preview-enabled` 和来源 `enabled` 控制。M6-A 播放/审核资格未放宽。测试覆盖已导入新增/替换、未确认候选不换线、失败/确认时长不符/版本过期/软删拒绝、草稿旧行为、鉴权/脱敏和新 SQL 方法。独立审查无阻塞；保留管理员核验同一版本及时间轴的规则，不拿探测秒数做精确匹配。在 `Java_video` 隔离工作区运行普通后端离线回归：共 1342 项，1114 通过、228 跳过、零失败或错误（`/tmp/feibijiubi-m6b.DnK3kk/full-m6b-r1.log`）。整应用 smoke test 未运行，真实基础设施 opt-in 未开启。M6-B 本轮后端回归未涉及真实 MySQL 行锁/回滚、真实上游或生产验收。
 
 ### M6 管理端：已导入剧集线路管理
 
@@ -122,7 +122,7 @@
 1. **管理端首次导入通过模拟接口验证**：同一页面可建作品/剧集草稿，选择候选、确认统一时长、上传 COS 临时封面、选真实分类接口提供的父子分区并提交为待审核。草稿可人工补偿失败探测；已导入仍要求成功 HLS 证据。`Java_video` 隔离工作区 `/tmp/feibijiubi-first-import.hcbgVa`：10 项定向 Node 测试、定向 ESLint、生产构建、两组 Chromium 模拟 API 均通过（`tests.log`、`build-r4.log`、`lines-browser-r4.log`、`import-browser-r4.log`）。未跑全仓测试。
 2. **真实 MySQL 分项已通过**：`Java_video` 独立 Docker MySQL 8.4.11，随机回环端口、临时数据目录、专用测试账号与隔离标记；在临时库应用 E1-A、M4-A1、S2、M5，未应用废弃 M4-A2，结束后移除容器。实际 MyBatis 和 Spring 事务验证并发首次导入只建一个 `vid`、临时封面数据库认领失败时整体回滚、并发换线只有一项成功且保留 `vid`、进度、点赞、收藏与统计。3 项 MySQL 测试及 122 项直接相关回归全部通过：`/data/home/feibijiubi-episode-mysql.HoswlG/mysql-tests.log`。这一步的存储和上游是测试替身，不能证明真实 COS 或上游部署行为。
 3. **真实 COS 与上游分项已验证**：在 `Java_video` 用腾讯云 SDK 和项目存储服务，在新建私有测试桶上传封面、复制到正式 key、比较文件字节、删除临时对象并验证正式对象仍可读取。测试对象和桶均已清理（`/data/home/feibijiubi-episode-mysql.HoswlG/cos-smoke.log`）。COS 操作与上面的真实数据库认领/回滚是不同用例，未连接现有对象或业务数据。用户指定的资源网首页云机返回访问验证 403，本机通过公开目录找到候选；对候选 `bfzyapi.com:443` / `v.fengbao14.com:443`，生产代码的受限 HTTP、目录/详情解析和 HLS 时长探测通过（`public-cms-backend-r2.log`），Chromium 的隔离生产构建也拉取真实媒体并解码起播（`/tmp/feibijiubi-m6-client.1rBOOX/browser-qa/public-cms-playback-bfzy.log`：一个真实清单、三个真实分片）。浏览器使用模拟本站 API，媒体未替换也未补 CORS；只证明该源抽样，与完整生产部署是不同验收。虎牙候选的样本虽返回清单和分片，Chromium 未起播，不作为通过来源。
-4. **上线检查决定**：配置默认值、白名单注册、外部/旧 COS 审核和播放 API 共 41 项定向回归通过（`/data/home/feibijiubi-episode-mysql.HoswlG/release-gates.log`）。代码可提交，但不在本轮部署。仓库中的预览与外部播放开关继续默认关闭，不预置真实来源配置；真正启用前须在部署环境复验来源授权、实际站点 Origin、允许列表和接入配置。已有库按未部署的迁移顺序执行，不重复跑新版初始化 SQL；本轮仅在一次性 MySQL 实例执行迁移。分阶段启用：先验证管理端预览和一条审核抽样，再启用外部播放；发现异常可停用来源或关闭相应开关，已发给浏览器的上游地址不会主动撤回。旧 COS 投稿和播放始终保留。
+4. **上线检查决定**：配置默认值、白名单注册、外部/旧 COS 审核和播放 API 共 41 项定向回归通过（`/data/home/feibijiubi-episode-mysql.HoswlG/release-gates.log`）。代码可提交，但不在本轮部署。外部播放现默认开启，管理员预览仍默认关闭，不预置真实来源配置；部署已有显式 `playback-enabled: false` 的环境仍会关闭外部播放。配置来源前须在部署环境复验来源授权、实际站点 Origin、允许列表和接入配置。已有库按未部署的迁移顺序执行，不重复跑新版初始化 SQL；本轮仅在一次性 MySQL 实例执行迁移。可先用少量已核验线路验收；发现异常可停用来源或显式关闭总开关，已发给浏览器的上游地址不会主动撤回。旧 COS 投稿和播放始终保留。
 
 MySQL 定向测试类 `LocalEpisodeMysqlTests` 默认跳过。只在隔离测试 workspace 中准备一次性 MySQL 8.4（回环端口、独立数据目录，使用 `--skip-log-bin` 允许非 root 测试账号建立故障注入触发器）；先以 UTF-8 初始化基础表，再应用上述四份迁移。创建测试专用表 `episode_test_isolation(run_marker CHAR(32) PRIMARY KEY)`、写入本轮随机 32 位小写十六进制标记，使用专用账号 `episode_test_only`。环境变量仅注入本轮临时连接参数 `EPISODE_TEST_MYSQL_PORT`、`EPISODE_TEST_MYSQL_MARKER`、`EPISODE_TEST_MYSQL_PASSWORD`。运行 `./mvnw -o -DexternalEpisodeMysqlIT=true -Dtest=LocalEpisodeMysqlTests test`；测试仅接受带匹配隔离标记的回环 MySQL 8.4，不读取运行配置。
 

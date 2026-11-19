@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
  *
  * <h2>一条线路可用的条件（全部满足）</h2>
  * <ol>
- *   <li>{@code playback-enabled=true}（部署显式开启；默认关闭时所有线路不可用）；</li>
+ *   <li>{@code playback-enabled=true}（默认开启；显式关闭时所有外部线路不可用）；</li>
  *   <li>binding 当前指针所指的候选已人工确认（{@code confirmed_at/confirmed_seconds} 非空）；</li>
  *   <li>候选有 HLS 探测成功证据：{@code probe_status=SUCCEEDED}、{@code manifest_hash} 为 64 位
  *       小写十六进制、{@code candidate_seconds} 有限且 &gt; 0；失败/未知格式不会被当作 HLS；</li>
