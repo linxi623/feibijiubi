@@ -66,6 +66,7 @@ public class VideoStatusDirtyRecoveryScheduler {
                     }
             );
 
+    @Autowired
     public VideoStatusDirtyRecoveryScheduler(
             VideoStatusProperties properties,
             VideoStatusConsumedEventMapper consumedEventMapper,

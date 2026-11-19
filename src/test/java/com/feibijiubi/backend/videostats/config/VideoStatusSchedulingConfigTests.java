@@ -1,5 +1,7 @@
 package com.feibijiubi.backend.videostats.config;
 
+import com.feibijiubi.backend.infrastructure.redis.operation.RedisSetOperations;
+import com.feibijiubi.backend.videostats.mapper.VideoStatusConsumedEventMapper;
 import com.feibijiubi.backend.videostats.mq.VideoStatusBatchFlushScheduler;
 import com.feibijiubi.backend.videostats.mq.VideoStatusDirtyRecoveryScheduler;
 import com.feibijiubi.backend.videostats.mq.VideoStatusOutboxRelay;
@@ -17,6 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 /**
  * T06 调度资源隔离的配置层测试：只加载 {@link VideoStatusSchedulingConfig}，
@@ -30,6 +33,19 @@ class VideoStatusSchedulingConfigTests {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(VideoStatusSchedulingConfig.class);
+
+    @Test
+    void dirtyRecoverySchedulerSelectsRuntimeConstructorWithoutClockBean() {
+        runner.withUserConfiguration(VideoStatusDirtyRecoveryScheduler.class)
+                .withBean(VideoStatusProperties.class, VideoStatusProperties::new)
+                .withBean(VideoStatusConsumedEventMapper.class,
+                        () -> mock(VideoStatusConsumedEventMapper.class))
+                .withBean(RedisSetOperations.class, () -> mock(RedisSetOperations.class))
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).hasSingleBean(VideoStatusDirtyRecoveryScheduler.class);
+                });
+    }
 
     @Test
     void threeIndependentSingleThreadSchedulersAreRegisteredWithStableNames() {
