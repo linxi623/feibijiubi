@@ -53,6 +53,7 @@ public final class ExternalVideoSourceRegistry {
             "SOURCE_UNAVAILABLE：来源未配置或未启用";
 
     private final boolean previewEnabled;
+    private final boolean playbackEnabled;
     private final Map<String, ExternalVideoSourceDescriptor> descriptorsByCode;
     private final List<AvailableSource> availableSources;
 
@@ -80,6 +81,7 @@ public final class ExternalVideoSourceRegistry {
         properties.validate();
 
         this.previewEnabled = properties.isPreviewEnabled();
+        this.playbackEnabled = properties.isPlaybackEnabled();
         Map<String, ExternalVideoSourceDescriptor> byCode = new LinkedHashMap<>();
         List<AvailableSource> enabled = new ArrayList<>();
         List<ExternalVideoSourceProperties.Source> configured = properties.getSources();
@@ -111,6 +113,16 @@ public final class ExternalVideoSourceRegistry {
     }
 
     /**
+     * 播放总开关当前是否打开（注册表构造时的快照值）。
+     *
+     * <p>与 {@link #previewEnabled()} 独立：预览关闭不会自动关闭播放，反之亦然。开启只表示部署允许
+     * 对外提供<b>已通过 M6-A 资格判定</b>的线路；它不能把任意候选或任意 URL 变成可播放。</p>
+     */
+    public boolean playbackEnabled() {
+        return playbackEnabled;
+    }
+
+    /**
      * 当前可预览来源的<b>安全摘要</b>（只有 code 与名称，没有 base、没有允许列表）。
      *
      * <p>预览关闭时返回空列表（不是"全部来源"、也不是抛异常）：关闭状态下连"配置了哪些来源"都不该
@@ -137,6 +149,22 @@ public final class ExternalVideoSourceRegistry {
         if (!previewEnabled) {
             throw new IllegalStateException(PREVIEW_DISABLED_MESSAGE);
         }
+        return requireEnabledSource(sourceCode);
+    }
+
+    /**
+     * 取出一个来源的已批准配置，用于<b>已确认草稿的导入</b>：只要求来源存在且已启用，
+     * <b>不</b>受 {@code preview-enabled} 影响。导入不再抓取上游或探测媒体，因此预览开关关闭时
+     * 仍允许管理员把此前已确认的草稿导入；来源被停用时仍然拒绝。
+     *
+     * <p>未配置、已禁用、code 为 null 一律得到同一个 {@link #SOURCE_UNAVAILABLE_MESSAGE}，
+     * 不区分“存在但禁用”与“不存在”。本方法同样只做内存查找。</p>
+     *
+     * @param sourceCode 部署白名单引用键（字符串，不是数据库主键）
+     * @return 该来源的不可变描述符（服务端对象，<b>不要</b>序列化给客户端）
+     * @throws IllegalStateException 来源未配置或未启用
+     */
+    public ExternalVideoSourceDescriptor requireEnabledSource(String sourceCode) {
         ExternalVideoSourceDescriptor descriptor =
                 sourceCode == null ? null : descriptorsByCode.get(sourceCode);
         if (descriptor == null || !descriptor.enabled()) {

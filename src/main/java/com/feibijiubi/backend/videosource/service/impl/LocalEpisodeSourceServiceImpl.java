@@ -1,6 +1,8 @@
 package com.feibijiubi.backend.videosource.service.impl;
 
 import com.feibijiubi.backend.shared.BusinessException;
+import com.feibijiubi.backend.video.entity.Video;
+import com.feibijiubi.backend.video.mapper.VideoMapper;
 import com.feibijiubi.backend.videosource.config.ExternalVideoSourceProperties;
 import com.feibijiubi.backend.videosource.dto.LocalEpisodeSourceCaptureDTO;
 import com.feibijiubi.backend.videosource.dto.LocalEpisodeSourceConfirmDTO;
@@ -11,6 +13,7 @@ import com.feibijiubi.backend.videosource.integration.applecms.AppleCmsDetailSna
 import com.feibijiubi.backend.videosource.integration.applecms.AppleCmsJsonAdapter;
 import com.feibijiubi.backend.videosource.integration.applecms.AppleCmsLineEntry;
 import com.feibijiubi.backend.videosource.integration.applecms.AppleCmsPlayLine;
+import com.feibijiubi.backend.videosource.integration.ExternalMediaAddressDigest;
 import com.feibijiubi.backend.videosource.integration.media.HlsManifestParseException;
 import com.feibijiubi.backend.videosource.integration.transport.CmsHttpRequestException;
 import com.feibijiubi.backend.videosource.integration.transport.RestrictedCmsHttpClient;
@@ -18,6 +21,7 @@ import com.feibijiubi.backend.videosource.mapper.LocalEpisodeSourceMapper;
 import com.feibijiubi.backend.video.local.mapper.LocalVideoCatalogMapper;
 import com.feibijiubi.backend.videosource.service.LocalEpisodeSourceService;
 import com.feibijiubi.backend.videosource.service.ExternalMediaProbe;
+import com.feibijiubi.backend.videosource.service.ExternalPlaybackLineResolver;
 import com.feibijiubi.backend.videosource.service.ExternalVideoSourceClientProvider;
 import com.feibijiubi.backend.videosource.service.ExternalVideoSourceDescriptor;
 import com.feibijiubi.backend.videosource.service.ExternalVideoSourcePreviewQuotaService;
@@ -31,20 +35,22 @@ import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Semaphore;
 import java.util.function.Supplier;
 
-/** Synchronous network outside transactions; all mutations serialize on the local episode row. */
+/**
+ * S2 草稿来源确认与 M6-B 已导入剧集加线/换线。
+ *
+ * <p>抓取网络严格在事务外；候选只入库。确认在同一短事务内先锁 {@code local_video_episode}，
+ * 已导入时再按固定顺序锁原 {@code video}，不跨网络持锁、不反向锁、不写 video/时长/统计。</p>
+ */
 @Service
 public class LocalEpisodeSourceServiceImpl implements LocalEpisodeSourceService {
     private final LocalEpisodeSourceMapper mapper;
     private final LocalVideoCatalogMapper catalog;
+    private final VideoMapper videoMapper;
     private final ExternalVideoSourceRegistry registry;
     private final ExternalVideoSourceClientProvider clients;
     private final ExternalMediaProbe probe;
@@ -53,11 +59,12 @@ public class LocalEpisodeSourceServiceImpl implements LocalEpisodeSourceService 
     private final TransactionTemplate transaction;
 
     public LocalEpisodeSourceServiceImpl(LocalEpisodeSourceMapper mapper, LocalVideoCatalogMapper catalog,
-            ExternalVideoSourceRegistry registry, ExternalVideoSourceClientProvider clients,
+            VideoMapper videoMapper, ExternalVideoSourceRegistry registry, ExternalVideoSourceClientProvider clients,
             ExternalMediaProbe probe, ExternalVideoSourcePreviewQuotaService quota,
             ExternalVideoSourceProperties properties, PlatformTransactionManager transactionManager) {
         this.mapper = mapper;
         this.catalog = catalog;
+        this.videoMapper = videoMapper;
         this.registry = registry;
         this.clients = clients;
         this.probe = probe;
@@ -84,11 +91,12 @@ public class LocalEpisodeSourceServiceImpl implements LocalEpisodeSourceService 
         }
         ExternalVideoSourceDescriptor source = requireSource(request.sourceCode());
         // Consistent preflight read ends before any network IO. Rechecked under lock after IO.
-        inTransaction(() -> {
-            requireDraft(catalog.selectEpisodeById(episodeId));
+        Integer preflightVid = inTransaction(() -> {
+            LocalVideoEpisode episode = requireEpisode(catalog.selectEpisodeById(episodeId));
+            if (episode.getVid() != null) requireImportedContext(episode);
             requireRevision(episodeId, request.expectedRevision());
             requireTarget(episodeId, request.targetBindingId(), source.code(), request.workId());
-            return null;
+            return episode.getVid();
         });
         if (!permits.tryAcquire()) throw new BusinessException(429, "来源探测并发已达上限");
         LocalEpisodeMediaCandidate candidate;
@@ -99,7 +107,9 @@ public class LocalEpisodeSourceServiceImpl implements LocalEpisodeSourceService 
             permits.release();
         }
         return inTransaction(() -> {
-            requireDraft(mapper.lockEpisode(episodeId));
+            LocalVideoEpisode episode = requireEpisode(mapper.lockEpisode(episodeId));
+            requireSameVid(preflightVid, episode);
+            if (episode.getVid() != null) lockImportedContext(episode);
             requireRevision(episodeId, request.expectedRevision());
             requireTarget(episodeId, request.targetBindingId(), source.code(), request.workId());
             requireOne(mapper.insertCandidate(candidate));
@@ -122,18 +132,24 @@ public class LocalEpisodeSourceServiceImpl implements LocalEpisodeSourceService 
             throw new BusinessException(400, "请提交有效版本、有限正时长和1..500字符的确认理由");
         }
         return inTransaction(() -> {
-            LocalVideoEpisode episode = requireDraft(mapper.lockEpisode(episodeId));
+            LocalVideoEpisode episode = requireEpisode(mapper.lockEpisode(episodeId));
+            // M6-B：已导入剧集先按固定顺序锁原 video，再完成版本/候选/来源/目标核对；不写 video、不改时长。
+            ImportedEpisode imported = episode.getVid() == null ? null : lockImportedContext(episode);
             requireRevision(episodeId, request.expectedRevision());
             LocalEpisodeMediaCandidate candidate = requireCandidate(episodeId, candidateId);
             if (!Objects.equals(candidate.getExpectedRevision(), request.expectedRevision())
                     || candidate.getConfirmedAt() != null) throw stale();
             ExternalVideoSourceDescriptor source = requireSource(candidate.getSourceCode());
             validateAddress(source, candidate.getAddress());
-            if (!sha256(candidate.getAddress()).equals(candidate.getAddressHash())) throw persistenceFailure();
+            if (!ExternalMediaAddressDigest.sha256Hex(candidate.getAddress()).equals(candidate.getAddressHash())) {
+                throw persistenceFailure();
+            }
             requireTarget(episodeId, candidate.getTargetBindingId(), candidate.getSourceCode(), candidate.getWorkId());
-            // Adding another source must not silently change the episode's already confirmed timeline.
-            if (episode.getDurationSeconds() != null
+            if (imported != null) {
+                requireImportedCandidate(candidate, request.durationSeconds(), imported.durationSeconds());
+            } else if (episode.getDurationSeconds() != null
                     && Double.compare(episode.getDurationSeconds(), request.durationSeconds()) != 0) {
+                // 草稿阶段保持原行为：新增来源不得静默改变已确认的统一时长。
                 throw new BusinessException(409, "已有统一时长，新来源必须确认同一时长；本接口不改写时间轴");
             }
             mapper.initializeState(episodeId);
@@ -148,7 +164,9 @@ public class LocalEpisodeSourceServiceImpl implements LocalEpisodeSourceService 
             } else {
                 requireOne(mapper.replaceBinding(episodeId, candidate.getTargetBindingId(), candidateId));
             }
-            if (episode.getDurationSeconds() == null) requireOne(mapper.setDuration(episodeId, request.durationSeconds()));
+            if (imported == null && episode.getDurationSeconds() == null) {
+                requireOne(mapper.setDuration(episodeId, request.durationSeconds()));
+            }
             return readCurrent(episodeId);
         });
     }
@@ -204,7 +222,7 @@ public class LocalEpisodeSourceServiceImpl implements LocalEpisodeSourceService 
         c.setEntryOrdinal(request.entryOrdinal());
         c.setLabel(entry.episodeLabel());
         c.setAddress(entry.address());
-        c.setAddressHash(sha256(entry.address()));
+        c.setAddressHash(ExternalMediaAddressDigest.sha256Hex(entry.address()));
         c.setCapturedBy(adminId);
         try {
             var result = probe.probe(source, entry.address());
@@ -267,6 +285,56 @@ public class LocalEpisodeSourceServiceImpl implements LocalEpisodeSourceService 
         }
     }
 
+    private void requireImportedContext(LocalVideoEpisode episode) {
+        validateImportedContext(episode, videoMapper.selectByVid(episode.getVid()));
+    }
+
+    private ImportedEpisode lockImportedContext(LocalVideoEpisode episode) {
+        // 固定顺序：调用方已持有 episode 行锁，这里才锁原 video；不得在锁内做网络 IO。
+        return validateImportedContext(episode, mapper.lockVideoForUpdate(episode.getVid()));
+    }
+
+    private static ImportedEpisode validateImportedContext(LocalVideoEpisode episode, Video video) {
+        if (episode.getVid() == null || video == null || !episode.getVid().equals(video.getVid())) {
+            throw new BusinessException(500, "IMPORTED_VIDEO_DATA_FAILED：导入视频数据异常");
+        }
+        if (video.getDeletedAt() != null) {
+            throw new BusinessException(409, "已导入视频已删除，不能变更播放线路");
+        }
+        if (video.getVideoUrl() != null || video.getVideoKey() != null) {
+            throw new BusinessException(409, "已导入视频不是外部稿件，不能通过来源接口变更线路");
+        }
+        Double episodeDuration = episode.getDurationSeconds();
+        Double videoDuration = video.getDuration();
+        if (!positiveFinite(episodeDuration) || !positiveFinite(videoDuration)
+                || Double.compare(episodeDuration, videoDuration) != 0) {
+            throw new BusinessException(409, "剧集与导入视频的统一时长不一致，不能变更播放线路");
+        }
+        return new ImportedEpisode(episodeDuration);
+    }
+
+    private static void requireImportedCandidate(LocalEpisodeMediaCandidate candidate,
+                                                 double confirmedSeconds, double timelineSeconds) {
+        if (!ExternalPlaybackLineResolver.hasSuccessfulHlsEvidence(candidate.getProbeStatus(),
+                candidate.getManifestHash(), candidate.getCandidateSeconds())) {
+            throw new BusinessException(409, "已导入剧集只能确认具有成功HLS证据的候选，失败候选不能替换当前线路");
+        }
+        if (Double.compare(confirmedSeconds, timelineSeconds) != 0) {
+            throw new BusinessException(409, "确认时长必须等于剧集与原视频的统一时长");
+        }
+    }
+
+    private static void requireSameVid(Integer preflightVid, LocalVideoEpisode episode) {
+        if (!Objects.equals(preflightVid, episode.getVid())) {
+            // 预检后发生首次导入/换绑定时不能按旧状态自动保存候选。
+            throw new BusinessException(409, "EPISODE_IMPORT_STATE_CHANGED：剧集导入状态已变化，请刷新后重新选择线路");
+        }
+    }
+
+    private static boolean positiveFinite(Double value) {
+        return value != null && Double.isFinite(value) && value > 0;
+    }
+
     private long revision(long episodeId) {
         Long value = mapper.selectRevision(episodeId);
         return value == null ? 0 : value;
@@ -296,12 +364,6 @@ public class LocalEpisodeSourceServiceImpl implements LocalEpisodeSourceService 
         return episode;
     }
 
-    private static LocalVideoEpisode requireDraft(LocalVideoEpisode episode) {
-        requireEpisode(episode);
-        if (episode.getVid() != null) throw new BusinessException(409, "已导入剧集不能通过草稿接口变更来源或时长");
-        return episode;
-    }
-
     private static void requireId(long id) {
         if (id <= 0) throw new BusinessException(400, "id必须为正数");
     }
@@ -328,11 +390,7 @@ public class LocalEpisodeSourceServiceImpl implements LocalEpisodeSourceService 
         return new BusinessException(500, "SOURCE_PERSISTENCE_FAILED：来源记录保存或读取失败");
     }
 
-    private static String sha256(String value) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 unavailable");
-        }
+    /** 已导入剧集的统一时长；仅用于本次确认/候选判定，不写回 video。 */
+    private record ImportedEpisode(double durationSeconds) {
     }
 }

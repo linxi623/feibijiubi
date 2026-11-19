@@ -5,6 +5,13 @@
     <select id="lockEpisode" resultType="com.feibijiubi.backend.video.local.entity.LocalVideoEpisode" timeout="3">
         SELECT id, duration_seconds, vid FROM local_video_episode WHERE id = #{id} FOR UPDATE
     </select>
+    <!-- M6-B: episode row is locked first; this read-only lock only protects the external video timeline. -->
+    <select id="lockVideoForUpdate" resultType="com.feibijiubi.backend.video.entity.Video" timeout="3">
+        SELECT vid, duration, video_url, video_key, deleted_at
+        FROM video
+        WHERE vid = #{vid}
+        FOR UPDATE
+    </select>
     <select id="selectRevision" resultType="java.lang.Long" timeout="3">
         SELECT revision FROM local_episode_source_state WHERE episode_id = #{episodeId}
     </select>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.feibijiubi.backend.videosource.mapper.VideoPlaybackMapper">
+    <!-- M6-A is read-only. Never add INSERT/UPDATE/DELETE here: playback must not count plays,
+         write Redis or change video/video_url/video_status. address is a server-only signed value;
+         keep SQL parameter/result logging off in production (see docs/api.md). -->
+
+    <select id="selectEpisodeByVid" resultType="com.feibijiubi.backend.video.local.entity.LocalVideoEpisode" timeout="3">
+        SELECT id, series_id, display_title, duration_seconds, vid
+        FROM local_video_episode
+        WHERE vid = #{vid}
+    </select>
+
+    <select id="selectPlaybackLines" resultType="com.feibijiubi.backend.videosource.entity.LocalEpisodePlaybackLine" timeout="3">
+        SELECT b.id AS binding_id,
+               c.id AS candidate_id,
+               c.source_code,
+               c.label,
+               c.address,
+               c.address_hash,
+               c.probe_status,
+               c.candidate_seconds,
+               c.manifest_hash,
+               c.confirmed_seconds,
+               c.confirmed_at
+        FROM local_episode_source_binding b
+        INNER JOIN local_episode_media_candidate c
+            ON c.episode_id = b.episode_id AND c.id = b.candidate_id
+        WHERE b.episode_id = #{episodeId}
+        ORDER BY b.id
+        LIMIT 33
+    </select>
+
+    <select id="selectVisibleEpisodesAfter" resultType="com.feibijiubi.backend.video.local.entity.LocalVideoEpisode" timeout="3">
+        SELECT e.id, e.series_id, e.display_title, e.vid
+        FROM local_video_episode e
+        INNER JOIN video v ON v.vid = e.vid
+        WHERE e.series_id = #{seriesId}
+          AND e.id &gt; #{afterId}
+          AND v.status = 1
+          AND v.deleted_at IS NULL
+          AND (v.visibility = 0 OR v.uid = #{uid})
+        ORDER BY e.id
+        LIMIT #{limit}
+    </select>
+</mapper>

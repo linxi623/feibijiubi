@@ -8,6 +8,8 @@
 
 统一前缀：`/api/admin/local-video-episodes/{episodeId}/sources`。全部管理员专用；写操作的操作者只从登录态获取。前置为M4-A1及`database/migrations/s2-local-episode-source.sql`，不依赖未使用的M4-A2表。已有库缺表会500，不能直接启用。
 
+本组接口最初只服务未导入草稿；M6-B 起，**已导入剧集（`vid`非空）复用同一套抓取/确认接口**新增独立线路或明确替换现有线路，确认条件更严格（见下文“M6-B 新增”）。没有新增路由，也没有新增DDL。
+
 | 方法 | 相对路径 | 用途 |
 | --- | --- | --- |
 | GET | 空 | 当前`revision`、`durationSeconds`、`bindings[{id,candidate}]` |
@@ -18,13 +20,189 @@
 抓取请求：`{"sourceCode":"demo","workId":"7","lineOrdinal":1,"entryOrdinal":1,"expectedRevision":0,"targetBindingId":null}`。
 `workId`为1..191位无前导零正整数字符串；位置范围1..16/1..1000，只对应**本次新抓取快照**，不是历史预览的持久身份。返回后须人工核对label。targetBindingId为空新增，非空明确替换已有来源关联（sourceCode/workId不能改变）。不接受客户端URL或探测成功声明。
 
-确认请求：`{"expectedRevision":0,"durationSeconds":1250.5,"reason":"已人工核验该集统一时长"}`。秒数有限且>0，reason非空白且最多500字符。只接受属于该剧集的服务端候选；探测失败可人工核验填写，但不改写原失败状态。首次确认设置统一时长，后续来源必须采用相同时长；不允许通过此接口变更已确认时间轴。每剧集最多32条关联，已导入（vid非空）禁止草稿抓取/确认。
+确认请求：`{"expectedRevision":0,"durationSeconds":1250.5,"reason":"已人工核验该集统一时长"}`。秒数有限且>0，reason非空白且最多500字符。只接受属于该剧集的服务端候选；**草稿**探测失败可人工核验填写，但不改写原失败状态。草稿首次确认设置统一时长，后续来源必须采用相同时长；不允许通过此接口变更已确认时间轴。每剧集最多32条关联。**已导入剧集不能使用草稿的人工补偿规则**：只能确认具有成功HLS证据的候选，确认时长必须等于剧集与原视频的统一时长，详见 M6-B。
 
 候选字段：`id/episodeId/expectedRevision/targetBindingId/sourceCode/workId/lineOrdinal/entryOrdinal/label/probeStatus/candidateSeconds/capturedAt/confirmedSeconds/confirmedBy/confirmedAt/reason`。probeStatus为`SUCCEEDED/UNSUPPORTED_MANIFEST/FETCH_FAILED/PROBE_REJECTED`，失败时candidateSeconds为null。无地址、地址摘要、清单摘要或线路键字段；label/reason是需前端转义的自由文本。
 
 确认后revision加1；版本冲突/旧候选/重复确认返回409，不承诺透明幂等重放。响应丢失先GET当前状态/候选列表。GET不联网，不消耗配额；POST抓取消费与预览共享的Redis管理员配额（不退还），使用独立实例内并发限制，最多一详情请求和一媒体请求。确认不联网。抓取/确认受默认关闭的preview-enabled及source enabled控制，历史查询不受此开关限制。
 
 错误HTTP与业务code一致：400参数/JSON、401/403鉴权、404不存在、409冲突、415内容类型、429配额/并发、503关闭/策略缺失/Redis故障、502上游、500持久化。控制器在服务调用前设置no-store，不覆盖拦截器及绑定前失败。本片**无video创建、无发布/播放地址、无真实数据库验收**。详细步骤及敏感地址部署注意事项：[S2教程](tutorial/external-video-source-binding.md)。
+
+## M5 新增：管理员单集导入（离线候选，迁移未执行）
+
+```http
+POST /api/admin/local-video-episodes/{episodeId}/import
+Content-Type: application/json
+Authorization: Bearer <管理员 token>
+```
+
+管理员专用；操作者只取登录态，请求体没有 uid / vid / sourceType / status / duration / videoUrl / videoKey。已有库须具备 M4-A1、S2 三表，再执行一次 `database/migrations/m5-local-episode-import.sql`（**本轮未执行**）。使用新版 `database/feibijiubi.sql` 新建的库已含这些变更，不要再执行该迁移。
+
+请求体：
+
+```json
+{
+  "expectedRevision": 0,
+  "tempCoverKey": "temp/covers/7/20250101/cover.png",
+  "title": "导入视频标题",
+  "mcId": "douga",
+  "scId": "mad",
+  "visibility": 1
+}
+```
+
+- `expectedRevision` 必填且 >= 0。仅首次导入检查它等于当前 `local_episode_source_state.revision`，版本缺行等价于0；已绑定的请求复用原 `vid`，不重新比较版本。
+- `tempCoverKey` 必填，必须符合当前管理员的 `temp/covers/{uid}/...` 格式。仅首次导入检查临时记录存在、属于当前管理员、是封面、未过期且未认领；已绑定的请求只校验字段格式，不读取封面记录或访问 COS。
+- `title` 必填，trim 后 1..80 字符（`video.title` 列宽）；`mcId/scId` 必填，trim 后各 1..20 字符，首次导入要求 `category` 表中存在该二级组合，并写入表中的规范分类 ID。
+- `visibility` 省略时默认1（私密）；只接受0（公开）/1（私密）。
+- 不接受的字段被忽略且不生效，不能覆盖时长、作者、审核状态或播放地址。
+
+响应 data：
+
+```json
+{"episodeId":1,"vid":55,"durationSeconds":1250.5,"importRevision":0,"status":0,"reused":false}
+```
+
+只返回稳定业务标识、统一时长、首次导入来源 revision、审核状态与是否复用；**不返回** cover key、cover URL、video URL、video key、媒体地址或摘要。`status=0` 为PENDING；首次导入固定 `source_type=2`（转载），作者为执行导入的管理员，时长取剧集已确认的统一时长，不读取探测候选秒数。
+
+事务与重复语义：
+
+- 与S2相同，使用 `local_video_episode` 行 `FOR UPDATE`；事务内先锁再判定。
+- 已绑定且 `video.deleted_at IS NULL`：返回原 `vid`、原状态与原 `importRevision`，`reused=true`；不改作者、video、统计或来源，且该判定发生在任何COS I/O之前。
+- 已绑定但视频已软删：固定409，不复活、不新建第二个video。
+- 首次导入：校验版本、已确认且仍启用的来源（至少一个；`preview-enabled`关闭不影响导入已确认草稿，来源停用仍拒绝）、有限且>0的剧集统一时长；事务外检查临时COS对象并复制到唯一正式key；随后同一短事务写PENDING video、初始化 `video_status`、以 `vid IS NULL` CAS写 `vid` 与 `import_revision`、最后以 `upload_temp_file.status=0→1` CAS认领封面，同时在 UPDATE 中检查所有者、封面类型和过期时间。任一必需写入影响行数不是1即回滚。
+- 外部稿件 `video_url/video_key` 均为NULL，不写假COS key或外链；`cover_url/cover_key` 承接认领的COS封面，仍为NOT NULL。
+- 封面补偿：仅在确认数据库回滚、或复制后尚未进入数据库事务（该copy确定未被稿件引用）时删除正式copy；提交结果未知时不删除任何对象。临时对象只在认领事务提交后删除。
+- 重试不会重置video/status/统计/封面状态；不承诺任意请求透明重放。
+
+错误：400参数/标题/分类/可见性/临时封面不合法或JSON错误；401未登录；403非管理员，或首次导入时数据库里的封面所有者与当前管理员不符（错误的 key 前缀先返回400）；404剧集不存在；409首次导入版本冲突、已软删绑定、无已确认/启用来源、无有效统一时长、临时封面状态冲突或认领条件已变化；415内容类型；500持久化或COS失败。控制器在服务调用前设置 `Cache-Control:no-store`，不覆盖拦截器及参数绑定前错误。
+
+迁移文件 `database/migrations/m5-local-episode-import.sql` 仅新增 `local_video_episode.import_revision BIGINT NULL` 并把 `video.video_url/video_key` 放宽为NULL；初始化SQL末尾已镜像，**本轮未执行**，不代表真实MySQL回滚/并发或COS验收。审核路径同时阻止无播放媒体的外部稿件进入APPROVED（见8.1）；M6-A 新增默认关闭的 `playback-enabled` 与只读播放/选集接口，详见下文“M6-A 新增”；M6-B 允许已导入剧集通过 S2 来源接口加线/换线，详见“M6-B 新增”。M5新增测试与相关回归已在 `Java_video` 隔离环境运行，详见 [M5 验证记录](tutorial/external-video-source-manual-import.md)。
+
+## M6-A 新增：只读播放与选集（后端通过离线回归）
+
+两个公开接口均为 `@OptionalLogin`、GET 纯读，响应头设置 `Cache-Control: no-store`。不联网、不探测媒体、不计播放、不写 Redis/MySQL、不修改 `PublishedVideoGuard` 或进度契约。前置为 M4-A1、S2 三表及 M5 迁移；缺表时返回固定500，不能直接启用。**本轮没有新增 DDL**。
+
+### GET /api/videos/{vid}/playback
+
+```http
+GET /api/videos/{vid}/playback?lineId=12
+```
+
+权限与现有详情一致：`vid<=0` → 400 `视频参数不合法`；不存在/未过审/已软删 → 404 `视频不存在`；`visibility=1` 且不是作者本人 → 403 `你无权查看此视频`。管理员在公共侧**没有**额外绕过。
+
+- `lineId` 可省略，值是本地 `local_episode_source_binding.id`（BIGINT，正整数）。缺省时按本地 binding id 升序取**第一条可用线路**。指定线路必须属于当前 `vid` 所绑定的本地剧集；非法、未知或其他剧集的 lineId 一律 400 `播放线路不合法`，**不会静默回退**到默认线路。
+- 旧 COS 视频没有本地剧集绑定：返回 200 `playable=false / NOT_BOUND`，**不**回退到旧详情的 `videoUrl`，也不改写 `video.video_url`。
+- 无本地绑定但携带 `lineId` 仍先做归属校验：400。
+
+可用响应示例：
+
+```json
+{
+  "vid": 55,
+  "playable": true,
+  "reason": "OK",
+  "format": "HLS",
+  "url": "https://media.example.invalid/hls/index.m3u8",
+  "lineId": 12,
+  "episodeLabel": "第01集",
+  "lines": [
+    {"lineId": 12, "episodeLabel": "第01集", "available": true},
+    {"lineId": 13, "episodeLabel": "第1集", "available": false}
+  ]
+}
+```
+
+不可播放示例：
+
+```json
+{"vid":55,"playable":false,"reason":"NOT_BOUND","format":null,"url":null,"lineId":null,"episodeLabel":null,"lines":[]}
+```
+
+`reason` 固定集合：`OK`、`NOT_BOUND`（无本地剧集/线路绑定，含旧COS）、`PLAYBACK_DISABLED`（`playback-enabled=false`）、`SOURCE_DISABLED`（全部线路或指定线路的来源已停用）、`NO_PLAYABLE_ADDRESS`（有绑定但没有线路通过资格判定）。
+
+线路资格判定（播放接口与审核闸门共用同一实现）：
+
+1. 部署显式开启 `app.external-video-source.playback-enabled=true`（默认 false，与 `preview-enabled` 独立）；
+2. binding 当前指针所指候选已人工确认（`confirmed_at/confirmed_seconds` 非空）；
+3. 仅有 HLS 探测成功证据：`probe_status=SUCCEEDED`、`manifest_hash` 为64位小写十六进制、`candidate_seconds` 有限且>0；失败/未知格式不会被假称 HLS；
+4. 确认时长与剧集统一时长、视频统一时长都精确相等；
+5. 来源当前存在且启用，来源媒体允许列表重新校验通过；
+6. 存储地址重新计算的 SHA-256 与现有 `address_hash` 完全一致；不 trim、不规范化、不改写原始 URL 字节。
+
+`url` **只给当前选中线路的一条**已确认地址；`lines[]` 只给本地 id、标签和按配置计算的可用性，不返回地址、地址/清单摘要、来源配置、凭据引用或未批准候选。`episodeLabel` 是上游的分集标签，不是线路名称；它与选集 `displayTitle` 都是自由文本，前端需按纯文本渲染。除选中线路的 `url` 外，其他响应字段和对象 `toString` 不输出地址；服务端异常只返回固定文案，不保留可能含 SQL 参数/结果的原始异常。
+
+### GET /api/videos/{vid}/episodes
+
+```http
+GET /api/videos/{vid}/episodes?cursor=11&size=20
+```
+
+- 权限与前置校验同 playback：`vid<=0` 400、不存在/未过审/软删 404、私密非本人 403。
+- `size` 默认20，范围1..50；`cursor` 是上一页 `nextCursor`，基于本地 `local_video_episode.id`；非法参数 400 `分页参数不合法`。
+- 返回同一本地作品下**可见**剧集：`video.status=1 AND video.deleted_at IS NULL AND (visibility=0 OR uid=当前用户)`，按本地 episode.id keyset 升序，取 `size+1` 行判断 `hasMore`；没有 OFFSET 或总数查询。
+- 响应 `{"items":[{"vid":56,"displayTitle":"第二集"}],"hasMore":true,"nextCursor":"11"}`。`displayTitle` 是本地展示标题，可为 null；不返回总量、不可见集数量、线路或地址。
+- 当前 `vid` 没有本地剧集绑定时返回空页（`items=[]`、`hasMore=false`、`nextCursor=null`），不是 404。
+
+### 审核闸门更新
+
+`POST /api/admin/videos/{vid}/review` 的 APPROVED 分支：
+
+- 旧 COS 行（`video_url`/`video_key` 非空）行为不变，**不查询** S2/M5 表；
+- 外部稿件（两列均为 NULL）只有在 `playback-enabled=true` **且**上述同一资格判定确认至少一条可用 HLS 线路时才允许通过；仅打开开关、任意 URL、未确认候选、失败探测、时长不一致、来源停用或摘要不匹配都仍返回 409 `视频尚无可用播放媒体，不能审核通过`。
+- 外部稿件仍保持 `video_url/video_key=NULL`；不放宽私密权限，也不新增绕过审核的写入口。
+
+### 敏感数据与验证边界
+
+- `local_episode_media_candidate.address` 是可能带签名的上游播放凭据：生产环境必须限制数据库/备份访问，并关闭 MyBatis SQL 参数/结果 TRACE 日志（本仓库不读取或编辑实际 `application.yml`）；播放 SQL 不把地址作为参数，但结果日志仍可能打印整行。
+- 本接口只保证“按当前数据库和部署配置判定”，**不保证**上游地址当时可用、不过期或内容不变；关闭 `playback-enabled` 或停用来源只影响之后的响应，**不撤回**已经发给浏览器的上游地址，也不删除已导入数据。
+- 后端普通离线回归已在 `Java_video` 通过，见 [M6-A 验证记录](tutorial/external-video-source-manual-import.md)。用户端已接入，组件回归、隔离构建和 Chromium 合成 HLS/MP4 实播已通过，详见同一计划文档。尚未验收真实上游及地址时效、生产跨域、MySQL、Redis 或生产环境。
+
+## M6-B 新增：已导入剧集的管理员加线/换线（通过后端离线回归）
+
+复用 S2 的四个管理员接口，不新增路由、不新增表或列：
+
+| 方法 | 相对路径 | M6-B 行为 |
+| --- | --- | --- |
+| GET | 空 | 返回当前剧集 `revision`、统一时长和已有线路，不区分草稿/已导入 |
+| POST | `/candidates` | 已导入剧集也可抓取并保存候选；候选仅入库，不改线路指针 |
+| GET | `/candidates?afterId=0&limit=20` | 历史候选查询不变 |
+| POST | `/candidates/{candidateId}/confirm` | 已导入剧集可新增独立线路或明确替换 `targetBindingId` |
+
+### 抓取：预检与最终短事务
+
+已导入剧集（`local_video_episode.vid` 非空）抓取前必须满足：
+
+1. 绑定的 `video` 存在且 `deleted_at IS NULL`；
+2. 该视频是外部稿件：`video_url`、`video_key` 均为 NULL；
+3. 剧集统一时长与视频时长都是有限且大于0的秒数，并且精确相等。
+
+预检在事务内读取剧集/来源版本/目标关联后结束，之后才做有界 CMS 详情和媒体探测；不持有行锁跨网络。网络结束后重新锁 `local_video_episode`（已导入时再按 `episode → video` 顺序锁原 `video`），再次核对导入状态、原 `vid`、来源版本和目标关联；若预检后发生首次导入或原 `vid` 变化，返回 409 `EPISODE_IMPORT_STATE_CHANGED`，不保存候选。
+
+候选保存阶段只插入 `local_episode_media_candidate`，**不**修改 binding 指针、剧集时长、video、video_status、审核状态或统计。探测失败仍可保存 `UNSUPPORTED_MANIFEST/FETCH_FAILED/PROBE_REJECTED` 候选供管理员诊断，但这类候选不能用于已导入剧集的确认/替换。
+
+### 确认：已导入剧集的严格条件
+
+确认事务先锁剧集行，再按固定顺序锁原 video 行（`episode → video`），随后核对：
+
+1. 请求 `expectedRevision` 等于当前剧集来源 revision，候选属于本剧集、未确认且基准版本一致；
+2. 来源仍存在且启用，媒体允许列表重新校验通过，存储地址重新计算的 SHA-256 等于 `address_hash`；
+3. 目标 `targetBindingId` 为空表示新增独立线路；非空必须先存在且属于本剧集，并保持原 `sourceCode/workId`。换到另一来源是新增，不是替换；
+4. 候选具备与 M6-A **完全相同**的成功 HLS 证据：`probe_status=SUCCEEDED`、`manifest_hash` 为64位小写十六进制、`candidate_seconds` 有限且>0；
+5. 人工确认时长与剧集统一时长、原视频时长精确相等。候选探测秒数不要求和人工统一时长相同；管理员通过必填 `reason` 明确“同一版本/同一时间轴”的人工判断。
+
+只有全部满足才在同一短事务中执行 revision CAS、候选 write-once 确认、新增/替换 binding；任一写入影响行数不是1即回滚。已导入剧集**不会**调用 `setDuration`，不修改 `vid`、作者、标题、视频列、审核状态、进度或计数。失败候选、来源停用、地址摘要不符或时长不一致都会在写 binding 前被拒绝（按 S2 的固定 HTTP/业务码），当前有效线路保持不变。
+
+播放开关 `app.external-video-source.playback-enabled` 不参与本管理流程；抓取/确认仍受默认关闭的 `preview-enabled` 和来源 `enabled` 控制。M6-A 播放与审核闸门的资格条件没有放宽。
+
+### 错误与安全
+
+- 409：版本过期、首次导入/原vid变化、已导入视频已删除、不是外部稿件、剧集与视频时长不一致、候选缺少成功HLS证据、确认时长不等于统一时长、替换目标不符、32条上限。
+- 500：绑定视频缺失/数据异常、持久化失败；固定文案不携带原始异常或地址。
+- 400/401/403/404/415/429/502/503/500 的其余含义与 S2 相同。
+- 候选地址仍只在服务端保存；本流程不返回地址、地址/清单摘要或来源配置，不记录含地址的日志。真实部署仍须限制数据库/备份访问并关闭 MyBatis SQL 参数/结果 TRACE。
+
+M6-B 后端回归已在 `Java_video` 隔离工作区通过，见 [人工导入进度](tutorial/external-video-source-manual-import.md)。管理端已接入已导入剧集的新增/替换线路，Chromium 模拟 API 验证通过。未新增或执行迁移，未做真实 MySQL 并发/回滚、真实上游或生产验收。
 
 ## 0. Docker Compose 启动
 
@@ -279,11 +457,11 @@ HTTP错误：未登录401、非管理员403；参数缺失/格式/取值错误40
 
 配置 `app.external-video-source`：`preview-enabled=false`；来源也默认disabled，最多32个；`max-concurrent-requests=2`（1..8，本实例）、`per-admin-requests-per-minute=30`（1..120，Redis跨实例同管理员共享60秒窗口）。目录和详情共用额度；参数/来源检查后才申请并发许可和消费额度，超并发不排队，失败释放许可但不返还已花额度。根列表不访问上游且不消耗额度。
 
-所有路由不写业务库/不创建视频，但目录详情会写Redis配额计数。控制器执行后响应带 `Cache-Control:no-store`，包括服务拒绝；拦截器提前返回401/403和绑定前错误不在此保证内。这些M3路由没有写入口；新增草稿探测/确认见本文S2，导入仍未实现。父级273项离线测试通过（`/tmp/m3b-parent-final.log`），没有真实上游或Redis端到端验收。
+所有路由不写业务库/不创建视频，但目录详情会写Redis配额计数。控制器执行后响应带 `Cache-Control:no-store`，包括服务拒绝；拦截器提前返回401/403和绑定前错误不在此保证内。这些M3路由没有写入口；新增草稿探测/确认见本文S2，单集导入见本文M5（离线候选，迁移未执行）。父级273项离线测试通过（`/tmp/m3b-parent-final.log`），没有真实上游或Redis端到端验收。
 
 #### M4-A1：本地身份表文件（没有新增接口）
 
-新增 `local_video_series` / `local_video_episode` 迁移及初始化SQL镜像，为多来源共享本地剧集/vid提供结构基础。该表文件切片当时无业务接线；后续S1已接草稿Mapper及接口，S2已接来源确认，导入仍未实现；没有执行SQL。25项静态结构测试通过（`/tmp/m4a1-parent-final2.log`），不代表真实MySQL约束或并发验收。
+新增 `local_video_series` / `local_video_episode` 迁移及初始化SQL镜像，为多来源共享本地剧集/vid提供结构基础。该表文件切片当时无业务接线；后续S1已接草稿Mapper及接口，S2已接来源确认，M5已接单集导入（离线候选，迁移未执行）；没有执行SQL。25项静态结构测试通过（`/tmp/m4a1-parent-final2.log`），不代表真实MySQL约束或并发验收。
 
 #### M4-A2：来源证据与绑定历史表文件（没有新增接口）
 
@@ -306,7 +484,7 @@ title必填非空，原文最多200字符；displayTitle可省略/null，原文�
 
 创建不是幂等：重复POST可产生两个空草稿，不按标题合并，但不创建video。操作失败或响应丢失后应先查询，不承诺请求重放。非法参数/缺请求体/错误JSON400，不支持Content-Type415，未登录401，非管理员403，父作品不存在404，数据库/插入回读异常500；不统一改成409。控制器执行后的响应no-store，权限拦截等前置错误不保证该头。仅声明创建事务，未做真实DB回滚测试。
 
-S1历史离线验收134项通过（`/tmp/s1-parent-final.log`，新增33项）。后续来源关联/探测确认见S2；S2确认后剧集查询的durationSeconds可非null。视频导入仍未实现。
+S1历史离线验收134项通过（`/tmp/s1-parent-final.log`，新增33项）。后续来源关联/探测确认见S2；S2确认后剧集查询的durationSeconds可非null。视频导入见本文M5（离线候选，迁移未执行）。
 
 ### 1.5 常见业务状态码
 
@@ -1912,7 +2090,10 @@ Content-Type: application/json
 | 403 | `你的权限不足` |
 | 404 | `视频不存在` |
 | 409 | 状态不允许流转的动态提示 |
+| 409 | `视频尚无可用播放媒体，不能审核通过`（外部稿件 `video_url/video_key` 均为NULL，且 `playback-enabled` 关闭或没有线路通过 M6-A 资格判定时） |
 | 409 | `视频已经由其他管理员审核，请刷新后重试` |
+
+> M5导入的外部稿件没有本站播放对象（`video_url`/`video_key` 均为NULL）。审核服务在唯一的状态写入口阻止其进入 `APPROVED`；仍可驳回。M6-A 只有显式开启 `app.external-video-source.playback-enabled` 且同一资格判定确认至少一条可用 HLS 线路时才允许外部稿件通过；仅打开开关不等于可用。旧COS视频两列非空，审核行为不变且不查询 S2/M5 表。
 
 ### curl
 

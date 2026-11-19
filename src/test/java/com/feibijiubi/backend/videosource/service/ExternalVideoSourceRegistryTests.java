@@ -177,4 +177,22 @@ class ExternalVideoSourceRegistryTests {
             assertFalse(text.contains(secret), "toString 只能输出 code/enabled，不能带：" + secret);
         }
     }
+
+    @Test
+    void playbackEnabledDefaultsOffAndIsIndependentOfPreview() {
+        ExternalVideoSourceProperties defaults = properties(false, source("live-one", true));
+        assertFalse(defaults.isPlaybackEnabled(), "playback-enabled 默认关闭");
+        assertFalse(new ExternalVideoSourceRegistry(defaults).playbackEnabled());
+
+        ExternalVideoSourceProperties playbackOnly = properties(false, source("live-one", true));
+        playbackOnly.setPlaybackEnabled(true);
+        ExternalVideoSourceRegistry playbackRegistry = new ExternalVideoSourceRegistry(playbackOnly);
+
+        assertTrue(playbackRegistry.playbackEnabled());
+        assertFalse(playbackRegistry.previewEnabled(), "播放开关与预览开关独立");
+        assertTrue(playbackRegistry.listAvailableSources().isEmpty(),
+                "预览关闭时仍不暴露来源摘要");
+        assertEquals("live-one", playbackRegistry.requireEnabledSource("live-one").code(),
+                "播放只需要来源存在且启用，不受预览开关影响");
+    }
 }

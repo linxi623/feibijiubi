@@ -1,5 +1,6 @@
 package com.feibijiubi.backend.videosource.mapper;
 
+import com.feibijiubi.backend.video.entity.Video;
 import com.feibijiubi.backend.video.local.entity.LocalVideoEpisode;
 import com.feibijiubi.backend.videosource.entity.LocalEpisodeMediaCandidate;
 import com.feibijiubi.backend.videosource.entity.LocalEpisodeSourceBinding;
@@ -58,6 +59,7 @@ class LocalEpisodeSourceMapperBindingTests {
         Configuration configuration = parse();
 
         assertEquals(LocalVideoEpisode.class, resultType(configuration, "lockEpisode"));
+        assertEquals(Video.class, resultType(configuration, "lockVideoForUpdate"));
         assertEquals(LocalEpisodeMediaCandidate.class, resultType(configuration, "selectCandidate"));
         assertEquals(LocalEpisodeMediaCandidate.class, resultType(configuration, "selectCandidates"));
         assertEquals(LocalEpisodeSourceBinding.class, resultType(configuration, "selectBindings"));

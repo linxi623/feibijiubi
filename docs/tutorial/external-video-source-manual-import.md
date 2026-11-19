@@ -13,7 +13,7 @@
 - 仅记录必要的操作者、操作时间、确认值/理由和关联版本，不另建通用审计平台。
 - 来源带token的签名地址是上游播放凭据，不要求自建签名系统；不写日志、不返回普通预览接口，过期后人工更新。首版不实现自动归档/清理或自研加密平台；真实部署前仍需正常的数据库访问权限和备份保护。
 
-已完成A1/A2表文件都未执行。S2现已选择更小的独立三表方案（状态版本、单条候选、稳定来源关联），只依赖A1，不接旧A2四表；旧文件保留，不执行迁移。旧的operation/任务恢复规划不再推进。S2代码及离线测试见[来源绑定与确认](external-video-source-binding.md)，下一步是M5导入事务而不是再加基础设施。
+已完成A1/A2表文件都未执行。S2现已选择更小的独立三表方案（状态版本、单条候选、稳定来源关联），只依赖A1，不接旧A2四表；旧文件保留，不执行迁移。旧的operation/任务恢复规划不再推进。S2代码及离线测试见[来源绑定与确认](external-video-source-binding.md)，M5单集导入已实现为离线候选（迁移未执行），下一步是M6播放/选集/前端而不是再加基础设施。
 
 ## 1. 已确认决策与边界
 
@@ -66,7 +66,65 @@
 
 新增 `/api/admin/local-video-episodes/{episodeId}/sources` 下当前状态、候选抓取/查询、确认四接口。服务端保存原始地址和摘要（不返API），探测失败可保留固定原因并人工核验填写；确认锁本地剧集，核对整个剧集revision及候选基准版本，保存稳定关联和统一时长。事务外最多一次CMS详情和一次媒体请求，短事务写入，不加任务系统。
 
-采用 `s2-local-episode-source.sql` 三张新表，不接旧A2四表。迁移未执行。仅未导入草稿可写；第一次确认后的统一时长不能经此接口改写，其他来源必须采用同一时长。重复确认409，响应丢失查询状态，不承诺重放。源码/离线测试完成不代表真实MySQL、真实视频源或浏览器验收；完整视频源仍缺M5导入及M6播放/前端。操作指南：[S2来源绑定与确认](external-video-source-binding.md)。
+采用 `s2-local-episode-source.sql` 三张新表，不接旧A2四表。迁移未执行。S2 首版仅未导入草稿可写，M6-B 起也允许已导入剧集加线/换线；第一次确认后的统一时长不能经此接口改写，其他来源必须采用同一时长。重复确认409，响应丢失查询状态，不承诺重放。此处记录的是 S2 首版源码与离线测试；后续播放与客户端验证见 M6 各节。操作指南：[S2来源绑定与确认](external-video-source-binding.md)。
+
+### M5 单集导入事务（离线候选，迁移未执行）
+
+新增管理员 `POST /api/admin/local-video-episodes/{episodeId}/import`，请求只含 `expectedRevision/tempCoverKey/title/mcId/scId/visibility`。操作者只取登录态；`source_type` 固定2（转载），审核状态固定PENDING，可见性省略时默认私密，时长取剧集已确认的统一时长，不接受客户端播放地址、uid、vid、审核状态或时长。响应只返回 `episodeId/vid/durationSeconds/importRevision/status/reused`，不返回任何资源key或URL。
+
+流程与正确性：先用与S2相同的 `local_video_episode` 行 `FOR UPDATE` 判定；已绑定且未软删直接返回原vid（不改作者/video/统计/来源，常规重试在任何COS I/O前结束），已软删固定409不复活。首次导入校验版本、有限正时长、至少一个已确认且仍启用的来源、有效二级分类组合；事务外检查并复制当前管理员临时封面到唯一正式key；同一短事务创建PENDING video、初始化video_status、以 `vid IS NULL` CAS写vid与首次导入revision、最后以临时文件 `status=0→1` CAS认领封面，同一 UPDATE 原子校验所有者、封面类型和以应用时间为准的过期条件。任一必需写入影响行数不是1即回滚。外部稿件 `video_url/video_key` 保持NULL；不写假COS key或外链。
+
+封面所有权：正式copy在提交成功且被认领后保留，临时对象仅在认领提交后删除；只有确认数据库回滚、或复制后尚未进入数据库事务（确定未被稿件引用）时才补偿删除正式copy；提交结果未知时两个对象都不删除。同集/不同集共用同一 `tempCoverKey` 时由认领CAS决出唯一成功者，失败请求清理自己的copy且不记录key。
+
+审核闸门：`VideoReviewImpl` 在唯一状态写入口阻止 `video_url/video_key` 均为NULL的外部稿件进入APPROVED；旧COS行两列非空，审核行为不变。
+
+迁移 `database/migrations/m5-local-episode-import.sql` 只加 `local_video_episode.import_revision BIGINT NULL` 并把 `video.video_url/video_key` 放宽为NULL。已有库已具备 M4-A1/S2 时才单独执行这份迁移；新版初始化SQL已包含相同变更，新建库不要重复执行。**本轮未执行迁移**。`preview-enabled`关闭不影响导入已确认草稿，但来源停用仍拒绝。
+
+父级在 `Java_video` 隔离工作区执行定向离线回归：首轮因测试缺少 VO import 无法编译；补 import 后有 6 个测试因 Mockito 重设 stub 时提前执行事务断言失败。改用 `doAnswer` 重设，保留原有断言，最终 117 项全部通过、无跳过（`/tmp/feibijiubi-m5.tZk81D/targeted-m5-r3.log`）。首轮构建曾从 Maven Central 补依赖，最终复验用 Maven 离线模式。独立审查首轮运行器退出 `3221226505`、未产生结论；同模型重试 PASS（有 P2 建议，无阻塞）。父级据此收紧封面认领 CAS、保存规范分类 ID，并澄清已绑定复用、可用分类示例和迁移二选一规则。随后在 `Java_video` 离线普通回归 1251 项：1023 项执行通过、228 项跳过、零失败或错误，M5 新增的 48 项全过（`/tmp/feibijiubi-m5.tZk81D/full-m5-r4.log`）。整应用 smoke test 排除，真实基础设施 opt-in 未开启。真实 MySQL 行锁/回滚/并发、真实 COS 或浏览器未验收。
+
+### M6-A 首片：只读播放/选集与审核接线（通过离线回归）
+
+新增公开 `GET /api/videos/{vid}/playback`（可选 `lineId`）与 `GET /api/videos/{vid}/episodes`（`cursor`/`size`，默认20、最大50，按本地 `local_video_episode.id` keyset）。两者与现有详情使用同一可见性：未发布/软删/不存在404，私密非本人403，管理员公共侧无绕过；`Cache-Control:no-store`，GET 纯读，不联网、不计播放、不写 Redis/MySQL，不改 `PublishedVideoGuard` 或进度契约。
+
+线路直接复用 S2 当前 `local_episode_source_binding`/`local_episode_media_candidate`：binding.id 即线路ID，默认按id取第一条可用线路；指定线路只在当前vid所绑剧集内，非法/跨集400且不静默回退。资格判定要求 `playback-enabled=true`、候选已人工确认、`probe_status=SUCCEEDED` 且 `manifest_hash`/`candidate_seconds` 有效、确认时长与剧集/视频统一时长精确一致、来源当前启用、媒体允许列表重新校验、地址重算 SHA-256 等于现有 `address_hash`。只有选中线路的一条地址进入响应 `url`；`lines[]` 只有本地id/标签/可用性。旧COS无绑定返回200 `NOT_BOUND`，不读取或改写旧 `videoUrl`；选集返回空页。
+
+新增 `app.external-video-source.playback-enabled`，默认false，与 `preview-enabled` 独立。审核唯一写入口 `VideoReviewImpl` 复用同一资格判定：旧COS行为不变且不查S2/M5表；外部稿件只有显式开启且至少一条可用HLS线路时才可APPROVED，仅打开开关仍409；`video_url/video_key` 继续为NULL。无新DDL。
+
+敏感边界：候选 `address` 是可能带签名的上游凭据，只保存在服务端；播放 SQL 按剧集限定最多33行（32条+溢出防线），不返回地址摘要/来源配置/凭据引用，异常固定文案且不带 cause。生产须限制数据库/备份访问并关闭 MyBatis SQL 参数/结果 TRACE；本仓库未读取或编辑实际 `application.yml`。关闭开关或停用来源不撤回已发给浏览器的上游地址，也不保证地址可用/时效。
+
+独立审查 OK with notes，无阻塞；父级把上游分集标签明确为 `episodeLabel`，并统一拒绝分页大小的前导零。`Java_video` 隔离工作区普通离线回归共 1319 项：1091 项执行通过、228 项跳过、零失败或错误（`/tmp/feibijiubi-m6a.juCAKS/full-m6a-r1.log`）。整应用 smoke test 未运行，真实基础设施 opt-in 未开启。未做真实 MySQL、Redis、上游、浏览器或生产验收。外部播放保持默认关闭。
+
+### M6 用户端：HLS、线路和选集（组件及隔离构建已验）
+
+客户端仓库 `fronted/feibijiubi-client` 已接播放与选集 API：原生 HLS 优先，其余支持 MSE 的浏览器按需加载锁定的 `hls.js@1.6.5`；旧 COS 视频沿用详情 `videoUrl`。同一 `vid` 换线保留进度和播放意图，不因换线重复计数；手动重试向后端重新获取当前线路。源地址不持久化，失去授权或导航时丢弃旧请求结果。不改管理端、封面或旧 COS 投稿。已导入后加源/换源随后由 M6-B 后端实现（本片仍不做管理端 UI）。
+
+独立审查首轮因缺 HLS 依赖锁文件未通过，父级在 `Java_video` 补锁并验证 `npm ci`、定向 ESLint 和两套 Node 组件回归，通过；首轮播放器测试因父级修改遗漏逗号失败，修后复验通过。原工作树已有删除的 `BadApple.mp4` 导致原样构建找不到资源；只在远端隔离副本补入 HEAD 中经 Git blob 哈希核对的素材后，生产构建通过（资源体积警告）。本地用户删除未恢复。日志目录 `/tmp/feibijiubi-m6-client.1rBOOX`。随后在同一隔离环境用真实 Chromium 和合成 HLS/MP4 验证已构建客户端，所有 HTTP 均由测试拦截响应，不连接真实源/后端。第二次实播发现媒体元素已暂停、但控件状态尚未同步时换线会自动继续；修正后，两套 Node 回归、定向 ESLint、隔离生产构建与浏览器复验均通过。实测 HLS 解码起播、同集切线保持暂停及 4 秒进度且仅一次播放上报、选集游标导航及旧 MP4 直出（`browser-qa/external-playback-smoke-r3.log`）。未验证真实来源、浏览器跨域部署或生产环境，未启用外部播放、执行迁移或关闭旧入口。
+
+### M6-B：已导入剧集管理员加线/换线（后端通过离线回归）
+
+复用 S2 的 `GET /api/admin/local-video-episodes/{episodeId}/sources` 状态/候选历史、`POST /candidates` 抓取和 `POST /candidates/{candidateId}/confirm` 确认四个接口；没有新增路由、没有新增表或列，也没有执行迁移。已导入剧集（`vid`非空）现在可以：
+
+- 抓取候选（仍每次最多一次 CMS 详情和一次媒体请求，事务外有界执行，消费同一管理员 Redis 配额）；候选只入库，不改 current binding、剧集时长或 video；探测失败候选仍可保存用于诊断。
+- 确认新增独立线路（`targetBindingId=null`）或明确替换现有线路（`targetBindingId` 非空且保持原 `sourceCode/workId`）。换到另一来源是新增，不是替换。
+
+已导入确认额外要求：绑定的 video 存在、未软删、`video_url/video_key` 均为 NULL；剧集和视频时长一致、有限且>0；候选具备与 M6-A 相同的成功 HLS 证据（`SUCCEEDED`、64位小写 `manifest_hash`、正有限 `candidate_seconds`）；来源仍启用且媒体允许列表/地址摘要重新校验通过；人工确认时长等于剧集与原视频的统一时长（不要求等于候选探测秒数，理由字段记录同版判断）。确认事务按 `episode → video` 顺序取行锁，版本 CAS、候选 write-once 与新增/替换 binding 在同一短事务；不写 video/video_status/统计/进度，不调用 `setDuration`，不改变 `vid`、作者、标题或 `import_revision`。失败探测、来源停用、摘要不符或时长不一致都会在写 binding 前被拒绝，当前有效线路保持不变。
+
+播放开关 `playback-enabled` 不参与管理端确认；抓取/确认仍由默认关闭的 `preview-enabled` 和来源 `enabled` 控制。M6-A 播放/审核资格未放宽。测试覆盖已导入新增/替换、未确认候选不换线、失败/确认时长不符/版本过期/软删拒绝、草稿旧行为、鉴权/脱敏和新 SQL 方法。独立审查无阻塞；保留管理员核验同一版本及时间轴的规则，不拿探测秒数做精确匹配。在 `Java_video` 隔离工作区运行普通后端离线回归：共 1342 项，1114 通过、228 跳过、零失败或错误（`/tmp/feibijiubi-m6b.DnK3kk/full-m6b-r1.log`）。整应用 smoke test 未运行，真实基础设施 opt-in 未开启。M6-B 本轮后端回归未涉及真实 MySQL 行锁/回滚、真实上游或生产验收；外部播放保持默认关闭。
+
+### M6 管理端：已导入剧集线路管理
+
+`fronted/feibijiubi-admin` 的「内容管理 → 外部视频线路」已接入本地作品/剧集分页、上游目录/分集选择、新增与指定线路替换。探测通过后须对照抓取结果人工确认同集、同版及同一时间轴，提交原统一时长和当前版本；失败探测不准确认，并发冲突或提交结果不明时先刷新、不自动重发。只支持已导入剧集，不包含草稿创建或首次导入页面，不改封面、审核或旧投稿。
+
+`Java_video` 隔离工作区 `/tmp/feibijiubi-m6-admin.uKkKKD`：5 项定向 Node 测试、定向 ESLint、管理端生产构建（体积警告）与 Chromium 模拟 API 验证通过（`browser-r3.log`）。浏览器覆盖失败探测保留旧线路、显式替换、冲突刷新再确认、新增独立线路、`vid` 不变与自由文本转义。未跑全仓测试，未访问真实后端/上游、未执行迁移或更改开关。
+
+### 管理端首次导入与上线验收进度
+
+1. **管理端首次导入通过模拟接口验证**：同一页面可建作品/剧集草稿，选择候选、确认统一时长、上传 COS 临时封面、选真实分类接口提供的父子分区并提交为待审核。草稿可人工补偿失败探测；已导入仍要求成功 HLS 证据。`Java_video` 隔离工作区 `/tmp/feibijiubi-first-import.hcbgVa`：10 项定向 Node 测试、定向 ESLint、生产构建、两组 Chromium 模拟 API 均通过（`tests.log`、`build-r4.log`、`lines-browser-r4.log`、`import-browser-r4.log`）。未跑全仓测试。
+2. **真实 MySQL 分项已通过**：`Java_video` 独立 Docker MySQL 8.4.11，随机回环端口、临时数据目录、专用测试账号与隔离标记；在临时库应用 E1-A、M4-A1、S2、M5，未应用废弃 M4-A2，结束后移除容器。实际 MyBatis 和 Spring 事务验证并发首次导入只建一个 `vid`、临时封面数据库认领失败时整体回滚、并发换线只有一项成功且保留 `vid`、进度、点赞、收藏与统计。3 项 MySQL 测试及 122 项直接相关回归全部通过：`/data/home/feibijiubi-episode-mysql.HoswlG/mysql-tests.log`。这一步的存储和上游是测试替身，不能证明真实 COS 或上游部署行为。
+3. **真实 COS 与上游分项已验证**：在 `Java_video` 用腾讯云 SDK 和项目存储服务，在新建私有测试桶上传封面、复制到正式 key、比较文件字节、删除临时对象并验证正式对象仍可读取。测试对象和桶均已清理（`/data/home/feibijiubi-episode-mysql.HoswlG/cos-smoke.log`）。COS 操作与上面的真实数据库认领/回滚是不同用例，未连接现有对象或业务数据。用户指定的资源网首页云机返回访问验证 403，本机通过公开目录找到候选；对候选 `bfzyapi.com:443` / `v.fengbao14.com:443`，生产代码的受限 HTTP、目录/详情解析和 HLS 时长探测通过（`public-cms-backend-r2.log`），Chromium 的隔离生产构建也拉取真实媒体并解码起播（`/tmp/feibijiubi-m6-client.1rBOOX/browser-qa/public-cms-playback-bfzy.log`：一个真实清单、三个真实分片）。浏览器使用模拟本站 API，媒体未替换也未补 CORS；只证明该源抽样，与完整生产部署是不同验收。虎牙候选的样本虽返回清单和分片，Chromium 未起播，不作为通过来源。
+4. **上线检查决定**：配置默认值、白名单注册、外部/旧 COS 审核和播放 API 共 41 项定向回归通过（`/data/home/feibijiubi-episode-mysql.HoswlG/release-gates.log`）。代码可提交，但不在本轮部署。仓库中的预览与外部播放开关继续默认关闭，不预置真实来源配置；真正启用前须在部署环境复验来源授权、实际站点 Origin、允许列表和接入配置。已有库按未部署的迁移顺序执行，不重复跑新版初始化 SQL；本轮仅在一次性 MySQL 实例执行迁移。分阶段启用：先验证管理端预览和一条审核抽样，再启用外部播放；发现异常可停用来源或关闭相应开关，已发给浏览器的上游地址不会主动撤回。旧 COS 投稿和播放始终保留。
+
+MySQL 定向测试类 `LocalEpisodeMysqlTests` 默认跳过。只在隔离测试 workspace 中准备一次性 MySQL 8.4（回环端口、独立数据目录，使用 `--skip-log-bin` 允许非 root 测试账号建立故障注入触发器）；先以 UTF-8 初始化基础表，再应用上述四份迁移。创建测试专用表 `episode_test_isolation(run_marker CHAR(32) PRIMARY KEY)`、写入本轮随机 32 位小写十六进制标记，使用专用账号 `episode_test_only`。环境变量仅注入本轮临时连接参数 `EPISODE_TEST_MYSQL_PORT`、`EPISODE_TEST_MYSQL_MARKER`、`EPISODE_TEST_MYSQL_PASSWORD`。运行 `./mvnw -o -DexternalEpisodeMysqlIT=true -Dtest=LocalEpisodeMysqlTests test`；测试仅接受带匹配隔离标记的回环 MySQL 8.4，不读取运行配置。
 
 ### S1 简化方案首片：本地草稿管理（离线验收）
 
@@ -82,7 +140,7 @@
 - M3-B父最终 `/tmp/m3b-parent-final.log` 273项全通过（新增37+相关236），含真实拦截器MockMvc、真实服务/配额/控制器最小装配和缺named-script失败检查。初跑258项有1失败1错误（错误限流键断言、mock Throwable重复when逃逸破坏JUnit报告）；修测试后270项通过，审查补充后273项通过。没有真实Redis/上游/DB或完整应用启动。修复worker披露违规unzip/javap/sed检视，记录而不扩权。
 - M4-A1两表已静态验收：迁移 `database/migrations/m4a1-local-video-identity.sql`，镜像初始化SQL；最终25项通过（14新+11目录，`/tmp/m4a1-parent-final2.log`）。评审后补父列类型验证及强制IF NOT EXISTS断言，首次增补运行因测试解析器保留父列反引号失败，修复后通过。没有执行SQL或验证真实MySQL约束。
 - M4-A2四表文件已静态验收：`m4a2-external-capture-binding.sql`及初始化镜像，父最终 `/tmp/m4a2-parent-final.log` 42项通过（17 A2+14 A1+11目录）。已补ordinal范围、绑定版本证据唯一约束、复合外键；评审后加强表选项和父唯一键完整匹配测试。未执行SQL，不构成真实MySQL约束验收；ROW_FORMAT未固定，实例兼容性待实测。
-- §0简化同步方案已由S2接线，不再设计operation恢复/fencing或审计平台。旧A2仍未使用，DDL也从未强制历史不可变。S2旧候选由业务接口保留，expectedRevision冲突409；下一步为M5导入事务，真实约束/回滚/并发验证仍须单独授权。
+- §0简化同步方案已由S2接线，不再设计operation恢复/fencing或审计平台。旧A2仍未使用，DDL也从未强制历史不可变。S2旧候选由业务接口保留，expectedRevision冲突409。M5单集导入已实现为离线候选：锁同一剧集行、已绑定复用vid、软删409、首次导入同一短事务写video/video_status/`vid IS NULL` CAS/封面认领CAS，`video_url/video_key`为NULL，审核闸门阻止无播放媒体稿件进入APPROVED。M5迁移未执行，定向离线回归见上文；真实约束/回滚/并发验证仍须单独授权。
 - M2-B子代理披露违规只读shell检视，未运行测试或联网；保留记录，不扩大授权。
 - 不读取 application.yml/密钥、不访问外网、不启动数据库/容器、不执行迁移、不提交或暂存。旧有数据与工作区改动保留。
 - 工作子代理仅指定 DeepSeek Flash 4.1，父级审查和运行限定离线测试。需要真实媒体、数据库或前端环境时单独说明并取得相应授权。

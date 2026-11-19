@@ -1,6 +1,8 @@
 package com.feibijiubi.backend.videosource.service;
 
 import com.feibijiubi.backend.shared.BusinessException;
+import com.feibijiubi.backend.video.entity.Video;
+import com.feibijiubi.backend.video.mapper.VideoMapper;
 import com.feibijiubi.backend.videosource.config.ExternalVideoSourceProperties;
 import com.feibijiubi.backend.videosource.dto.*;
 import com.feibijiubi.backend.videosource.entity.*;
@@ -30,12 +32,14 @@ class LocalEpisodeSourceServiceTests {
     static final String URL = "https://media.example.invalid/episode.m3u8?token=private-test";
     final LocalEpisodeSourceMapper mapper = mock(LocalEpisodeSourceMapper.class);
     final LocalVideoCatalogMapper catalog = mock(LocalVideoCatalogMapper.class);
+    final VideoMapper videoMapper = mock(VideoMapper.class);
     final ExternalVideoSourceClientProvider clients = mock(ExternalVideoSourceClientProvider.class);
     final ExternalVideoSourceDetailClient detail = mock(ExternalVideoSourceDetailClient.class);
     final ExternalMediaProbe probe = mock(ExternalMediaProbe.class);
     final ExternalVideoSourcePreviewQuotaService quota = mock(ExternalVideoSourcePreviewQuotaService.class);
     final TestTransactions tx = new TestTransactions();
     final LocalVideoEpisode episode = new LocalVideoEpisode();
+    final Video video = new Video();
     final ExternalVideoSourceProperties properties = new ExternalVideoSourceProperties();
     LocalEpisodeSourceService service;
     LocalEpisodeMediaCandidate candidate;
@@ -51,8 +55,8 @@ class LocalEpisodeSourceServiceTests {
         source.setApiAllowedEndpoints(Set.of("api.example.invalid:443"));
         source.setMediaAllowedEndpoints(Set.of("media.example.invalid:443"));
         properties.setSources(List.of(source));
-        service = new LocalEpisodeSourceServiceImpl(mapper, catalog, new ExternalVideoSourceRegistry(properties),
-                clients, probe, quota, properties, tx);
+        service = new LocalEpisodeSourceServiceImpl(mapper, catalog, videoMapper,
+                new ExternalVideoSourceRegistry(properties), clients, probe, quota, properties, tx);
         episode.setId(1L);
         when(catalog.selectEpisodeById(1)).thenReturn(episode);
         when(mapper.lockEpisode(1)).thenReturn(episode);
@@ -70,6 +74,7 @@ class LocalEpisodeSourceServiceTests {
         candidate.setLabel("Episode 1"); candidate.setAddress(URL);
         candidate.setAddressHash(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(URL.getBytes(StandardCharsets.UTF_8))));
         candidate.setProbeStatus("SUCCEEDED"); candidate.setCandidateSeconds(12.5);
+        candidate.setManifestHash("a".repeat(64));
         when(mapper.selectCandidate(1, 9)).thenAnswer(i -> candidate);
         when(mapper.insertCandidate(any())).thenAnswer(i -> {
             assertTrue(TransactionSynchronizationManager.isActualTransactionActive());
@@ -83,6 +88,39 @@ class LocalEpisodeSourceServiceTests {
 
     LocalEpisodeSourceCaptureDTO captureRequest() { return new LocalEpisodeSourceCaptureDTO("demo", "7", 1, 1, 0L, null); }
     LocalEpisodeSourceConfirmDTO confirmRequest() { return new LocalEpisodeSourceConfirmDTO(0L, 12.5, "人工核对同一集"); }
+
+    /** 已导入剧集：原 vid 指向一个未软删、无本站播放列且时长一致的外部稿件。 */
+    void importedEpisode() {
+        episode.setVid(55);
+        episode.setDurationSeconds(12.5);
+        video.setVid(55);
+        video.setDuration(12.5);
+        when(videoMapper.selectByVid(55)).thenReturn(video);
+        when(mapper.lockVideoForUpdate(55)).thenReturn(video);
+    }
+
+    LocalEpisodeSourceBinding binding(long id, long candidateId) {
+        LocalEpisodeSourceBinding binding = new LocalEpisodeSourceBinding();
+        binding.setId(id); binding.setEpisodeId(1L); binding.setCandidateId(candidateId);
+        return binding;
+    }
+
+    LocalEpisodeMediaCandidate oldCandidate(long id, String sourceCode, String workId) {
+        LocalEpisodeMediaCandidate old = new LocalEpisodeMediaCandidate();
+        old.setId(id); old.setEpisodeId(1L); old.setSourceCode(sourceCode); old.setWorkId(workId);
+        old.setExpectedRevision(0L); old.setProbeStatus("SUCCEEDED"); old.setCandidateSeconds(12.5);
+        old.setManifestHash("b".repeat(64)); old.setAddress(URL);
+        old.setAddressHash(candidate.getAddressHash());
+        old.setConfirmedAt(LocalDateTime.now()); old.setConfirmedSeconds(12.5);
+        return old;
+    }
+
+    void verifyVideoNeverWritten() {
+        verify(videoMapper, never()).insert(any());
+        verify(videoMapper, never()).updateVideo(any());
+        verify(videoMapper, never()).updateReviewStatus(any(), any(), any());
+        verify(videoMapper, never()).softDeleteByOwner(any(), any(), any());
+    }
     void code(int code, org.junit.jupiter.api.function.Executable call) {
         assertEquals(code, assertThrows(BusinessException.class, call).getCode());
     }
@@ -118,7 +156,8 @@ class LocalEpisodeSourceServiceTests {
         verifyNoInteractions(mapper, catalog, clients, quota);
     }
     @Test void disabledByDefaultRejectsBeforeDb() {
-        service = new LocalEpisodeSourceServiceImpl(mapper, catalog, new ExternalVideoSourceRegistry(new ExternalVideoSourceProperties()),
+        service = new LocalEpisodeSourceServiceImpl(mapper, catalog, videoMapper,
+                new ExternalVideoSourceRegistry(new ExternalVideoSourceProperties()),
                 clients, probe, quota, properties, tx);
         code(503, () -> service.capture(7, 1, captureRequest()));
         verifyNoInteractions(mapper, catalog, clients, quota);
@@ -136,10 +175,327 @@ class LocalEpisodeSourceServiceTests {
         code(409, () -> service.capture(7, 1, captureRequest()));
         verify(mapper, never()).insertCandidate(any()); assertEquals(1, tx.rollbacks);
     }
-    @Test void importedEpisodeRefusesCaptureAndConfirm() {
-        episode.setVid(55);
+    @Test void importedEpisodeCaptureAddsCandidateWithoutChangingCurrentLineOrTimeline() {
+        importedEpisode();
+        LocalEpisodeSourceBinding current = binding(3L, 8L);
+        when(mapper.selectBindings(1)).thenReturn(List.of(current));
+
+        var result = service.capture(7, 1, captureRequest());
+
+        assertEquals(9, result.id());
+        assertEquals(8L, current.getCandidateId().longValue());
+        verify(mapper, never()).insertBinding(any());
+        verify(mapper, never()).replaceBinding(anyLong(), anyLong(), anyLong());
+        verify(mapper, never()).confirmCandidate(anyLong(), anyLong(), anyDouble(), anyInt(), anyString());
+        verify(mapper, never()).setDuration(anyLong(), anyDouble());
+        verifyVideoNeverWritten();
+    }
+
+    @Test void importedEpisodeCaptureForReplacementLeavesCurrentLineUntouchedUntilConfirmation() {
+        importedEpisode();
+        LocalEpisodeSourceBinding current = binding(3L, 8L);
+        LocalEpisodeMediaCandidate old = oldCandidate(8L, "demo", "7");
+        when(mapper.selectBindings(1)).thenReturn(List.of(current));
+        when(mapper.selectCandidate(1, 8)).thenReturn(old);
+
+        service.capture(7, 1, new LocalEpisodeSourceCaptureDTO("demo", "7", 1, 1, 0L, 3L));
+
+        assertEquals(8L, current.getCandidateId().longValue());
+        verify(mapper, never()).replaceBinding(anyLong(), anyLong(), anyLong());
+        verify(mapper, never()).confirmCandidate(anyLong(), anyLong(), anyDouble(), anyInt(), anyString());
+        verifyVideoNeverWritten();
+    }
+
+    @Test void importedEpisodeCaptureCanSaveFailedProbeForDiagnosisWithoutChangingCurrentLine() {
+        importedEpisode();
+        LocalEpisodeSourceBinding current = binding(3L, 8L);
+        when(mapper.selectBindings(1)).thenReturn(List.of(current));
+        when(probe.probe(any(), anyString()))
+                .thenAnswer(i -> HlsMediaDurationParser.parse("bad".getBytes(StandardCharsets.UTF_8)));
+
+        var result = service.capture(7, 1, captureRequest());
+
+        assertEquals("UNSUPPORTED_MANIFEST", result.probeStatus());
+        assertNull(result.candidateSeconds());
+        assertEquals(8L, current.getCandidateId().longValue());
+        verify(mapper, never()).replaceBinding(anyLong(), anyLong(), anyLong());
+        verifyVideoNeverWritten();
+    }
+
+    @Test void importedEpisodeCaptureRejectsMissingSoftDeletedOrNonExternalVideo() {
+        importedEpisode();
+
+        video.setDeletedAt(LocalDateTime.now());
         code(409, () -> service.capture(7, 1, captureRequest()));
-        code(409, () -> service.confirm(7, 1, 9, confirmRequest())); verifyNoInteractions(clients, quota);
+
+        video.setDeletedAt(null);
+        video.setVideoUrl("cos/video.mp4");
+        code(409, () -> service.capture(7, 1, captureRequest()));
+
+        video.setVideoUrl(null);
+        video.setVideoKey("cos/video-key");
+        code(409, () -> service.capture(7, 1, captureRequest()));
+
+        verifyNoInteractions(clients, quota, probe);
+    }
+
+    @Test void importedEpisodeCaptureRejectsMissingBoundVideoAsDataFailure() {
+        importedEpisode();
+        when(videoMapper.selectByVid(55)).thenReturn(null);
+
+        code(500, () -> service.capture(7, 1, captureRequest()));
+
+        verifyNoInteractions(clients, quota, probe);
+    }
+
+    @Test void importedEpisodeCaptureRejectsInconsistentFiniteTimeline() {
+        importedEpisode();
+        video.setDuration(20.0);
+        code(409, () -> service.capture(7, 1, captureRequest()));
+
+        video.setDuration(12.5);
+        episode.setDurationSeconds(null);
+        code(409, () -> service.capture(7, 1, captureRequest()));
+
+        verifyNoInteractions(clients, quota, probe);
+    }
+
+    @Test void firstImportDuringCaptureIsRejectedAsStaleWithoutSavingCandidate() {
+        LocalVideoEpisode draft = new LocalVideoEpisode();
+        draft.setId(1L);
+        LocalVideoEpisode imported = new LocalVideoEpisode();
+        imported.setId(1L); imported.setVid(55); imported.setDurationSeconds(12.5);
+        when(catalog.selectEpisodeById(1)).thenReturn(draft);
+        when(mapper.lockEpisode(1)).thenReturn(imported);
+
+        code(409, () -> service.capture(7, 1, captureRequest()));
+
+        verify(mapper, never()).insertCandidate(any());
+        assertEquals(1, tx.rollbacks);
+    }
+
+    @Test void importedEpisodeReplacementCannotSwitchSourceOrWork() {
+        importedEpisode();
+        LocalEpisodeSourceBinding current = binding(3L, 8L);
+        LocalEpisodeMediaCandidate old = oldCandidate(8L, "demo", "8");
+        when(mapper.selectBindings(1)).thenReturn(List.of(current));
+        when(mapper.selectCandidate(1, 8)).thenReturn(old);
+
+        code(409, () -> service.capture(7, 1,
+                new LocalEpisodeSourceCaptureDTO("demo", "7", 1, 1, 0L, 3L)));
+
+        verifyNoInteractions(clients, quota, probe);
+    }
+
+    @Test void importedEpisodeCaptureRechecksVideoStateUnderTheFinalLock() {
+        importedEpisode();
+        Video deletedAfterNetwork = new Video();
+        deletedAfterNetwork.setVid(55);
+        deletedAfterNetwork.setDuration(12.5);
+        deletedAfterNetwork.setDeletedAt(LocalDateTime.now());
+        when(mapper.lockVideoForUpdate(55)).thenReturn(deletedAfterNetwork);
+
+        code(409, () -> service.capture(7, 1, captureRequest()));
+
+        verify(mapper, never()).insertCandidate(any());
+        assertEquals(1, tx.rollbacks);
+    }
+
+    @Test void importedEpisodeConfirmationAddsIndependentBindingWithoutTouchingVideoTimeline() {
+        importedEpisode();
+        assertFalse(new ExternalVideoSourceRegistry(properties).playbackEnabled());
+        when(mapper.selectRevision(1)).thenReturn(0L, 1L);
+        doAnswer(i -> {
+            var inserted = (LocalEpisodeSourceBinding) i.getArgument(0);
+            inserted.setId(3L);
+            when(mapper.selectBindings(1)).thenReturn(List.of(inserted));
+            return 1;
+        }).when(mapper).insertBinding(any());
+
+        var result = service.confirm(7, 1, 9, confirmRequest());
+
+        assertEquals(1, result.revision());
+        assertEquals(12.5, result.durationSeconds());
+        verify(mapper).insertBinding(any());
+        verify(mapper, never()).replaceBinding(anyLong(), anyLong(), anyLong());
+        verify(mapper, never()).setDuration(anyLong(), anyDouble());
+        verifyVideoNeverWritten();
+        var order = inOrder(mapper);
+        order.verify(mapper).lockEpisode(1);
+        order.verify(mapper).lockVideoForUpdate(55);
+    }
+
+    @Test void importedEpisodeConfirmationAllowsManualDurationDifferentFromProbeSeconds() {
+        importedEpisode();
+        candidate.setCandidateSeconds(11.0);
+        when(mapper.selectRevision(1)).thenReturn(0L, 1L);
+        doAnswer(i -> {
+            var inserted = (LocalEpisodeSourceBinding) i.getArgument(0);
+            inserted.setId(3L);
+            when(mapper.selectBindings(1)).thenReturn(List.of(inserted));
+            return 1;
+        }).when(mapper).insertBinding(any());
+
+        service.confirm(7, 1, 9, confirmRequest());
+
+        verify(mapper).confirmCandidate(1, 9, 12.5, 7, "人工核对同一集");
+        verify(mapper, never()).setDuration(anyLong(), anyDouble());
+        verifyVideoNeverWritten();
+    }
+
+    @Test void importedEpisodeConfirmationReplacesExplicitBindingAndKeepsOldEvidence() {
+        importedEpisode();
+        LocalEpisodeSourceBinding current = binding(3L, 8L);
+        LocalEpisodeMediaCandidate old = oldCandidate(8L, "demo", "7");
+        when(mapper.selectBindings(1)).thenReturn(List.of(current));
+        when(mapper.selectCandidate(1, 8)).thenReturn(old);
+        candidate.setTargetBindingId(3L);
+        when(mapper.selectRevision(1)).thenReturn(0L, 1L);
+        when(mapper.replaceBinding(1, 3, 9)).thenAnswer(i -> {
+            current.setCandidateId(9L);
+            return 1;
+        });
+
+        service.confirm(7, 1, 9, confirmRequest());
+
+        verify(mapper).replaceBinding(1, 3, 9);
+        verify(mapper, never()).insertBinding(any());
+        verify(mapper, never()).setDuration(anyLong(), anyDouble());
+        verify(mapper).confirmCandidate(1, 9, 12.5, 7, "人工核对同一集");
+        assertEquals(8L, old.getId().longValue());
+        assertNotNull(old.getConfirmedAt());
+        verifyVideoNeverWritten();
+    }
+
+    @Test void importedEpisodeRejectsFailedProbeCandidateWithoutReplacingCurrentLine() {
+        importedEpisode();
+        LocalEpisodeSourceBinding current = binding(3L, 8L);
+        LocalEpisodeMediaCandidate old = oldCandidate(8L, "demo", "7");
+        when(mapper.selectBindings(1)).thenReturn(List.of(current));
+        when(mapper.selectCandidate(1, 8)).thenReturn(old);
+        candidate.setTargetBindingId(3L);
+        candidate.setProbeStatus("FETCH_FAILED");
+        candidate.setCandidateSeconds(null);
+        candidate.setManifestHash(null);
+
+        code(409, () -> service.confirm(7, 1, 9, confirmRequest()));
+
+        assertEquals(8L, current.getCandidateId().longValue());
+        verify(mapper, never()).confirmCandidate(anyLong(), anyLong(), anyDouble(), anyInt(), anyString());
+        verify(mapper, never()).replaceBinding(anyLong(), anyLong(), anyLong());
+        verifyVideoNeverWritten();
+    }
+
+    @Test void importedEpisodeConfirmationRequiresM6aHlsEvidence() {
+        importedEpisode();
+        for (String status : new String[]{"UNSUPPORTED_MANIFEST", "FETCH_FAILED", "PROBE_REJECTED", null}) {
+            candidate.setProbeStatus(status);
+            code(409, () -> service.confirm(7, 1, 9, confirmRequest()));
+        }
+        candidate.setProbeStatus("SUCCEEDED");
+        candidate.setManifestHash(null);
+        code(409, () -> service.confirm(7, 1, 9, confirmRequest()));
+
+        candidate.setManifestHash("A".repeat(64));
+        code(409, () -> service.confirm(7, 1, 9, confirmRequest()));
+
+        candidate.setManifestHash("a".repeat(64));
+        candidate.setCandidateSeconds(0.0);
+        code(409, () -> service.confirm(7, 1, 9, confirmRequest()));
+
+        candidate.setCandidateSeconds(Double.NaN);
+        code(409, () -> service.confirm(7, 1, 9, confirmRequest()));
+
+        candidate.setCandidateSeconds(null);
+        code(409, () -> service.confirm(7, 1, 9, confirmRequest()));
+
+        verify(mapper, never()).confirmCandidate(anyLong(), anyLong(), anyDouble(), anyInt(), anyString());
+        verify(mapper, never()).insertBinding(any());
+        verifyVideoNeverWritten();
+    }
+
+    @Test void importedEpisodeConfirmationRejectsCorruptAddressHash() {
+        importedEpisode();
+        candidate.setAddressHash("0".repeat(64));
+
+        code(500, () -> service.confirm(7, 1, 9, confirmRequest()));
+
+        verify(mapper, never()).confirmCandidate(anyLong(), anyLong(), anyDouble(), anyInt(), anyString());
+        verifyVideoNeverWritten();
+    }
+
+    @Test void importedEpisodeConfirmationRejectsDisabledSource() {
+        importedEpisode();
+        properties.getSources().get(0).setEnabled(false);
+        service = new LocalEpisodeSourceServiceImpl(mapper, catalog, videoMapper,
+                new ExternalVideoSourceRegistry(properties), clients, probe, quota, properties, tx);
+
+        code(404, () -> service.confirm(7, 1, 9, confirmRequest()));
+
+        verify(mapper, never()).confirmCandidate(anyLong(), anyLong(), anyDouble(), anyInt(), anyString());
+        verifyVideoNeverWritten();
+    }
+
+    @Test void importedEpisodeConfirmationRequiresUnifiedTimelineDuration() {
+        importedEpisode();
+        code(409, () -> service.confirm(7, 1, 9, new LocalEpisodeSourceConfirmDTO(0L, 13.0, "人工核对同一集")));
+        verify(mapper, never()).confirmCandidate(anyLong(), anyLong(), anyDouble(), anyInt(), anyString());
+
+        video.setDuration(20.0);
+        code(409, () -> service.confirm(7, 1, 9, new LocalEpisodeSourceConfirmDTO(0L, 20.0, "人工核对同一集")));
+        verify(mapper, never()).confirmCandidate(anyLong(), anyLong(), anyDouble(), anyInt(), anyString());
+        verifyVideoNeverWritten();
+    }
+
+    @Test void importedEpisodeConfirmationRejectsSoftDeletedOrNonExternalVideo() {
+        importedEpisode();
+        video.setDeletedAt(LocalDateTime.now());
+        code(409, () -> service.confirm(7, 1, 9, confirmRequest()));
+
+        video.setDeletedAt(null);
+        video.setVideoUrl("cos/video.mp4");
+        code(409, () -> service.confirm(7, 1, 9, confirmRequest()));
+
+        video.setVideoUrl(null);
+        video.setVideoKey("cos/video-key");
+        code(409, () -> service.confirm(7, 1, 9, confirmRequest()));
+
+        verify(mapper, never()).confirmCandidate(anyLong(), anyLong(), anyDouble(), anyInt(), anyString());
+        verify(mapper, never()).insertBinding(any());
+        verifyVideoNeverWritten();
+    }
+
+    @Test void importedEpisodeConfirmationRejectsMissingVideoAndStaleRevision() {
+        importedEpisode();
+        when(mapper.lockVideoForUpdate(55)).thenReturn(null);
+        code(500, () -> service.confirm(7, 1, 9, confirmRequest()));
+
+        when(mapper.lockVideoForUpdate(55)).thenReturn(video);
+        when(mapper.selectRevision(1)).thenReturn(1L);
+        code(409, () -> service.confirm(7, 1, 9, confirmRequest()));
+        verify(mapper, never()).confirmCandidate(anyLong(), anyLong(), anyDouble(), anyInt(), anyString());
+        verifyVideoNeverWritten();
+    }
+
+    @Test void importedEpisodeConfirmationSqlFailureRedactedAndRolledBack() {
+        importedEpisode();
+        when(mapper.selectRevision(1)).thenReturn(0L, 1L);
+        doThrow(new DataAccessResourceFailureException(URL)).when(mapper).insertBinding(any());
+
+        var error = assertThrows(BusinessException.class, () -> service.confirm(7, 1, 9, confirmRequest()));
+
+        assertEquals(500, error.getCode());
+        assertNull(error.getCause());
+        assertFalse(error.getMessage().contains(URL));
+        assertEquals(1, tx.rollbacks);
+        verifyVideoNeverWritten();
+    }
+
+    @Test void draftPathsRemainIndependentOfImportedVideo() {
+        service.capture(7, 1, captureRequest());
+        service.confirm(7, 1, 9, confirmRequest());
+
+        verifyNoInteractions(videoMapper);
     }
     @Test void missingEpisodeIs404() {
         when(catalog.selectEpisodeById(1)).thenReturn(null);
@@ -261,8 +617,8 @@ class LocalEpisodeSourceServiceTests {
 
     @Test void noMediaPolicyRefusesBeforeQuotaOrDatabase() {
         properties.getSources().get(0).setMediaAllowedEndpoints(Set.of());
-        service = new LocalEpisodeSourceServiceImpl(mapper, catalog, new ExternalVideoSourceRegistry(properties),
-                clients, probe, quota, properties, tx);
+        service = new LocalEpisodeSourceServiceImpl(mapper, catalog, videoMapper,
+                new ExternalVideoSourceRegistry(properties), clients, probe, quota, properties, tx);
         code(503, () -> service.capture(7, 1, captureRequest())); verifyNoInteractions(mapper, catalog, quota, clients);
     }
     @Test void newBindingsHaveHardCapAndNoNetworkAfterRejection() {

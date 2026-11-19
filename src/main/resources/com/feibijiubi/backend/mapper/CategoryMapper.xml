@@ -7,4 +7,11 @@
     <select id="categoryList" resultType="com.feibijiubi.backend.video.entity.Category">
         select * FROM category
     </select>
+
+    <select id="selectByMcIdAndScId" resultType="com.feibijiubi.backend.video.entity.Category">
+        SELECT mc_id, sc_id, mc_name, sc_name, description, rcm_tags
+        FROM category
+        WHERE mc_id = #{mcId}
+          AND sc_id = #{scId}
+    </select>
 </mapper>

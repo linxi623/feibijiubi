@@ -31,6 +31,24 @@ class LocalEpisodeSourceMapperTests {
         assertTrue(sql("replaceBinding").contains("WHERE EPISODE_ID = ? AND ID = ?"));
         assertTrue(sql("setDuration").contains("WHERE ID = ? AND VID IS NULL"));
     }
+    @Test void importedVideoLockReadsOnlyTheExternalTimelineColumns() {
+        String lock = sql("lockVideoForUpdate");
+        assertTrue(lock.endsWith("FROM VIDEO WHERE VID = ? FOR UPDATE"));
+        for (String column : List.of("VID, DURATION", "VIDEO_URL", "VIDEO_KEY", "DELETED_AT")) {
+            assertTrue(lock.contains(column), "缺少列 " + column + "：" + lock);
+        }
+        assertFalse(lock.contains("ADDRESS"));
+        assertEquals(3, config.getMappedStatement(
+                "com.feibijiubi.backend.videosource.mapper.LocalEpisodeSourceMapper.lockVideoForUpdate")
+                .getTimeout());
+    }
+    @Test void sourceLineChangesNeverTouchImportRevisionOrVideoStatus() {
+        for (var method : LocalEpisodeSourceMapper.class.getDeclaredMethods()) {
+            String sql = sql(method.getName());
+            assertFalse(sql.contains("IMPORT_REVISION"), method.getName());
+            assertFalse(sql.contains("VIDEO_STATUS"), method.getName());
+        }
+    }
     @Test void readsBoundedAndCandidateNeverUpdatedExceptConfirmation() {
         assertTrue(sql("selectCandidates").contains("WHERE EPISODE_ID = ? AND ID > ? ORDER BY ID LIMIT ?"));
         assertTrue(sql("selectBindings").endsWith("ORDER BY ID LIMIT 33"));

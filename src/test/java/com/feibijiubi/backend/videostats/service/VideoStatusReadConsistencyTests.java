@@ -17,6 +17,7 @@ import com.feibijiubi.backend.videostats.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.videostats.mapper.VideoStatusOutboxMapper;
 import com.feibijiubi.backend.user.service.impl.UserServiceImpl;
 import com.feibijiubi.backend.video.service.impl.VideoReviewImpl;
+import com.feibijiubi.backend.videosource.service.ExternalPlaybackLineResolver;
 import com.feibijiubi.backend.video.service.impl.VideoServiceImpl;
 import com.feibijiubi.backend.videostats.service.impl.VideoStatusServiceImpl;
 import com.feibijiubi.backend.infrastructure.storage.service.FileStorageService;
@@ -177,7 +178,8 @@ class VideoStatusReadConsistencyTests {
     // ------------------------------------------------------------------ 管理员详情
 
     private final VideoReviewImpl videoReviewService = new VideoReviewImpl(
-            videoMapper, videoStatusMapper, userMapper, userFollowMapper);
+            videoMapper, videoStatusMapper, userMapper, userFollowMapper,
+            mock(ExternalPlaybackLineResolver.class));
 
     @Test
     void adminDetailPassesAllEightDatabaseCountersExactlyIncludingAbove2Pow53() {

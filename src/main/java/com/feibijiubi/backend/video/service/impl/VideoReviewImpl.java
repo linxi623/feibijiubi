@@ -14,6 +14,7 @@ import com.feibijiubi.backend.videostats.mapper.VideoStatusMapper;
 import com.feibijiubi.backend.video.service.VideoReviewService;
 import com.feibijiubi.backend.video.vo.AdminVideoDetailVO;
 import com.feibijiubi.backend.video.vo.AdminVideoListItemVO;
+import com.feibijiubi.backend.videosource.service.ExternalPlaybackLineResolver;
 import com.github.pagehelper.PageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -27,13 +28,16 @@ public class VideoReviewImpl implements VideoReviewService {
     private final VideoStatusMapper videoStatusMapper;
     private final UserMapper userMapper;
     private final UserFollowMapper userFollowMapper;
+    private final ExternalPlaybackLineResolver externalPlaybackLines;
 
     public VideoReviewImpl(VideoMapper videoMapper, VideoStatusMapper videoStatusMapper,
-                           UserMapper userMapper, UserFollowMapper userFollowMapper) {
+                           UserMapper userMapper, UserFollowMapper userFollowMapper,
+                           ExternalPlaybackLineResolver externalPlaybackLines) {
         this.videoMapper = videoMapper;
         this.videoStatusMapper = videoStatusMapper;
         this.userMapper = userMapper;
         this.userFollowMapper = userFollowMapper;
+        this.externalPlaybackLines = externalPlaybackLines;
     }
 
     @Override
@@ -74,6 +78,13 @@ public class VideoReviewImpl implements VideoReviewService {
                             + targetStatus.getDesc()
                             + "”"
             );
+        }
+        // M5 外部稿件没有本站播放对象（video_url / video_key 均为 NULL）。在唯一的状态写入口
+        // 统一阻止它进入 APPROVED；旧 COS 行两列非空，行为不变。M6-A 只有显式开启
+        // playback-enabled 且同一资格判定确认至少一条可用 HLS 线路时才放行——不能只看开关。
+        if (targetStatus == VideoReviewStatus.APPROVED && !hasPlaybackMedia(video)
+                && !externalPlaybackLines.hasAvailableHlsLine(video)) {
+            throw new BusinessException(409, "视频尚无可用播放媒体，不能审核通过");
         }
 
         int rows = videoMapper.updateReviewStatus(vid, currentStatus.getCode(), targetStatus.getCode());
@@ -149,5 +160,10 @@ public class VideoReviewImpl implements VideoReviewService {
                     "审核结果只能是 APPROVED 或 REJECTED"
             );
         }
+    }
+
+    /** 旧 COS 行两列均非空；外部稿件两列均为 NULL，须由 M6-A 资格判定另行放行。 */
+    private static boolean hasPlaybackMedia(Video video) {
+        return StringUtils.hasText(video.getVideoUrl()) && StringUtils.hasText(video.getVideoKey());
     }
 }

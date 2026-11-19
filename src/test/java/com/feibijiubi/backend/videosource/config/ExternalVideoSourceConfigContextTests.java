@@ -78,12 +78,14 @@ class ExternalVideoSourceConfigContextTests {
 
             ExternalVideoSourceProperties properties = context.getBean(ExternalVideoSourceProperties.class);
             assertFalse(properties.isPreviewEnabled(), "preview-enabled 默认关闭");
+            assertFalse(properties.isPlaybackEnabled(), "playback-enabled 默认关闭");
             assertTrue(properties.getSources().isEmpty(), "默认零来源 = 零预览能力");
             assertEquals(2, properties.getMaxConcurrentRequests());
             assertEquals(30, properties.getPerAdminRequestsPerMinute());
 
             ExternalVideoSourceRegistry registry = context.getBean(ExternalVideoSourceRegistry.class);
             assertFalse(registry.previewEnabled());
+            assertFalse(registry.playbackEnabled());
             assertTrue(registry.listAvailableSources().isEmpty());
             assertEquals(1, context.getBeanNamesForType(ExternalVideoSourceClientProvider.class).length);
 

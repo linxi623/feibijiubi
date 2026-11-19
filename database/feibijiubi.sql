@@ -646,3 +646,15 @@ CREATE TABLE IF NOT EXISTS local_episode_source_binding (
     CONSTRAINT fk_local_binding_candidate FOREIGN KEY (episode_id, candidate_id)
         REFERENCES local_episode_media_candidate (episode_id, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Fresh database initialization applies the M5 schema changes below.
+-- Do not also run m5-local-episode-import.sql on a database initialized with this file.
+ALTER TABLE local_video_episode
+    ADD COLUMN import_revision BIGINT NULL
+        COMMENT 'M5 first-import source revision; stable retry evidence, not rewritten by M6';
+
+ALTER TABLE video
+    MODIFY COLUMN video_url VARCHAR(500) NULL
+        COMMENT '视频URL；外部来源为 NULL，历史 COS 行保持原值',
+    MODIFY COLUMN video_key VARCHAR(500) NULL
+        COMMENT 'COS 对象 key；外部来源为 NULL（不写假 key），历史行保持原值';
