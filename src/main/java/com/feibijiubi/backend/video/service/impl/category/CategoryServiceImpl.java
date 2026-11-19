@@ -39,11 +39,15 @@ public class CategoryServiceImpl implements CategoryService {
         List<Category> categories = categoryMapper.categoryList();
         List<CategoryParentVO> categoryTree = buildCategoryTree(categories);
 
-        redisUtils.setJson(
-                key,
-                categoryTree,
-                Duration.ofSeconds(RedisConstants.CATEGORY_EXPIRE_TIME)
-        );
+        // 空结果不能写缓存：查库瞬时失败或空的库会把这个空数组钉到 TTL 结束，
+        // 页面上就是“分类全部消失”，并要求人工清 Redis 才能恢复。
+        if (!categoryTree.isEmpty()) {
+            redisUtils.setJson(
+                    key,
+                    categoryTree,
+                    Duration.ofSeconds(RedisConstants.CATEGORY_EXPIRE_TIME)
+            );
+        }
 
         return categoryTree;
     }
